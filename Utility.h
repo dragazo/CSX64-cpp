@@ -1,0 +1,406 @@
+#ifndef CSX64_UTILITY_H
+#define CSX64_UTILITY_H
+
+#include <utility>
+#include <cmath>
+#include <limits>
+#include <cstdlib>
+#include <string>
+#include <sstream>
+#include <iomanip>
+#include <vector>
+#include <exception>
+#include <cctype>
+#include <iostream>
+#include <random>
+#include <unordered_map>
+#include <unordered_set>
+
+#include "CoreTypes.h"
+
+namespace CSX64
+{
+	// -- serialization -- //
+
+	// writes the value's binary representation verbatim
+	template<typename T>
+	std::ostream &BinWrite(std::ostream &ostr, const T &val)
+	{
+		ostr.write((char*)&val, sizeof(T));
+		return ostr;
+	}
+	// reads the value's binary representation verbatim
+	template<typename T>
+	std::istream &BinRead(std::istream &istr, T &val)
+	{
+		istr.read((char*)&val, sizeof(T));
+		if (istr.gcount() != sizeof(T)) istr.setstate(std::ios::failbit);
+		return istr;
+	}
+
+	// writes a binary representation of the string to the stream
+	std::ostream &BinWrite(std::ostream &ostr, const std::string &str);
+	// reads a binary representation of the string from the stream
+	std::istream &BinRead(std::istream &istr, std::string &str);
+
+	// -- misc utilities -- //
+
+	// computes the full (unsigned) product of a * b and stores the result in high:low
+	void UnsignedMul(u64 a, u64 b, u64 &res_high, u64 &res_low);
+	// computes the full (signed) product of a * b and stores the result in high:low
+	void SignedMul(u64 a, u64 b, u64 &res_high, u64 &res_low);
+
+	// computes the (unsigned) division of num by denom and returns the quotient and remainder
+	void UnsignedDiv(u64 num_high, u64 num_low, u64 denom, u64 &quot_high, u64 &quot_low, u64 &rem);
+	// computes the (unsigned) division of num by denom and returns the quotient and remainder
+	void SignedDiv(u64 num_high, u64 num_low, u64 denom, u64 &quot_high, u64 &quot_low, u64 &rem);
+
+	// returns true if low is a lossless truncation of high:low
+	bool TruncGood_128_64(u64 high, u64 low);
+
+	// returns true if the container has at least one entry equal to val
+	template<typename T>
+	bool Contains(const std::vector<T> &container, const T &val)
+	{
+		for (const auto &entry : container)
+			if (entry == val) return true;
+
+		return false;
+	}
+	template<typename T>
+	bool Contains(const std::list<T> &container, const T &val)
+	{
+		for (const auto &entry : container)
+			if (entry == val) return true;
+
+		return false;
+	}
+
+	// returns a pointer to the node with specified key if it exists, otherwise null
+	template<typename T, typename U>
+	bool TryGetValue(const std::unordered_map<T, U> &map, const T &key, const U *&ptr)
+	{
+		auto iter = map.find(key);
+		return ptr = iter == map.end() ? nullptr : &iter->second;
+	}
+	template<typename T, typename U>
+	bool TryGetValue(std::unordered_map<T, U> &map, const T &key, U *&ptr)
+	{
+		auto iter = map.find(key);
+		return ptr = iter == map.end() ? nullptr : &iter->second;
+	}
+
+	// returns true if the map contains a node with the specified key
+	template<typename T, typename U>
+	bool ContainsKey(const std::unordered_map<T, U> &map, const T &key) { return map.find(key) != map.end(); }
+	// returns true if the map contains a node with the specified value
+	template<typename T, typename U>
+	bool ContainsValue(const std::unordered_map<T, U> &map, const U &value)
+	{
+		for (const auto &entry : map)
+			if (entry.second == value) return true;
+		return false;
+	}
+
+	// returns a pointer to the node with specified key if it exists, otherwise null
+	template<typename T>
+	bool TryGetValue(const std::unordered_set<T> &set, const T &value, T *&ptr)
+	{
+		auto iter = set.find(key);
+		return ptr = iter == map.set() ? nullptr : &*iter;
+	}
+	// returns true if the set contains an entry with the specified value
+	template<typename T, typename U>
+	bool Contains(const std::unordered_set<T> &set, const U &value) { return set.find(value) != set.end(); }
+
+	// gets a new string where all instances of the specified character have been removed
+	std::string remove_ch(const std::string &str, char ch);
+
+	std::string ToString(long double val);
+
+	u64 Rand64(std::default_random_engine &engine);
+
+	/// <summary>
+	/// Returns true if this value is a power of two. (zero returns false)
+	/// </summary>
+	bool IsPowerOf2(u64 val);
+
+	/// <summary>
+	/// Extracts 2 distinct powers of 2 from the specified value. Returns true if the value is made up of exactly two non-zero powers of 2.
+	/// </summary>
+	/// <param name="val">the value to process</param>
+	/// <param name="a">the first (larger) power of 2</param>
+	/// <param name="b">the second (smaller) power of 2</param>
+	bool Extract2PowersOf2(u64 val, u64 &a, u64 &b);
+
+	void ExtractDouble(double val, double &exp, double &sig);
+	double AssembleDouble(double exp, double sig);
+
+	/// <summary>
+	/// Returns true if the floating-point value is denormalized (including +-0)
+	/// </summary>
+	/// <param name="val">the value to test</param>
+	bool IsDenorm(double val);
+
+	// -- memory utilities -- //
+
+	// writes a value to the array. T should be a POD type
+	template<typename T>
+	bool Write(std::vector<u8> &arr, u64 pos, const T &val)
+	{
+		// make sure we're not exceeding memory bounds
+		if (pos >= arr.size() || pos + sizeof(T) > arr.size()) return false;
+
+		std::memcpy(&arr[pos], &val, sizeof(T));
+		return true;
+	}
+	// reads a value from the array. T should be a POD type
+	template<typename T>
+	bool Read(std::vector<u8> &arr, u64 pos, T &val)
+	{
+		// make sure we're not exceeding memory bounds
+		if (pos >= arr.size() || pos + sizeof(T) > arr.size()) return false;
+
+		std::memcpy(&val, &arr[pos], sizeof(T));
+		return true;
+	}
+
+	/// <summary>
+	/// Writes a value to the array
+	/// </summary>
+	/// <param name="arr">the data to write to</param>
+	/// <param name="pos">the index to begin at</param>
+	/// <param name="size">the size of the value in bytes</param>
+	/// <param name="val">the value to write</param>
+	/// <exception cref="ArgumentException"></exception>
+	bool Write(std::vector<u8> &arr, u64 pos, u64 size, u64 val);
+	/// <summary>
+	/// Reads a value from the array
+	/// </summary>
+	/// <param name="arr">the data to write to</param>
+	/// <param name="pos">the index to begin at</param>
+	/// <param name="size">the size of the value in bytes</param>
+	/// <param name="res">the read value</param>
+	bool Read(const std::vector<u8> &arr, u64 pos, u64 size, u64 &res);
+
+	/// <summary>
+	/// Appends a value to an array of bytes in a list
+	/// </summary>
+	/// <param name="data">the byte array</param>
+	/// <param name="size">the size in bytes of the value to write</param>
+	/// <param name="val">the value to write</param>
+	void Append(std::vector<u8> &arr, u64 size, u64 val);
+
+	/// <summary>
+	/// Gets the amount to offset address by to make it a multiple of size. if address is already a multiple of size, returns 0.
+	/// </summary>
+	/// <param name="address">the address to examine</param>
+	/// <param name="size">the size to align to</param>
+	u64 AlignOffset(u64 address, u64 size);
+	/// <summary>
+	/// Where address is the starting point, returns the next address aligned to the specified size
+	/// </summary>
+	/// <param name="address">the starting address</param>
+	/// <param name="size">the size to align to</param>
+	/// <returns></returns>
+	u64 Align(u64 address, u64 size);
+	/// <summary>
+	/// Adds the specified amount of zeroed padding (in bytes) to the array
+	/// </summary>
+	/// <param name="arr">the data array to pad</param>
+	/// <param name="count">the amount of padding in bytes</param>
+	void Pad(std::vector<u8> &arr, u64 count);
+	/// <summary>
+	/// Pads the array with 0's until the length is a multiple of the specified size
+	/// </summary>
+	/// <param name="arr">the array to align</param>
+	/// <param name="size">the size to align to</param>
+	void Align(std::vector<u8> &arr, u64 size);
+
+	/// <summary>
+	/// Writes an ASCII C-style string to memory. Returns true on success
+	/// </summary>
+	/// <param name="arr">the data array to write to</param>
+	/// <param name="pos">the position in the array to begin writing</param>
+	/// <param name="str">the string to write</param>
+	bool WriteCString(std::vector<u8> &arr, u64 pos, const std::string &str);
+	/// <summary>
+	/// Reads an ASCII C-style string from memory. Returns true on success
+	/// </summary>
+	/// <param name="arr">the data array to read from</param>
+	/// <param name="pos">the position in the array to begin reading</param>
+	/// <param name="str">the string read</param>
+	bool ReadCString(const std::vector<u8> &arr, u64 pos, std::string &str);
+
+	// -- string stuff -- //
+
+	template<typename T>
+	std::string tostr(const T &val)
+	{
+		std::ostringstream ostr;
+		ostr << val;
+		return ostr.str();
+	}
+
+	template<typename T>
+	std::string tohex(T val)
+	{
+		std::ostringstream ostr;
+		ostr << std::hex << val;
+		return ostr.str();
+	}
+
+	std::string TrimStart(const std::string &str);
+	std::string TrimEnd(const std::string &str);
+	std::string TrimEnd(std::string &&str);
+	std::string Trim(const std::string &str);
+
+	bool TryExtractStringChars(const std::string &token, std::string &chars, std::string &err);
+
+	template<typename T>
+	std::string ToUpper(T &&str)
+	{
+		std::string res(std::forward<T>(str));
+		for (std::size_t i = 0; i < res.size(); ++i)
+			res[i] = std::toupper(res[i]);
+		return res;
+	}
+
+	/// <summary>
+	/// Gets the numeric value of a hexadecimal digit. returns true if the character was in the hex range.
+	/// </summary>
+	/// <param name="ch">the character to test</param>
+	/// <param name="val">the character's value [0-15]</param>
+	bool GetHexValue(char ch, int &val);
+	/// <summary>
+	/// Attempts to parse the string into an unsigned integer. Returns true on success.
+	/// </summary>
+	/// <param name="str">the string to parse</param>
+	/// <param name="val">the resulting value</param>
+	/// <param name="radix">the radix to use (must be 2-36)</param>
+	bool TryParseUInt64(const std::string &str, u64 &val, unsigned int radix = 10);
+	bool TryParseDouble(const std::string &str, double &val);
+
+	/// <summary>
+	/// Returns true if the string contains at least one occurrence of the specified character
+	/// </summary>
+	/// <param name="str">the string to test</param>
+	/// <param name="ch">the character to look for</param>
+	bool Contains(const std::string &str, char ch);
+	/// <summary>
+	/// Removes ALL white space from a string
+	/// </summary>
+	std::string RemoveWhiteSpace(const std::string &str);
+
+	/// <summary>
+	/// Returns true if the string starts with the specified character
+	/// </summary>
+	/// <param name="str">the string to test</param>
+	/// <param name="ch">the character it must start with</param>
+	bool StartsWith(const std::string &str, char ch);
+	bool StartsWith(const std::string &str, const std::string &val);
+	/// <summary>
+	/// Returns true if the the string is equal to the specified value or begins with it and is followed by white space.
+	/// </summary>
+	/// <param name="str">the string to search in</param>
+	/// <param name="val">the header value to test for</param>
+	bool StartsWithToken(const std::string &str, const std::string &val);
+
+	// return true if str ends with val
+	bool EndsWith(const std::string &str, const std::string &val);
+
+	/// <summary>
+	/// returns a binary dump representation of the data
+	/// </summary>
+	/// <param name="data">the data to dump</param>
+	/// <param name="start">the index at which to begin dumping</param>
+	/// <param name="count">the number of bytes to write</param>
+	std::ostream &Dump(std::ostream &dump, void *data, u64 start, u64 count);
+
+	// -- CSX64 encoding utilities -- //
+
+	/// <summary>
+	/// Gets the bitmask for the sign bit of an integer with the specified sizecode
+	/// </summary>
+	/// <param name="sizecode">the sizecode specifying the width of integer to examine</param>
+	u64 SignMask(u64 sizecode);
+	/// <summary>
+	/// Gets the bitmask that includes the entire valid domain of an integer with the specified width
+	/// </summary>
+	/// <param name="sizecode">the sizecode specifying the width of integer to examine</param>
+	u64 TruncMask(u64 sizecode);
+
+	/// <summary>
+	/// Returns if the value with specified size code is positive
+	/// </summary>
+	/// <param name="val">the value to process</param>
+	/// <param name="sizecode">the current size code of the value</param>
+	bool Positive(u64 val, u64 sizecode);
+	/// <summary>
+	/// Returns if the value with specified size code is negative
+	/// </summary>
+	/// <param name="val">the value to process</param>
+	/// <param name="sizecode">the current size code of the value</param>
+	bool Negative(u64 val, u64 sizecode);
+
+	/// <summary>
+	/// Sign extends a value to 64-bits
+	/// </summary>
+	/// <param name="val">the value to sign extend</param>
+	/// <param name="sizecode">the current size code</param>
+	u64 SignExtend(u64 val, u64 sizecode);
+	/// <summary>
+	/// Truncates the value to the specified size code (can also be used to zero extend a value)
+	/// </summary>
+	/// <param name="val">the value to truncate</param>
+	/// <param name="sizecode">the size code to truncate to</param>
+	u64 Truncate(u64 val, u64 sizecode);
+
+	/// <summary>
+	/// Parses a 2-bit size code into an actual size (in bytes) 0:1  1:2  2:4  3:8
+	/// </summary>
+	/// <param name="sizecode">the code to parse</param>
+	u64 Size(u64 sizecode);
+	/// <summary>
+	/// Parses a 2-bit size code into an actual size (in bits) 0:8  1:16  2:32  3:64
+	/// </summary>
+	/// <param name="sizecode">the code to parse</param>
+	u64 SizeBits(u64 sizecode);
+
+	/// <summary>
+	/// Gets the sizecode of the specified size. Throws <see cref="ArgumentException"/> if the size is not a power of 2
+	/// </summary>
+	/// <param name="size">the size</param>
+	/// <exception cref="ArgumentException"></exception>
+	u64 Sizecode(u64 size);
+
+	/// <summary>
+	/// returns an elementary word size in bytes sufficient to hold the specified number of bits
+	/// </summary>
+	/// <param name="bits">the number of bits in the representation</param>
+	u64 BitsToBytes(u64 bits);
+
+	/// <summary>
+	/// Interprets a double as its raw bits
+	/// </summary>
+	/// <param name="val">value to interpret</param>
+	u64 DoubleAsUInt64(double val);
+	/// <summary>
+	/// Interprets raw bits as a double
+	/// </summary>
+	/// <param name="val">value to interpret</param>
+	double AsDouble(u64 val);
+
+	/// <summary>
+	/// Interprets a float as its raw bits (placed in low 32 bits)
+	/// </summary>
+	/// <param name="val">the float to interpret</param>
+	u64 FloatAsUInt64(float val);
+	/// <summary>
+	/// Interprets raw bits as a float (low 32 bits)
+	/// </summary>
+	/// <param name="val">the bits to interpret</param>
+	float AsFloat(std::uint32_t val);
+}
+
+#endif
