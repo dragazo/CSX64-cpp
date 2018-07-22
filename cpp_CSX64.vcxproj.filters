@@ -77,13 +77,13 @@
     <ClInclude Include="AsmArgs.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="CoreTypes.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="ExeTypes.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="AsmTables.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="CoreTypes.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

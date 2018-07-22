@@ -149,24 +149,24 @@ bool AssembleArgs::TryAppendByte(u8 val)
 
 bool AssembleArgs::TryAppendExpr(u64 size, Expr &&expr, std::vector<HoleData> &holes, std::vector<u8> &segment)
 {
-	// write a dummy (all 1's for easy manual identification)
-	if (!TryAppendVal(size, 0xffffffffffffffff)) return false;
-
 	std::string err; // evaluation error parsing location
 
-					 // create the hole data
+	// create the hole data
 	HoleData data;
 	data.Address = segment.size();
 	data.Size = size;
 	data.Line = line;
 	data.Expr = std::move(expr);
 
+	// write a dummy (all 1's for easy manual identification)
+	Append(segment, size, 0xffffffffffffffff);
+
 	// try to patch it
 	switch (TryPatchHole(segment, file.Symbols, data, err))
 	{
 	case PatchError::None: break;
 	case PatchError::Unevaluated: holes.emplace_back(std::move(data)); break;
-	case PatchError::Error: res = {AssembleError::ArgError, "line " + tostr(line) + ": " + err}; return false;
+	case PatchError::Error: res = {AssembleError::ArgError, std::move(err)}; return false;
 
 	default: throw std::runtime_error("Unknown patch error encountered");
 	}

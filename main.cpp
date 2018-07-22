@@ -99,6 +99,52 @@ report bugs to https://github.com/dragazo/CSX64/issues
 		return ".";
 	}
 
+	// adds standard symbols to the assembler predefine table
+	void AddPredefines()
+	{
+		// -- syscall codes -- //
+
+		DefineSymbol("sys_exit", (u64)SyscallCode::Exit);
+
+		DefineSymbol("sys_read", (u64)SyscallCode::Read);
+		DefineSymbol("sys_write", (u64)SyscallCode::Write);
+		DefineSymbol("sys_open", (u64)SyscallCode::Open);
+		DefineSymbol("sys_close", (u64)SyscallCode::Close);
+
+		DefineSymbol("sys_flush", (u64)SyscallCode::Flush);
+		DefineSymbol("sys_seek", (u64)SyscallCode::Seek);
+		DefineSymbol("sys_tell", (u64)SyscallCode::Tell);
+
+		DefineSymbol("sys_move", (u64)SyscallCode::Move);
+		DefineSymbol("sys_remove", (u64)SyscallCode::Remove);
+		DefineSymbol("sys_mkdir", (u64)SyscallCode::Mkdir);
+		DefineSymbol("sys_rmdir", (u64)SyscallCode::Rmdir);
+
+		DefineSymbol("sys_brk", (u64)SyscallCode::Brk);
+
+		// -- error codes -- //
+
+		DefineSymbol("err_none", (u64)ErrorCode::None);
+		DefineSymbol("err_outofbounds", (u64)ErrorCode::OutOfBounds);
+		DefineSymbol("err_unhandledsyscall", (u64)ErrorCode::UnhandledSyscall);
+		DefineSymbol("err_undefinedbehavior", (u64)ErrorCode::UndefinedBehavior);
+		DefineSymbol("err_arithmeticerror", (u64)ErrorCode::ArithmeticError);
+		DefineSymbol("err_abort", (u64)ErrorCode::Abort);
+		DefineSymbol("err_iofailure", (u64)ErrorCode::IOFailure);
+		DefineSymbol("err_fsdisabled", (u64)ErrorCode::FSDisabled);
+		DefineSymbol("err_accessviolation", (u64)ErrorCode::AccessViolation);
+		DefineSymbol("err_insufficientfds", (u64)ErrorCode::InsufficientFDs);
+		DefineSymbol("err_fdnotinuse", (u64)ErrorCode::FDNotInUse);
+		DefineSymbol("err_notimplemented", (u64)ErrorCode::NotImplemented);
+		DefineSymbol("err_stackoverflow", (u64)ErrorCode::StackOverflow);
+		DefineSymbol("err_fpustackoverflow", (u64)ErrorCode::FPUStackOverflow);
+		DefineSymbol("err_fpustackunderflow", (u64)ErrorCode::FPUStackUnderflow);
+		DefineSymbol("err_fpuerror", (u64)ErrorCode::FPUError);
+		DefineSymbol("err_fpuaccessviolation", (u64)ErrorCode::FPUAccessViolation);
+		DefineSymbol("err_alignmentviolation", (u64)ErrorCode::AlignmentViolation);
+		DefineSymbol("err_unknownop", (u64)ErrorCode::UnknownOp);
+	}
+
 	// Saves binary data to a file. Returns true if there were no errors
 	// path - the file to save to
 	// exe  - the binary data to save
@@ -243,7 +289,7 @@ report bugs to https://github.com/dragazo/CSX64/issues
 		// assemble the program
 		ObjectFile obj;
 		AssembleResult res = Assemble(code, obj);
-
+		
 		// if there was no error
 		if (res.Error == AssembleError::None)
 		{
@@ -371,8 +417,6 @@ int main(int argc, const char *argv[])
 {
 	using namespace CSX64;
 
-	//if (!BitConverter.IsLittleEndian) { Print("ERROR: This platform is not little-endian"); return -1; }
-
 	ProgramAction action = ProgramAction::ExecuteConsole; // requested action
 	std::vector<std::string> pathspec;                    // input paths
 	const char *entry_point = nullptr;                    // main entry point for linker
@@ -401,10 +445,9 @@ int main(int argc, const char *argv[])
 			// then the short names
 			else if (argv[i][0] == '-')
 			{
-				const char *arg = argv[i]; // record parsing arg (i may change upon -o option)
-				for (int j = 1; j < argc; ++j)
+				for (const char *arg = argv[i] + 1; *arg; ++arg)
 				{
-					switch (arg[j])
+					switch (*arg)
 					{
 					case '-': break; // acts as a separator for short options and enables -- as a no-op arg spacer
 					case 'h': std::cout << HelpMessage; return 0;
@@ -412,18 +455,16 @@ int main(int argc, const char *argv[])
 					case 'l': if (action != ProgramAction::ExecuteConsole) { std::cout << "usage error - see -h for help\n"; return 0; } action = ProgramAction::Link; break;
 					case 'o': if (output != nullptr || i + 1 >= argc) { std::cout << "usage error - see -h for help\n"; return 0; } output = argv[++i]; break;
 
-					default: std::cout << "unknown option '" << arg[j] << "' see -h for help\n"; return 0;
+					default: std::cout << "unknown option '" << *arg << "' see -h for help\n"; return 0;
 					}
 				}
 			}
 			// otherwise it's part of pathspec
-			else pathspec.push_back(argv[i]);
-
-			break;
+			else pathspec.emplace_back(argv[i]);
 		}
 		// if we're not accepting options, it's part of pathspec
-		else pathspec.push_back(argv[i]);
-	}
+		else pathspec.emplace_back(argv[i]);
+	}	
 
 	// perform the action
 	switch (action)
@@ -434,6 +475,10 @@ int main(int argc, const char *argv[])
 
 	case ProgramAction::Assemble:
 		if (pathspec.empty()) { std::cout << "Assembler expected at least 1 file to assemble\n"; return 0; }
+		
+		// add the assembler predefines now
+		AddPredefines();
+		
 		if (output == nullptr) // if no output is provided, batch process each pathspec
 		{
 			for (const std::string &path : pathspec)

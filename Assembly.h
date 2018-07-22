@@ -61,7 +61,7 @@ namespace CSX64
 	/// Gets the smallest size code that will support the unsigned value
 	/// </summary>
 	/// <param name="val">the value to test</param>
-	static u64 SmallestUnsignedSizeCode(u64 val);
+	u64 SmallestUnsignedSizeCode(u64 val);
 
 	/// <summary>
 	/// Renames "from" to "to" in the object file. The symbol to rename may be internal or external.
@@ -72,7 +72,7 @@ namespace CSX64
 	/// <param name="from">the original name</param>
 	/// <param name="to">the resulting name</param>
 	/// <exception cref="ArgumentException"></exception>
-	static void RenameSymbol(ObjectFile &file, const std::string &from, const std::string &to);
+	void RenameSymbol(ObjectFile &file, std::string from, std::string to);
 
 	// helper for imm parser
 	bool TryGetOp(const std::string &token, int pos, Expr::OPs &op, int &oplen);

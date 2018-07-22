@@ -41,7 +41,7 @@ namespace CSX64
 		BinWrite<u32>(writer, obj.GlobalSymbols.size());
 		for (const std::string &symbol : obj.GlobalSymbols)
 			BinWrite(writer, symbol);
-
+		
 		// -- write externals -- //
 
 		BinWrite<u32>(writer, obj.ExternalSymbols.size());
@@ -56,7 +56,7 @@ namespace CSX64
 			BinWrite(writer, entry.first);
 			Expr::WriteTo(writer, entry.second);
 		}
-
+		
 		// -- write alignments -- //
 
 		BinWrite(writer, obj.TextAlign);
@@ -74,20 +74,20 @@ namespace CSX64
 
 		BinWrite<u32>(writer, obj.DataHoles.size());
 		for (const HoleData &hole : obj.DataHoles) HoleData::WriteTo(writer, hole);
-
+		
 		// -- write segments -- //
 
 		BinWrite<u64>(writer, obj.Text.size());
-		writer.write((char*)&obj.Text[0], obj.Text.size());
+		writer.write((char*)obj.Text.data(), obj.Text.size());
 
 		BinWrite<u64>(writer, obj.Rodata.size());
-		writer.write((char*)&obj.Rodata[0], obj.Rodata.size());
+		writer.write((char*)obj.Rodata.data(), obj.Rodata.size());
 
 		BinWrite<u64>(writer, obj.Data.size());
-		writer.write((char*)&obj.Data[0], obj.Data.size());
-
+		writer.write((char*)obj.Data.data(), obj.Data.size());
+		
 		BinWrite<u64>(writer, obj.BssLen);
-
+		
 		// -- done -- //
 
 		return writer;
@@ -181,19 +181,19 @@ namespace CSX64
 		if (!BinRead(reader, temp64)) goto err;
 		obj.Text.clear();
 		obj.Text.resize(temp64);
-		reader.read((char*)&obj.Text[0], temp64);
+		reader.read((char*)obj.Text.data(), temp64);
 		if (reader.gcount() != temp64) goto err;
 
 		if (!BinRead(reader, temp64)) goto err;
 		obj.Rodata.clear();
 		obj.Rodata.resize(temp64);
-		reader.read((char*)&obj.Rodata[0], temp64);
+		reader.read((char*)obj.Rodata.data(), temp64);
 		if (reader.gcount() != temp64) goto err;
 
 		if (!BinRead(reader, temp64)) goto err;
 		obj.Data.clear();
 		obj.Data.resize(temp64);
-		reader.read((char*)&obj.Data[0], temp64);
+		reader.read((char*)obj.Data.data(), temp64);
 		if (reader.gcount() != temp64) goto err;
 
 		if (!BinRead(reader, temp64)) goto err;

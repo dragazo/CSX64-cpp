@@ -116,26 +116,27 @@ namespace CSX64
 		else return 3;
 	}
 
-	static void RenameSymbol(ObjectFile &file, const std::string &from, const std::string &to)
+	void RenameSymbol(ObjectFile &file, std::string from, std::string to)
 	{
 		// make sure "to" doesn't already exist
 		if (ContainsKey(file.Symbols, to) || Contains(file.ExternalSymbols, to))
 			throw std::invalid_argument("Attempt to rename symbol \"" + from + "\" to \"" + to + "\" (already exists)");
 		
 		// if it's a symbol defined in this file
-		const Expr *expr;
+		Expr *expr;
 		if (TryGetValue(file.Symbols, from, expr))
 		{
 			// make sure it hasn't already been evaluated (because it may have already been linked to other expressions)
 			if (expr->IsEvaluated()) throw std::runtime_error("Attempt to rename symbol \"" + from + "\" to \"" + to + "\" (already evaluated)");
-
+			
 			// rename the symbol
-			file.Symbols.emplace(to, std::move(file.Symbols.at(from)));
+			file.Symbols.emplace(to, std::move(*expr));
 			file.Symbols.erase(from);
 
 			// find and replace in global table (may not be global - that's ok)
 			if (Contains(file.GlobalSymbols, from))
 			{
+				
 				file.GlobalSymbols.emplace(to);
 				file.GlobalSymbols.erase(from);
 			}
@@ -151,7 +152,7 @@ namespace CSX64
 		else throw std::runtime_error("Attempt to rename symbol \"" + from + "\" to \"" + to + "\" (does not exist)");
 
 		// -- now the easy part -- //
-
+		
 		// find and replace in symbol table expressions
 		for(auto &entry : file.Symbols) entry.second.Resolve(from, to);
 
@@ -325,6 +326,10 @@ namespace CSX64
 	{
 		AssembleArgs args;
 
+		// add all the predefined symbols
+		args.file.Symbols.insert(PredefinedSymbols.begin(), PredefinedSymbols.end());
+		
+		// add a few more that we create ?? maybe --
 		/*
 		// create the table of predefined symbols
 		args.file.Symbols = new Dictionary<string, Expr>(PredefinedSymbols)
@@ -395,7 +400,7 @@ namespace CSX64
 			// advance to after the new line
 			pos = end + 1;
 		}
-
+		
 		// -- minimize symbols and holes -- //
 
 		// link each symbol to internal symbols (minimizes file size)
@@ -407,9 +412,10 @@ namespace CSX64
 		if (!_ElimHoles(args.file.Symbols, args.file.DataHoles, args.file.Data, err)) return {AssembleError::ArgError, err};
 
 		// -- eliminate as many unnecessary symbols as we can -- //
-
-		std::vector<const std::string*> elim_symbols;   // symbol names to be eliminated
-		std::vector<const std::string*> rename_symbols; // symbol names that we can rename to be shorter
+		
+		// these are copies to ensure removing/renaming in the symbol table doesn't make them dangling pointers
+		std::vector<std::string> elim_symbols;   // symbol names to be eliminated
+		std::vector<std::string> rename_symbols; // symbol names that we can rename to be shorter
 
 		// for each symbol
 		for(auto &entry : args.file.Symbols)
@@ -421,14 +427,14 @@ namespace CSX64
 				if (entry.second.IsEvaluated())
 				{
 					// we can eliminate it (because it's already been linked internally and won't be needed externally)
-					elim_symbols.push_back(&entry.first);
+					elim_symbols.push_back(entry.first);
 				}
 				// otherwise we can rename it to something shorter (because it's still needed internally, but not needed externally)
-				else rename_symbols.push_back(&entry.first);
+				else rename_symbols.push_back(entry.first);
 			}
 		}
 		// remove all the symbols we can eliminate
-		for(const std::string *elim : elim_symbols) args.file.Symbols.erase(*elim);
+		for(std::string &elim : elim_symbols) args.file.Symbols.erase(elim);
 
 		// -- finalize -- //
 
@@ -436,8 +442,8 @@ namespace CSX64
 		if (!args.VerifyIntegrity()) return args.res;
 
 		// rename all the symbols we can shorten (done after verify to ensure there's no verify error messages with the renamed symbols)
-		for (int i = 0; i < rename_symbols.size(); ++i) RenameSymbol(args.file, *rename_symbols[i], "^" + tohex(i));
-
+		for (int i = 0; i < rename_symbols.size(); ++i) RenameSymbol(args.file, std::move(rename_symbols[i]), "^" + tohex(i));
+		
 		// validate result
 		file = std::move(args.file);
 		file._Clean = true;
