@@ -150,10 +150,9 @@
     <ClInclude Include="AsmTables.h" />
     <ClInclude Include="Assembly.h" />
     <ClInclude Include="CoreTypes.h" />
-    <ClInclude Include="CSX64.h" />
+    <ClInclude Include="Computer.h" />
     <ClInclude Include="Expr.h" />
     <ClInclude Include="HoleData.h" />
-    <ClInclude Include="OFile.h" />
     <ClInclude Include="ExeTypes.h" />
     <ClInclude Include="Utility.h" />
   </ItemGroup>

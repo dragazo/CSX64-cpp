@@ -1,5 +1,5 @@
-#ifndef CSX64_H
-#define CSX64_H
+#ifndef CSX64_COMPUTER_H
+#define CSX64_COMPUTER_H
 
 #include <cstdint>
 #include <cstdlib>
@@ -425,7 +425,7 @@ namespace CSX64
 			res = 0; // initialize res - functions as imm parsing location, so it has to start at 0
 
 			// get the settings byte and regs byte if applicable
-			if (!GetMemAdv(1, settings) || (settings & 0x0c) != 0 && !GetMemAdv(1, regs)) return false;
+			if (!GetMemAdv(1, settings) || (settings & 3) != 0 && !GetMemAdv(1, regs)) return false;
 
 			// get the sizecode
 			sizecode = (settings >> 2) & 3;

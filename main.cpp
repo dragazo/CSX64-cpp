@@ -13,10 +13,11 @@
 #include <sstream>
 
 #include "CoreTypes.h"
-#include "CSX64.h"
+#include "Computer.h"
 #include "Assembly.h"
-#include "OFile.h"
 #include "Utility.h"
+
+using namespace CSX64;
 
 // !! REPLACE THIS WITH std::filesystem WHEN VISUAL STUDIO IS UPDATED !! //
 namespace fs = std::experimental::filesystem;
@@ -24,59 +25,57 @@ namespace fs = std::experimental::filesystem;
 namespace chrono = std::chrono;
 typedef std::chrono::high_resolution_clock hrc;
 
-namespace CSX64
+// Represents a desired action
+enum class ProgramAction
 {
-	// Represents a desired action
-	enum class ProgramAction
-	{
-		ExecuteConsole,
-		Assemble, Link
-	};
+	ExecuteConsole,
+	Assemble, Link
+};
 
-	// An extension of assembly and link error codes for use specifically in <see cref="Main(string[])"/>
-	enum AsmLnkErrorExt
-	{
-		FailOpen = 100,
-		NullPath,
-		InvalidPath,
-		DirectoryNotFound,
-		AccessViolation,
-		FileNotFound,
-		PathFormatUnsupported,
-		IOError,
-		FormatError,
+// An extension of assembly and link error codes for use specifically in <see cref="Main(string[])"/>
+enum AsmLnkErrorExt
+{
+	FailOpen = 100,
+	NullPath,
+	InvalidPath,
+	DirectoryNotFound,
+	AccessViolation,
+	FileNotFound,
+	PathFormatUnsupported,
+	IOError,
+	FormatError,
 
-		UnknownError = 199
-	};
+	UnknownError = 199
+};
 
-	// ---------------------------------
+// ---------------------------------
 
-	// converts time in nanoseconds to a more convenient human form
-	std::string FormatTime(long long ns)
-	{
-		long long hr, min;
-		long double sec;
+// converts time in nanoseconds to a more convenient human form
+std::string FormatTime(long long ns)
+{
+	long long hr, min;
+	long double sec;
 
-		hr = ns / 3600000000000;
-		ns %= 3600000000000;
+	hr = ns / 3600000000000;
+	ns %= 3600000000000;
 
-		min = ns / 60000000000;
-		ns %= 60000000000;
+	min = ns / 60000000000;
+	ns %= 60000000000;
 
-		sec = ns / (long double)1e9;
+	sec = ns / (long double)1e9;
 
-		// print result
-		std::ostringstream ostr;
-		ostr << hr << ':' << min << ':' << sec;
-		return ostr.str();
-	}
+	// print result
+	std::ostringstream ostr;
+	ostr << hr << ':' << min << ':' << sec;
+	return ostr.str();
+}
 
-	// ---------------------------------
+// ---------------------------------
 
-	// The return value to use in the case of error during execution
-	const int ExecErrorReturnCode = -1;
+// The return value to use in the case of error during execution
+const int ExecErrorReturnCode = -1;
 
-	const char *HelpMessage =
+const char *HelpMessage =
 R"(
 usage: csx[<options>][--] <pathspec>...
 - h, --help             shows help info
@@ -90,332 +89,346 @@ usage: csx[<options>][--] <pathspec>...
 
 if no - g / -a / -l provided, executes a console program
 
-report bugs to https://github.com/dragazo/CSX64/issues
+report bugs to https://github.com/dragazo/CSX64-cpp/issues
 )";
 
-	// The path to the executable's directory
-	std::string ExeDir()
-	{
-		return ".";
-	}
+// The path to the executable's directory
+std::string __exe_dir;
+const std::string &ExeDir()
+{
+	return __exe_dir;
+}
+void LoadExeDir(std::string exe)
+{
+	// chip off until we just have /blah/.../etc/
+	while (!exe.empty() && exe.back() != '/' && exe.back() != '\\') exe.pop_back();
 
-	// adds standard symbols to the assembler predefine table
-	void AddPredefines()
-	{
-		// -- syscall codes -- //
+	__exe_dir = std::move(exe);
+}
 
-		DefineSymbol("sys_exit", (u64)SyscallCode::Exit);
+// adds standard symbols to the assembler predefine table
+void AddPredefines()
+{
+	// -- syscall codes -- //
 
-		DefineSymbol("sys_read", (u64)SyscallCode::Read);
-		DefineSymbol("sys_write", (u64)SyscallCode::Write);
-		DefineSymbol("sys_open", (u64)SyscallCode::Open);
-		DefineSymbol("sys_close", (u64)SyscallCode::Close);
+	DefineSymbol("sys_exit", (u64)SyscallCode::Exit);
 
-		DefineSymbol("sys_flush", (u64)SyscallCode::Flush);
-		DefineSymbol("sys_seek", (u64)SyscallCode::Seek);
-		DefineSymbol("sys_tell", (u64)SyscallCode::Tell);
+	DefineSymbol("sys_read", (u64)SyscallCode::Read);
+	DefineSymbol("sys_write", (u64)SyscallCode::Write);
+	DefineSymbol("sys_open", (u64)SyscallCode::Open);
+	DefineSymbol("sys_close", (u64)SyscallCode::Close);
 
-		DefineSymbol("sys_move", (u64)SyscallCode::Move);
-		DefineSymbol("sys_remove", (u64)SyscallCode::Remove);
-		DefineSymbol("sys_mkdir", (u64)SyscallCode::Mkdir);
-		DefineSymbol("sys_rmdir", (u64)SyscallCode::Rmdir);
+	DefineSymbol("sys_flush", (u64)SyscallCode::Flush);
+	DefineSymbol("sys_seek", (u64)SyscallCode::Seek);
+	DefineSymbol("sys_tell", (u64)SyscallCode::Tell);
 
-		DefineSymbol("sys_brk", (u64)SyscallCode::Brk);
+	DefineSymbol("sys_move", (u64)SyscallCode::Move);
+	DefineSymbol("sys_remove", (u64)SyscallCode::Remove);
+	DefineSymbol("sys_mkdir", (u64)SyscallCode::Mkdir);
+	DefineSymbol("sys_rmdir", (u64)SyscallCode::Rmdir);
 
-		// -- error codes -- //
+	DefineSymbol("sys_brk", (u64)SyscallCode::Brk);
 
-		DefineSymbol("err_none", (u64)ErrorCode::None);
-		DefineSymbol("err_outofbounds", (u64)ErrorCode::OutOfBounds);
-		DefineSymbol("err_unhandledsyscall", (u64)ErrorCode::UnhandledSyscall);
-		DefineSymbol("err_undefinedbehavior", (u64)ErrorCode::UndefinedBehavior);
-		DefineSymbol("err_arithmeticerror", (u64)ErrorCode::ArithmeticError);
-		DefineSymbol("err_abort", (u64)ErrorCode::Abort);
-		DefineSymbol("err_iofailure", (u64)ErrorCode::IOFailure);
-		DefineSymbol("err_fsdisabled", (u64)ErrorCode::FSDisabled);
-		DefineSymbol("err_accessviolation", (u64)ErrorCode::AccessViolation);
-		DefineSymbol("err_insufficientfds", (u64)ErrorCode::InsufficientFDs);
-		DefineSymbol("err_fdnotinuse", (u64)ErrorCode::FDNotInUse);
-		DefineSymbol("err_notimplemented", (u64)ErrorCode::NotImplemented);
-		DefineSymbol("err_stackoverflow", (u64)ErrorCode::StackOverflow);
-		DefineSymbol("err_fpustackoverflow", (u64)ErrorCode::FPUStackOverflow);
-		DefineSymbol("err_fpustackunderflow", (u64)ErrorCode::FPUStackUnderflow);
-		DefineSymbol("err_fpuerror", (u64)ErrorCode::FPUError);
-		DefineSymbol("err_fpuaccessviolation", (u64)ErrorCode::FPUAccessViolation);
-		DefineSymbol("err_alignmentviolation", (u64)ErrorCode::AlignmentViolation);
-		DefineSymbol("err_unknownop", (u64)ErrorCode::UnknownOp);
-	}
+	// -- error codes -- //
 
-	// Saves binary data to a file. Returns true if there were no errors
-	// path - the file to save to
-	// exe  - the binary data to save
-	// len  - the length of the executable
-	int SaveBinaryFile(const std::string &path, const std::vector<u8> &exe)
-	{
-		std::ofstream f(path, std::ios::binary);
-		if (!f) { std::cout << "Failed to open \"" << path << "\" for writing\n"; return FailOpen; }
+	DefineSymbol("err_none", (u64)ErrorCode::None);
+	DefineSymbol("err_outofbounds", (u64)ErrorCode::OutOfBounds);
+	DefineSymbol("err_unhandledsyscall", (u64)ErrorCode::UnhandledSyscall);
+	DefineSymbol("err_undefinedbehavior", (u64)ErrorCode::UndefinedBehavior);
+	DefineSymbol("err_arithmeticerror", (u64)ErrorCode::ArithmeticError);
+	DefineSymbol("err_abort", (u64)ErrorCode::Abort);
+	DefineSymbol("err_iofailure", (u64)ErrorCode::IOFailure);
+	DefineSymbol("err_fsdisabled", (u64)ErrorCode::FSDisabled);
+	DefineSymbol("err_accessviolation", (u64)ErrorCode::AccessViolation);
+	DefineSymbol("err_insufficientfds", (u64)ErrorCode::InsufficientFDs);
+	DefineSymbol("err_fdnotinuse", (u64)ErrorCode::FDNotInUse);
+	DefineSymbol("err_notimplemented", (u64)ErrorCode::NotImplemented);
+	DefineSymbol("err_stackoverflow", (u64)ErrorCode::StackOverflow);
+	DefineSymbol("err_fpustackoverflow", (u64)ErrorCode::FPUStackOverflow);
+	DefineSymbol("err_fpustackunderflow", (u64)ErrorCode::FPUStackUnderflow);
+	DefineSymbol("err_fpuerror", (u64)ErrorCode::FPUError);
+	DefineSymbol("err_fpuaccessviolation", (u64)ErrorCode::FPUAccessViolation);
+	DefineSymbol("err_alignmentviolation", (u64)ErrorCode::AlignmentViolation);
+	DefineSymbol("err_unknownop", (u64)ErrorCode::UnknownOp);
+}
 
-		// write the data
-		f.write((char*)&exe[0], exe.size());
+// -- file io -- //
 
-		if (!f) { std::cout << "Failed to write to \"" << path << "\"\n"; return IOError; }
-		return 0;
-	}
-	// Loads the contents of a binary file. Returns true if there were no errors
-	// path - the file to read
-	// exe  - the resulting binary data
-	int LoadBinaryFile(const std::string &path, std::vector<u8> &exe)
-	{
-		std::ifstream f(path, std::ios::binary | std::ios::ate);
-		if (!f) { std::cout << "Failed to open \"" << path << "\"\n"; return FailOpen; }
+// Saves binary data to a file. Returns true if there were no errors
+// path - the file to save to
+// exe  - the binary data to save
+// len  - the length of the executable
+int SaveBinaryFile(const std::string &path, const std::vector<u8> &exe)
+{
+	std::ofstream f(path, std::ios::binary);
+	if (!f) { std::cout << "Failed to open \"" << path << "\" for writing\n"; return FailOpen; }
 
-		// get length and go back to start
-		exe.clear();
-		exe.resize(f.tellg());
-		f.seekg(0);
+	// write the data
+	f.write((char*)exe.data(), exe.size());
 
-		// read the contents
-		f.read((char*)&exe[0], exe.size());
-		if (f.gcount() != exe.size()) { std::cout << "IO error while reading from " << path; return IOError; }
+	if (!f) { std::cout << "Failed to write to \"" << path << "\"\n"; return IOError; }
+	return 0;
+}
+// Loads the contents of a binary file. Returns true if there were no errors
+// path - the file to read
+// exe  - the resulting binary data
+int LoadBinaryFile(const std::string &path, std::vector<u8> &exe)
+{
+	std::ifstream f(path, std::ios::binary | std::ios::ate);
+	if (!f) { std::cout << "Failed to open \"" << path << "\"\n"; return FailOpen; }
 
-		if (!f) { std::cout << "Failed to read from \"" << path << "\"\n"; return IOError; }
-		return 0;
-	}
+	// get length and go back to start
+	exe.clear();
+	exe.resize(f.tellg());
+	f.seekg(0);
 
-	/// <summary>
-	/// Loads the contents of a text file. Returns true if there were no errors
-	/// </summary>
-	/// <param name="path">the file to read
-	/// <param name="txt">the resulting text data
-	int LoadTextFile(const std::string &path, std::string &txt)
-	{
-		std::ifstream f(path); // file handle
-		if (!f) { std::cout << "Failed to open \"" << path << "\"\n"; return FailOpen; }
+	// read the contents
+	f.read((char*)exe.data(), exe.size());
+	if (f.gcount() != exe.size()) { std::cout << "IO error while reading from " << path; return IOError; }
 
-		// read the whole file into txt - we'll majorly optimize this out later
-		txt.assign(std::istreambuf_iterator<char>(f), std::istreambuf_iterator<char>());
+	if (!f) { std::cout << "Failed to read from \"" << path << "\"\n"; return IOError; }
+	return 0;
+}
 
-		return 0;
-	}
+/// <summary>
+/// Loads the contents of a text file. Returns true if there were no errors
+/// </summary>
+/// <param name="path">the file to read
+/// <param name="txt">the resulting text data
+int LoadTextFile(const std::string &path, std::string &txt)
+{
+	std::ifstream f(path); // file handle
+	if (!f) { std::cout << "Failed to open \"" << path << "\"\n"; return FailOpen; }
 
-	/// <summary>
-	/// Serializes an object file to a file. Returns true if there were no errors
-	/// </summary>
-	/// <param name="path">the destination file to save to
-	/// <param name="obj">the object file to serialize
-	int SaveObjectFile(const std::string &path, const ObjectFile &obj)
-	{
-		std::ofstream f(path, std::ios::binary);
-		if (!f) { std::cout << "Failed to open \"" << path << "\"\n"; return FailOpen; }
+	// read the whole file into txt - we'll majorly optimize this out later
+	txt.assign(std::istreambuf_iterator<char>(f), std::istreambuf_iterator<char>());
 
-		ObjectFile::WriteTo(f, obj);
+	return 0;
+}
 
-		if (!f) { std::cout << "Failed to write to \"" << path << "\"\n"; return IOError; }
-		return 0;
-	}
-	/// <summary>
-	/// Deserializes an object file from a file. Returns true if there were no errors
-	/// </summary>
-	/// <param name="path">the source file to read from
-	/// <param name="obj">the resulting object file
-	int LoadObjectFile(const std::string &path, ObjectFile &obj)
-	{
-		std::ifstream f(path, std::ios::binary);
-		if (!f) { std::cout << "Failed to open \"" << path << "\"\n"; return FailOpen; }
+/// <summary>
+/// Serializes an object file to a file. Returns true if there were no errors
+/// </summary>
+/// <param name="path">the destination file to save to
+/// <param name="obj">the object file to serialize
+int SaveObjectFile(const std::string &path, const ObjectFile &obj)
+{
+	std::ofstream f(path, std::ios::binary);
+	if (!f) { std::cout << "Failed to open \"" << path << "\"\n"; return FailOpen; }
 
-		ObjectFile::ReadFrom(f, obj);
+	ObjectFile::WriteTo(f, obj);
 
-		if (!f) { std::cout << "Failed to write to \"" << path << "\"\n"; return IOError; }
-		return 0;
-	}
+	if (!f) { std::cout << "Failed to write to \"" << path << "\"\n"; return IOError; }
+	return 0;
+}
+/// <summary>
+/// Deserializes an object file from a file. Returns true if there were no errors
+/// </summary>
+/// <param name="path">the source file to read from
+/// <param name="obj">the resulting object file
+int LoadObjectFile(const std::string &path, ObjectFile &obj)
+{
+	std::ifstream f(path, std::ios::binary);
+	if (!f) { std::cout << "Failed to open \"" << path << "\"\n"; return FailOpen; }
 
-	// Loads an object file and adds it to the list
-	// objs - the list of object files
-	// path - the file to to load
-	int LoadObjectFile(std::vector<ObjectFile> &objs, const std::string &path)
-	{
-		ObjectFile obj;
-		int ret = LoadObjectFile(path, obj);
-		if (ret != 0) return ret;
+	ObjectFile::ReadFrom(f, obj);
 
-		objs.emplace_back(std::move(obj));
+	if (!f) { std::cout << "Failed to write to \"" << path << "\"\n"; return IOError; }
+	return 0;
+}
 
-		return 0;
-	}
-	// Loads the .o object files from a directory and adds them to the list
-	// objs - the list of object files
-	// path - the directory to load
-	int LoadObjectFileDir(std::vector<ObjectFile> &objs, const std::string &path)
-	{
-		std::error_code err;
-		fs::file_status stat = fs::status(path, err);
+// Loads an object file and adds it to the list
+// objs - the list of object files
+// path - the file to to load
+int LoadObjectFile(std::vector<ObjectFile> &objs, const std::string &path)
+{
+	ObjectFile obj;
+	int ret = LoadObjectFile(path, obj);
+	if (ret != 0) return ret;
+
+	objs.emplace_back(std::move(obj));
+
+	return 0;
+}
+// Loads the .o object files from a directory and adds them to the list
+// objs - the list of object files
+// path - the directory to load
+int LoadObjectFileDir(std::vector<ObjectFile> &objs, const std::string &path)
+{
+	std::error_code err;
+	fs::file_status stat = fs::status(path, err);
 		
-		if (!fs::exists(stat) || !fs::is_directory(stat))
-		{
-			std::cout << "no directory found: " << path << '\n';
-			return (int)AsmLnkErrorExt::DirectoryNotFound;
-		}
-
-		ObjectFile obj;
-		std::string f_path;
-		for (auto &entry : fs::directory_iterator(path, err))
-		{
-			f_path = entry.path().string();
-			if (EndsWith(ToUpper(f_path), ".O"))
-			{
-				int ret = LoadObjectFile(f_path, obj);
-				if (ret != 0) return ret;
-
-				objs.emplace_back(std::move(obj));
-			}
-		}
-
-		return 0;
+	if (!fs::exists(stat) || !fs::is_directory(stat))
+	{
+		std::cout << "no directory found: " << path << '\n';
+		return (int)AsmLnkErrorExt::DirectoryNotFound;
 	}
 
-	// -- assembly / linking -- //
-
-	/// <summary>
-	/// Assembles the (from) file into an object file and saves it to the (to) file. Returns true if successful
-	/// </summary>
-	/// <param name="from">source assembly file
-	/// <param name="to">destination for resulting object file
-	int Assemble(const std::string &from, const std::string &to)
+	ObjectFile obj;
+	std::string f_path;
+	for (auto &entry : fs::directory_iterator(path, err))
 	{
-		// read the file contents
-		std::string code;
-		int ret = LoadTextFile(from, code);
-		if (ret != 0) return ret;
-
-		// assemble the program
-		ObjectFile obj;
-		AssembleResult res = Assemble(code, obj);
-		
-		// if there was no error
-		if (res.Error == AssembleError::None)
+		f_path = entry.path().string();
+		if (EndsWith(ToUpper(f_path), ".O"))
 		{
-			// save result
-			return SaveObjectFile(to, obj);
-		}
-		// otherwise show error message
-		else { std::cout << "Assemble Error in " << from << ":\n" << res.ErrorMsg; return (int)res.Error; }
-	}
-	/// <summary>
-	/// Assembles the (from) file into an object file and saves it as the same name but with a .o extension
-	/// </summary>
-	/// <param name="from">the source assembly file
-	int Assemble(const std::string &from)
-	{
-		fs::path _path(from);
-		_path.replace_extension(".o");
-		return Assemble(from, _path.string());
-	}
-
-	/// <summary>
-	/// Links several object files to create an executable and saves it to the (to) file. Returns true if successful
-	/// </summary>
-	/// <param name="paths">the object files to link
-	/// <param name="to">destination for the resulting executable
-	/// <param name="entry_point">the main entry point
-	int Link(std::vector<std::string> &paths, const std::string &to, const std::string &entry_point)
-	{
-		std::vector<ObjectFile> objs;
-
-		// load the _start file
-		int ret = LoadObjectFile(objs, ExeDir() + "/_start.o");
-		if (ret != 0) return ret;
-
-		// load the stdlib files
-		ret = LoadObjectFileDir(objs, ExeDir() + "/stdlib");
-		if (ret != 0) return ret;
-
-		// load the user-defined pathspecs
-		for(const std::string &path : paths)
-		{
-			ret = LoadObjectFile(objs, path);
+			int ret = LoadObjectFile(f_path, obj);
 			if (ret != 0) return ret;
-		}
 
-		// link the object files
-		std::vector<u8> exe;
-		LinkResult res = Link(exe, objs, entry_point);
-
-		// if there was no error
-		if (res.Error == LinkError::None)
-		{
-			// save result
-			return SaveBinaryFile(to, exe);
-		}
-		// otherwise show error message
-		else { std::cout << "Link Error:\n" << res.ErrorMsg; return (int)res.Error; }
-	}
-
-	// -- execution -- //
-
-	/// <summary>
-	/// Executes a program via the console client. returns true if there were no errors
-	/// </summary>
-	/// <param name="exe">the code to execute
-	/// <param name="args">the command line arguments for the client program
-	int RunRawConsole(std::vector<u8> &exe, std::vector<std::string> &args, bool fsf, bool time)
-	{
-		// create the computer
-		Computer computer;
-
-		// initialize program
-		computer.Initialize(exe, args);
-
-		// set private flags
-		computer.FSF() = fsf;
-
-		// tie standard streams - stdin is non-interactive because we don't control it
-		computer.GetFD(0).Open(static_cast<std::iostream&>(std::cin), false, false);
-		computer.GetFD(1).Open(static_cast<std::iostream&>(std::cout), false, false);
-		computer.GetFD(2).Open(static_cast<std::iostream&>(std::cerr), false, false);
-
-		// begin execution
-		hrc::time_point start, stop;
-		start = hrc::now();
-		while (computer.Running) computer.Tick(~(u64)0);
-		stop = hrc::now();
-
-		// if there was an error
-		if (computer.Error != ErrorCode::None)
-		{
-			// print error message
-			std::cout << "\n\nError Encountered: " << (int)computer.Error;
-			// return execution error code
-			return ExecErrorReturnCode;
-		}
-		// otherwise no error
-		else
-		{
-			// print elapsed time
-			if (time) std::cout << "\n\nElapsed Time: " << FormatTime(chrono::duration_cast<chrono::nanoseconds>(stop - start).count());
-			// use return value
-			return computer.ReturnValue;
+			objs.emplace_back(std::move(obj));
 		}
 	}
 
-	/// <summary>
-	/// Executes a program via the console client. returns true if there were no errors
-	/// </summary>
-	/// <param name="path">the file to execute
-	/// <param name="args">the command line arguments for the client program
-	int RunRawConsole(const std::string &path, std::vector<std::string> &args, bool fsf, bool time)
+	return 0;
+}
+
+// -- assembly / linking -- //
+
+/// <summary>
+/// Assembles the (from) file into an object file and saves it to the (to) file. Returns true if successful
+/// </summary>
+/// <param name="from">source assembly file
+/// <param name="to">destination for resulting object file
+int Assemble(const std::string &from, const std::string &to)
+{
+	// read the file contents
+	std::string code;
+	int ret = LoadTextFile(from, code);
+	if (ret != 0) return ret;
+
+	// assemble the program
+	ObjectFile obj;
+	AssembleResult res = Assemble(code, obj);
+		
+	// if there was no error
+	if (res.Error == AssembleError::None)
 	{
-		// read the binary data
-		std::vector<u8> exe;
-		int ret = LoadBinaryFile(path, exe);
+		// save result
+		return SaveObjectFile(to, obj);
+	}
+	// otherwise show error message
+	else { std::cout << "Assemble Error in " << from << ":\n" << res.ErrorMsg; return (int)res.Error; }
+}
+/// <summary>
+/// Assembles the (from) file into an object file and saves it as the same name but with a .o extension
+/// </summary>
+/// <param name="from">the source assembly file
+int Assemble(const std::string &from)
+{
+	fs::path _path(from);
+	_path.replace_extension(".o");
+	return Assemble(from, _path.string());
+}
+
+/// <summary>
+/// Links several object files to create an executable and saves it to the (to) file. Returns true if successful
+/// </summary>
+/// <param name="paths">the object files to link
+/// <param name="to">destination for the resulting executable
+/// <param name="entry_point">the main entry point
+int Link(std::vector<std::string> &paths, const std::string &to, const std::string &entry_point)
+{
+	std::vector<ObjectFile> objs;
+
+	// load the _start file
+	int ret = LoadObjectFile(objs, ExeDir() + "/_start.o");
+	if (ret != 0) return ret;
+
+	// load the stdlib files
+	ret = LoadObjectFileDir(objs, ExeDir() + "/stdlib");
+	if (ret != 0) return ret;
+
+	// load the user-defined pathspecs
+	for(const std::string &path : paths)
+	{
+		ret = LoadObjectFile(objs, path);
 		if (ret != 0) return ret;
+	}
 
-		// run as a console client and return success flag
-		return RunRawConsole(exe, args, fsf, time);
+	// link the object files
+	std::vector<u8> exe;
+	LinkResult res = Link(exe, objs, entry_point);
+
+	// if there was no error
+	if (res.Error == LinkError::None)
+	{
+		// save result
+		return SaveBinaryFile(to, exe);
+	}
+	// otherwise show error message
+	else { std::cout << "Link Error:\n" << res.ErrorMsg; return (int)res.Error; }
+}
+
+// -- execution -- //
+
+/// <summary>
+/// Executes a program via the console client. returns true if there were no errors
+/// </summary>
+/// <param name="exe">the code to execute
+/// <param name="args">the command line arguments for the client program
+int RunConsole(std::vector<u8> &exe, std::vector<std::string> &args, bool fsf, bool time)
+{
+	// create the computer
+	Computer computer;
+
+	// initialize program
+	computer.Initialize(exe, args);
+
+	// set private flags
+	computer.FSF() = fsf;
+
+	// tie standard streams - stdin is non-interactive because we don't control it
+	computer.GetFD(0).Open(static_cast<std::iostream&>(std::cin), false, false);
+	computer.GetFD(1).Open(static_cast<std::iostream&>(std::cout), false, false);
+	computer.GetFD(2).Open(static_cast<std::iostream&>(std::cerr), false, false);
+
+	// begin execution
+	hrc::time_point start, stop;
+	start = hrc::now();
+	while (computer.Running) computer.Tick(~(u64)0);
+	stop = hrc::now();
+
+	// if there was an error
+	if (computer.Error != ErrorCode::None)
+	{
+		// print error message
+		std::cout << "\n\nError Encountered: " << (int)computer.Error;
+		// return execution error code
+		return ExecErrorReturnCode;
+	}
+	// otherwise no error
+	else
+	{
+		// print elapsed time
+		if (time) std::cout << "\n\nElapsed Time: " << FormatTime(chrono::duration_cast<chrono::nanoseconds>(stop - start).count());
+		// use return value
+		return computer.ReturnValue;
 	}
 }
+
+/// <summary>
+/// Executes a program via the console client. returns true if there were no errors
+/// </summary>
+/// <param name="path">the file to execute
+/// <param name="args">the command line arguments for the client program
+int RunConsole(const std::string &path, std::vector<std::string> &args, bool fsf, bool time)
+{
+	// read the binary data
+	std::vector<u8> exe;
+	int ret = LoadBinaryFile(path, exe);
+	if (ret != 0) return ret;
+
+	// run as a console client and return success flag
+	return RunConsole(exe, args, fsf, time);
+}
+
+// -- main -- //
 
 int main(int argc, const char *argv[])
 {
 	using namespace CSX64;
+
+	// record executable path (for loading assembly modules)
+	LoadExeDir(argv[0]);
 
 	ProgramAction action = ProgramAction::ExecuteConsole; // requested action
 	std::vector<std::string> pathspec;                    // input paths
@@ -424,8 +437,6 @@ int main(int argc, const char *argv[])
 	bool fsf = false;                                     // fsf flag
 	bool time = false;                                    // time flag
 	bool accepting_options = true;                        // marks that we're still accepting options
-
-	int thing = 5;
 
 	// process the terminal args
 	for (int i = 1; i < argc; ++i)
@@ -471,7 +482,7 @@ int main(int argc, const char *argv[])
 	{
 	case ProgramAction::ExecuteConsole:
 		if (pathspec.empty()) { std::cout << "Expected a file to execute\n"; return 0; }
-		return RunRawConsole(pathspec[0], pathspec, fsf, time);
+		return RunConsole(pathspec[0], pathspec, fsf, time);
 
 	case ProgramAction::Assemble:
 		if (pathspec.empty()) { std::cout << "Assembler expected at least 1 file to assemble\n"; return 0; }

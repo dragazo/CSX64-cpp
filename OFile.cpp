@@ -2,7 +2,7 @@
 
 #include <iostream>
 
-#include "OFile.h"
+#include "Assembly.h"
 #include "Utility.h"
 
 namespace CSX64

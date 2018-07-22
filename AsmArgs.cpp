@@ -187,7 +187,7 @@ bool AssembleArgs::TryAppendExpr(u64 size, Expr &&expr)
 bool AssembleArgs::TryAppendAddress(u64 a, u64 b, Expr &&hole)
 {
 	if (!TryAppendByte(a)) return false;
-	if (a & 0x0c) { if (!TryAppendByte(b)) return false; }
+	if (a & 3) { if (!TryAppendByte(b)) return false; }
 	if (a & 0x80) { if (!TryAppendExpr(Size((a >> 2) & 3), std::move(hole))) return false; }
 
 	return true;

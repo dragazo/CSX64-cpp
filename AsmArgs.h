@@ -6,7 +6,6 @@
 #include <memory>
 
 #include "CoreTypes.h"
-#include "OFile.h"
 #include "Assembly.h"
 #include "Expr.h"
 #include "HoleData.h"

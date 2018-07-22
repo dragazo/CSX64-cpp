@@ -56,16 +56,10 @@
     <ClInclude Include="Utility.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="CSX64.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="Assembly.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Expr.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="OFile.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="AsmRouting.h">
@@ -84,6 +78,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="CoreTypes.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Computer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

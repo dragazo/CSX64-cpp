@@ -18,16 +18,11 @@
 #include "Assembly.h"
 #include "Utility.h"
 #include "Expr.h"
-#include "OFile.h"
 #include "AsmRouting.h"
 #include "AsmTables.h"
 
 namespace CSX64
 {
-	// -- implementation constants -- //
-
-	
-
 	// -- parsing utilities -- //
 
 	bool TryExtractStringChars(const std::string &token, std::string &chars, std::string &err)
@@ -250,20 +245,6 @@ namespace CSX64
 		PredefinedSymbols.emplace(std::move(key), std::move(expr));
 	}
 
-	// !! PUT SYSCALL DEFINES SOMEWHERE !!
-
-	/*
-	static Assembly()
-	{
-		// create definitions for all the syscall codes
-		foreach(SyscallCode item in Enum.GetValues(typeof(SyscallCode)))
-			DefineSymbol($"sys_{item.ToString().ToLower()}", (u64)item);
-
-		// create definitions for all the error codes
-		foreach(ErrorCode item in Enum.GetValues(typeof(ErrorCode)))
-			DefineSymbol($"err_{item.ToString().ToLower()}", (u64)item);
-	}
-	*/
 	// -- patching -- //
 
 	/// <summary>
@@ -304,25 +285,44 @@ namespace CSX64
 
 	// -- let the fun begin -- //
 
-	// helper function for assembler
-	bool _ElimHoles(std::unordered_map<std::string, Expr> &symbols, std::vector<HoleData> &holes, std::vector<u8> &seg, std::string &err)
+	// tries to patch and eliminate as many holes as possible. returns true unless there was a hard error during evaluation (e.g. unsupported floating-point format).
+	bool _ElimHoles(std::unordered_map<std::string, Expr> &symbols, std::vector<HoleData> &holes, std::vector<u8> &seg, AssembleResult &res)
 	{
 		using std::swap;
 
 		for (int i = holes.size() - 1; i >= 0; --i)
 		{
-			switch (TryPatchHole(seg, symbols, holes[i], err))
+			switch (TryPatchHole(seg, symbols, holes[i], res.ErrorMsg))
 			{
 			case PatchError::None: if (i != holes.size() - 1) swap(holes[i], holes.back()); holes.pop_back(); break; // remove the hole if we solved it
 			case PatchError::Unevaluated: break;
-			case PatchError::Error: err = err; return false;
+			case PatchError::Error: res.Error = AssembleError::ArgError; return false;
 
 			default: throw std::runtime_error("Unknown patch error encountered");
 			}
 		}
-	}
 
-	AssembleResult Assemble(const std::string &code, ObjectFile &file)
+		return true;
+	}
+	// tries to patch all holes. returns true only if all holes were patched.
+	bool _FixAllHoles(std::unordered_map<std::string, Expr> &symbols, std::vector<HoleData> &holes, std::vector<u8> &seg, LinkResult &res)
+	{
+		for (std::size_t i = 0; i < holes.size(); ++i)
+		{
+			switch (TryPatchHole(seg, symbols, holes[i], res.ErrorMsg))
+			{
+			case PatchError::None: break;
+			case PatchError::Unevaluated: res.Error = LinkError::MissingSymbol; return false;
+			case PatchError::Error: res.Error = LinkError::FormatError; return false;
+
+			default: throw std::runtime_error("Unknown patch error encountered");
+			}
+		}
+
+		return true;
+	}
+	
+	AssembleResult Assemble(const std::string &code, ObjectFile &_file_)
 	{
 		AssembleArgs args;
 
@@ -407,9 +407,9 @@ namespace CSX64
 		for(auto &entry : args.file.Symbols) entry.second.Evaluate(args.file.Symbols, a, floating, err);
 
 		// eliminate as many holes as possible
-		if (!_ElimHoles(args.file.Symbols, args.file.TextHoles, args.file.Text, err)) return {AssembleError::ArgError, err};
-		if (!_ElimHoles(args.file.Symbols, args.file.RodataHoles, args.file.Rodata, err)) return {AssembleError::ArgError, err};
-		if (!_ElimHoles(args.file.Symbols, args.file.DataHoles, args.file.Data, err)) return {AssembleError::ArgError, err};
+		if (!_ElimHoles(args.file.Symbols, args.file.TextHoles, args.file.Text, args.res)) return args.res;
+		if (!_ElimHoles(args.file.Symbols, args.file.RodataHoles, args.file.Rodata, args.res)) return args.res;
+		if (!_ElimHoles(args.file.Symbols, args.file.DataHoles, args.file.Data, args.res)) return args.res;
 
 		// -- eliminate as many unnecessary symbols as we can -- //
 		
@@ -445,8 +445,8 @@ namespace CSX64
 		for (int i = 0; i < rename_symbols.size(); ++i) RenameSymbol(args.file, std::move(rename_symbols[i]), "^" + tohex(i));
 		
 		// validate result
-		file = std::move(args.file);
-		file._Clean = true;
+		_file_ = std::move(args.file);
+		_file_._Clean = true;
 
 		// return no error
 		return {AssembleError::None, ""};
@@ -457,6 +457,7 @@ namespace CSX64
 		u64 _res;
 		bool _floating;
 		std::string _err;
+		LinkResult res;
 
 		// -- ensure args are good -- //
 
@@ -531,7 +532,7 @@ namespace CSX64
 		}
 
 		// start the merge process with the _start file
-		include_queue.push_back(&objs[0]);
+		include_queue.push_back(&objs[0]); // (by this point [0] is guaranteed to exist)
 
 		// -- merge things -- //
 
@@ -570,9 +571,9 @@ namespace CSX64
 			data.resize(data.size() + obj->Data.size());
 
 			// append segments
-			std::memcpy(&text[text.size() - obj->Text.size()], &obj->Text[0], obj->Text.size());
-			std::memcpy(&text[rodata.size() - obj->Rodata.size()], &obj->Rodata[0], obj->Rodata.size());
-			std::memcpy(&text[data.size() - obj->Data.size()], &obj->Data[0], obj->Data.size());
+			std::memcpy(text.data() + (text.size() - obj->Text.size()), obj->Text.data(), obj->Text.size());
+			std::memcpy(text.data() + (rodata.size() - obj->Rodata.size()), obj->Rodata.data(), obj->Rodata.size());
+			std::memcpy(text.data() + (data.size() - obj->Data.size()), obj->Data.data(), obj->Data.size());
 			bsslen += obj->BssLen;
 			
 			// for each external symbol
@@ -638,7 +639,7 @@ namespace CSX64
 				// if obj already has a symbol of the same name
 				if (ContainsKey(obj.Symbols, external)) return {LinkError::SymbolRedefinition, "Object file defined external symbol \"" + external + "\""};
 				// otherwise define it as a local in obj
-				else obj.Symbols.emplace(external, global_to_obj[external]->Symbols[external]);
+				else obj.Symbols.emplace(external, global_to_obj.at(external)->Symbols.at(external));
 			}
 		}
 
@@ -651,39 +652,9 @@ namespace CSX64
 			ObjectFile &obj = *entry.first;
 
 			// patch all the holes
-			for (HoleData &hole : obj.TextHoles)
-			{
-				switch (TryPatchHole(text, obj.Symbols, hole, _err))
-				{
-				case PatchError::None: break;
-				case PatchError::Unevaluated: return {LinkError::MissingSymbol, _err};
-				case PatchError::Error: return {LinkError::FormatError, _err};
-
-				default: throw std::runtime_error("Unknown patch error encountered");
-				}
-			}
-			for (HoleData &hole : obj.RodataHoles)
-			{
-				switch (TryPatchHole(rodata, obj.Symbols, hole, _err))
-				{
-				case PatchError::None: break;
-				case PatchError::Unevaluated: return {LinkError::MissingSymbol, _err};
-				case PatchError::Error: return {LinkError::FormatError, _err};
-
-				default: throw std::runtime_error("Unknown patch error encountered");
-				}
-			}
-			for (HoleData &hole : obj.DataHoles)
-			{
-				switch (TryPatchHole(data, obj.Symbols, hole, _err))
-				{
-				case PatchError::None: break;
-				case PatchError::Unevaluated: return {LinkError::MissingSymbol, _err};
-				case PatchError::Error: return {LinkError::FormatError, _err};
-
-				default: throw std::runtime_error("Unknown patch error encountered");
-				}
-			}
+			if (!_FixAllHoles(obj.Symbols, obj.TextHoles, text, res)) return res;
+			if (!_FixAllHoles(obj.Symbols, obj.RodataHoles, rodata, res)) return res;
+			if (!_FixAllHoles(obj.Symbols, obj.DataHoles, data, res)) return res;
 		}
 
 		// -- finalize things -- //
@@ -699,9 +670,9 @@ namespace CSX64
 		Write(exe, 24, 8, bsslen);
 
 		// copy text and data
-		std::memcpy(&exe[32], &text[0], text.size());
-		std::memcpy(&exe[32 + text.size()], &rodata[0], rodata.size());
-		std::memcpy(&exe[32 + text.size() + rodata.size()], &data[0], data.size());
+		std::memcpy(exe.data() + 32, text.data(), text.size());
+		std::memcpy(exe.data() + 32 + text.size(), rodata.data(), rodata.size());
+		std::memcpy(exe.data() + 32 + text.size() + rodata.size(), data.data(), data.size());
 
 		// linked successfully
 		return {LinkError::None, ""};

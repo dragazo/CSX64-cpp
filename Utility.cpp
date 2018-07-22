@@ -32,7 +32,7 @@ namespace CSX64
 		u16 len = str.size();
 		BinWrite(ostr, len);
 		// write the string
-		ostr.write(&str[0], len);
+		ostr.write(str.data(), len);
 
 		return ostr;
 	}
@@ -43,7 +43,7 @@ namespace CSX64
 		BinRead(istr, len);
 		// allocate space and read the string
 		str.resize(len);
-		istr.read(&str[0], len);
+		istr.read((char*)str.data(), len);
 		// make sure we got the whole thing
 		if (istr.gcount() != len) istr.setstate(std::ios::failbit);
 

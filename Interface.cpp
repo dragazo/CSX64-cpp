@@ -1,4 +1,4 @@
-#include "CSX64.h"
+#include "Computer.h"
 
 bool CSX64::Computer::Initialize(std::vector<u8> &exe, std::vector<std::string> args, u64 stacksize)
 {
@@ -15,15 +15,16 @@ bool CSX64::Computer::Initialize(std::vector<u8> &exe, std::vector<std::string> 
 	if (size > MaxMemory) return false;
 
 	// get new memory array (does not include header)
+    Memory.clear();
 	Memory.resize(size);
 	InitMemorySize = size;
 
 	// copy over the text/rodata/data segments (not including header)
-	std::memcpy(&Memory[0], &exe[32], exe.size() - 32);
+	std::memcpy(Memory.data(), exe.data() + 32, exe.size() - 32);
 	// zero the bss segment
-	std::memset(&Memory[exe.size() - 32], 0, bss_seglen);
+	std::memset(Memory.data() + (exe.size() - 32), 0, bss_seglen);
 	// randomize the stack segment
-	for (u64 i = exe.size() - 32 + bss_seglen; i < Memory.size(); ++i) Memory[i] = Rand();
+	//for (u64 i = exe.size() - 32 + bss_seglen; i < Memory.size(); ++i) Memory[i] = Rand();
 
 	// set up memory barriers
 	ExeBarrier = text_seglen;
@@ -31,14 +32,14 @@ bool CSX64::Computer::Initialize(std::vector<u8> &exe, std::vector<std::string> 
 	StackBarrier = text_seglen + rodata_seglen + data_seglen + bss_seglen;
 
 	// set up cpu registers
-	for (int i = 0; i < 16; ++i) CPURegisters[i].x64() = Rand64(Rand);
+	//for (int i = 0; i < 16; ++i) CPURegisters[i].x64() = Rand64(Rand);
 
 	// set up fpu registers
 	FINIT();
 
 	// set up vpu registers
-	for (int i = 0; i < 32; ++i)
-		for (int j = 0; j < 8; ++j) ZMMRegisters[i].uint64(j) = Rand64(Rand);
+	//for (int i = 0; i < 32; ++i)
+		//for (int j = 0; j < 8; ++j) ZMMRegisters[i].uint64(j) = Rand64(Rand);
 
 	// set execution state
 	RIP() = 0;
