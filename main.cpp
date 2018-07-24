@@ -16,6 +16,7 @@
 #include "Computer.h"
 #include "Assembly.h"
 #include "Utility.h"
+#include "ExeDir.h"
 
 using namespace CSX64;
 
@@ -92,42 +93,25 @@ if no - g / -a / -l provided, executes a console program
 report bugs to https://github.com/dragazo/CSX64-cpp/issues
 )";
 
-// The path to the executable's directory
-std::string __exe_dir;
-const std::string &ExeDir()
-{
-	return __exe_dir;
-}
-void LoadExeDir(std::string exe)
-{
-	// chip off until we just have /blah/.../etc/
-	while (!exe.empty() && exe.back() != '/' && exe.back() != '\\') exe.pop_back();
-
-	__exe_dir = std::move(exe);
-}
-
 // adds standard symbols to the assembler predefine table
 void AddPredefines()
 {
 	// -- syscall codes -- //
 
-	DefineSymbol("sys_exit", (u64)SyscallCode::Exit);
+	DefineSymbol("sys_exit", (u64)SyscallCode::sys_exit);
 
-	DefineSymbol("sys_read", (u64)SyscallCode::Read);
-	DefineSymbol("sys_write", (u64)SyscallCode::Write);
-	DefineSymbol("sys_open", (u64)SyscallCode::Open);
-	DefineSymbol("sys_close", (u64)SyscallCode::Close);
+	DefineSymbol("sys_read", (u64)SyscallCode::sys_read);
+	DefineSymbol("sys_write", (u64)SyscallCode::sys_write);
+	DefineSymbol("sys_open", (u64)SyscallCode::sys_open);
+	DefineSymbol("sys_close", (u64)SyscallCode::sys_close);
+	DefineSymbol("sys_lseek", (u64)SyscallCode::sys_lseek);
 
-	DefineSymbol("sys_flush", (u64)SyscallCode::Flush);
-	DefineSymbol("sys_seek", (u64)SyscallCode::Seek);
-	DefineSymbol("sys_tell", (u64)SyscallCode::Tell);
+	DefineSymbol("sys_brk", (u64)SyscallCode::sys_brk);
 
-	DefineSymbol("sys_move", (u64)SyscallCode::Move);
-	DefineSymbol("sys_remove", (u64)SyscallCode::Remove);
-	DefineSymbol("sys_mkdir", (u64)SyscallCode::Mkdir);
-	DefineSymbol("sys_rmdir", (u64)SyscallCode::Rmdir);
-
-	DefineSymbol("sys_brk", (u64)SyscallCode::Brk);
+	DefineSymbol("sys_rename", (u64)SyscallCode::sys_rename);
+	DefineSymbol("sys_unlink", (u64)SyscallCode::sys_unlink);
+	DefineSymbol("sys_mkdir", (u64)SyscallCode::sys_mkdir);
+	DefineSymbol("sys_rmdir", (u64)SyscallCode::sys_rmdir);
 
 	// -- error codes -- //
 
@@ -330,11 +314,11 @@ int Link(std::vector<std::string> &paths, const std::string &to, const std::stri
 	std::vector<ObjectFile> objs;
 
 	// load the _start file
-	int ret = LoadObjectFile(objs, ExeDir() + "/_start.o");
+	int ret = LoadObjectFile(objs, exe_dir() + "/_start.o");
 	if (ret != 0) return ret;
 
 	// load the stdlib files
-	ret = LoadObjectFileDir(objs, ExeDir() + "/stdlib");
+	ret = LoadObjectFileDir(objs, exe_dir() + "/stdlib");
 	if (ret != 0) return ret;
 
 	// load the user-defined pathspecs
@@ -377,9 +361,9 @@ int RunConsole(std::vector<u8> &exe, std::vector<std::string> &args, bool fsf, b
 	computer.FSF() = fsf;
 
 	// tie standard streams - stdin is non-interactive because we don't control it
-	computer.GetFD(0).Open(static_cast<std::iostream&>(std::cin), false, false);
-	computer.GetFD(1).Open(static_cast<std::iostream&>(std::cout), false, false);
-	computer.GetFD(2).Open(static_cast<std::iostream&>(std::cerr), false, false);
+	computer.GetFD(0).Open(static_cast<std::iostream*>(&std::cin), false, false);
+	computer.GetFD(1).Open(static_cast<std::iostream*>(&std::cout), false, false);
+	computer.GetFD(2).Open(static_cast<std::iostream*>(&std::cerr), false, false);
 
 	// begin execution
 	hrc::time_point start, stop;
@@ -427,9 +411,9 @@ int main(int argc, const char *argv[])
 {
 	using namespace CSX64;
 
-	// record executable path (for loading assembly modules)
-	LoadExeDir(argv[0]);
-
+	// initialize exe dir vars
+	init_exe_dir();
+	
 	ProgramAction action = ProgramAction::ExecuteConsole; // requested action
 	std::vector<std::string> pathspec;                    // input paths
 	const char *entry_point = nullptr;                    // main entry point for linker

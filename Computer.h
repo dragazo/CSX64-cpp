@@ -174,6 +174,19 @@ namespace CSX64
 				FileDescriptors[i].Close();
 		}
 
+		bool Process_sys_read();
+		bool Process_sys_write();
+		bool Process_sys_open();
+		bool Process_sys_close();
+		bool Process_sys_lseek();
+
+		bool Process_sys_brk();
+
+		bool Process_sys_rename();
+		bool Process_sys_unlink();
+		bool Process_sys_mkdir();
+		bool Process_sys_rmdir();
+
 		/// <summary>
 		/// Handles syscall instructions from the processor. Returns true iff the syscall was handled successfully.
 		/// Should not be called directly: only by interpreted syscall instructions
@@ -182,30 +195,22 @@ namespace CSX64
 		{
 			switch ((SyscallCode)RAX())
 			{
-			case SyscallCode::Exit: Exit(RBX()); return true;
+			case SyscallCode::sys_exit: Exit(RBX()); return true;
+				
+			case SyscallCode::sys_read: return Process_sys_read();
+			case SyscallCode::sys_write: return Process_sys_write();
+			case SyscallCode::sys_open: return Process_sys_open();
+			case SyscallCode::sys_close: return Process_sys_close();
+			case SyscallCode::sys_lseek: return Process_sys_lseek();
 
-				/*
-			case SyscallCode::Read: return Sys_Read();
-			case SyscallCode::Write: return Sys_Write();
+			case SyscallCode::sys_brk: return Process_sys_brk();
 
-			case SyscallCode::Open: return Sys_Open();
-			case SyscallCode::Close: return Sys_Close();
+			case SyscallCode::sys_rename: return Process_sys_rename();
+			case SyscallCode::sys_unlink: return Process_sys_unlink();
+			case SyscallCode::sys_mkdir: return Process_sys_mkdir();
+			case SyscallCode::sys_rmdir: return Process_sys_rmdir();
 
-			case SyscallCode::Flush: return Sys_Flush();
-
-			case SyscallCode::Seek: return Sys_Seek();
-			case SyscallCode::Tell: return Sys_Tell();
-
-			case SyscallCode::Move: return Sys_Move();
-			case SyscallCode::Remove: return Sys_Remove();
-			case SyscallCode::Mkdir: return Sys_Mkdir();
-			case SyscallCode::Rmdir: return Sys_Rmdir();
-
-			case SyscallCode::Brk: return Sys_Brk();
-				*/
-				// ----------------------------------
-
-				// otherwise syscall not found
+			// otherwise syscall not found
 			default: Terminate(ErrorCode::UnhandledSyscall); return false;
 			}
 		}

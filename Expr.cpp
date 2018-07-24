@@ -4,6 +4,43 @@
 
 namespace CSX64
 {
+	const std::unordered_map<Expr::OPs, std::string> Expr::Op_to_Str
+	{
+		{Expr::OPs::Mul, "*"},
+		{Expr::OPs::Div, "/"},
+		{Expr::OPs::Mod, "%"},
+		{Expr::OPs::Add, "+"},
+		{Expr::OPs::Sub, "-"},
+
+		{Expr::OPs::SL, "<<"},
+		{Expr::OPs::SR, ">>"},
+
+		{Expr::OPs::Less, "<"},
+		{Expr::OPs::LessE, "<="},
+		{Expr::OPs::Great, ">"},
+		{Expr::OPs::GreatE, ">="},
+		{Expr::OPs::Eq, "=="},
+		{Expr::OPs::Neq, "!="},
+
+		{Expr::OPs::BitAnd, "&"},
+		{Expr::OPs::BitOr, "|"},
+		{Expr::OPs::BitXor, "^"},
+		{Expr::OPs::LogAnd, "&&"},
+		{Expr::OPs::LogOr, "||"},
+
+		{Expr::OPs::Neg, "-"},
+		{Expr::OPs::BitNot, "~"},
+		{Expr::OPs::LogNot, "!"},
+		{Expr::OPs::Int, "(int)"},
+		{Expr::OPs::Float, "(float)"},
+
+		{Expr::OPs::Condition, "?"},
+		{Expr::OPs::Pair, ":"},
+		{Expr::OPs::NullCoalesce, "??"},
+	};
+
+	// ------------------------------
+
 	Expr::Expr() noexcept : OP(OPs::None), Left(nullptr), Right(nullptr), _Result(0), _Floating(false) {}
 	Expr::~Expr() noexcept { delete Left; delete Right; }
 
@@ -647,5 +684,42 @@ namespace CSX64
 		delete temp;
 
 		return reader;
+	}
+
+	std::ostream &operator<<(std::ostream &ostr, const Expr &expr)
+	{
+		if (expr.OP == Expr::OPs::None)
+		{
+			if (!expr._Token.empty()) ostr << expr._Token;
+			else if (expr._Floating) ostr << AsDouble(expr._Result);
+			else ostr << (i64)expr._Result;
+		}
+		else
+		{
+			// if we're a unary op
+			if (expr.Right == nullptr)
+			{
+				ostr << Expr::Op_to_Str.at(expr.OP);
+
+				ostr << '(';
+				ostr << *expr.Left;
+				ostr << ')';
+			}
+			// otherwise we're a binary op
+			else
+			{
+				ostr << '(';
+				ostr << *expr.Left;
+				ostr << ')';
+
+				ostr << Expr::Op_to_Str.at(expr.OP);
+
+				ostr << '(';
+				ostr << *expr.Right;
+				ostr << ')';
+			}
+		}
+
+		return ostr;
 	}
 }

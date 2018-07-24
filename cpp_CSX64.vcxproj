@@ -69,7 +69,22 @@
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
-  <PropertyGroup />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <TargetName>csx</TargetName>
+    <OutDir>debug</OutDir>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <TargetName>csx</TargetName>
+    <OutDir>release/</OutDir>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <TargetName>csx</TargetName>
+    <OutDir>debug</OutDir>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <TargetName>csx</TargetName>
+    <OutDir>release/</OutDir>
+  </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
@@ -105,6 +120,7 @@
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>true</ConformanceMode>
       <DisableLanguageExtensions>true</DisableLanguageExtensions>
+      <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
     </ClCompile>
     <Link>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
@@ -122,6 +138,7 @@
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>true</ConformanceMode>
       <DisableLanguageExtensions>true</DisableLanguageExtensions>
+      <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
     </ClCompile>
     <Link>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
@@ -134,6 +151,10 @@
     <ClCompile Include="AsmArgs.cpp" />
     <ClCompile Include="AsmTables.cpp" />
     <ClCompile Include="Assembly.cpp" />
+    <ClCompile Include="ExeDir.cpp">
+      <DisableLanguageExtensions Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">false</DisableLanguageExtensions>
+      <DisableLanguageExtensions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</DisableLanguageExtensions>
+    </ClCompile>
     <ClCompile Include="Expr.cpp" />
     <ClCompile Include="HoleData.cpp" />
     <ClCompile Include="Interface.cpp" />
@@ -151,6 +172,7 @@
     <ClInclude Include="Assembly.h" />
     <ClInclude Include="CoreTypes.h" />
     <ClInclude Include="Computer.h" />
+    <ClInclude Include="ExeDir.h" />
     <ClInclude Include="Expr.h" />
     <ClInclude Include="HoleData.h" />
     <ClInclude Include="ExeTypes.h" />

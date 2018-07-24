@@ -19,18 +19,16 @@ namespace CSX64
 	};
 	enum class SyscallCode
 	{
-		Exit,
+		sys_exit,
 
-		Read, Write,
-		Open, Close,
+		sys_read, sys_write,
+		sys_open, sys_close,
+		sys_lseek,
 
-		Flush,
-		Seek, Tell,
+		sys_brk,
 
-		Move, Remove,
-		Mkdir, Rmdir,
-
-		Brk,
+		sys_rename, sys_unlink,
+		sys_mkdir, sys_rmdir,
 	};
 
 	// acts as a reference to T, but gets/sets the value from a location of type U
@@ -264,11 +262,11 @@ namespace CSX64
 		/// <param name="managed">marks that this stream is considered "managed". see CSX64 manual for more information</param>
 		/// <param name="interactive">marks that this stream is considered "interactive" see CSX64 manual for more information</param>
 		/// <exception cref="AccessViolationException"></exception>
-		void Open(std::iostream &stream, bool managed, bool interactive)
+		void Open(std::iostream *stream, bool managed, bool interactive)
 		{
 			if (InUse()) throw std::runtime_error("Attempt to assign to a FileDescriptor that was currently in use");
 
-			BaseStream = &stream;
+			BaseStream = stream;
 			Managed = managed;
 			Interactive = interactive;
 		}
@@ -281,14 +279,8 @@ namespace CSX64
 			// closing unused file is no-op
 			if (InUse())
 			{
-				// if the file is managed
-				if (Managed)
-				{
-					// close the stream
-					try { delete BaseStream; }
-					// fail case must still null the stream (user is free to ignore the error and reuse the object)
-					catch (...) { BaseStream = nullptr; return false; }
-				}
+				// if the file is managed, we need to deallocate it
+				if (Managed) delete BaseStream;
 
 				// unlink the stream
 				BaseStream = nullptr;

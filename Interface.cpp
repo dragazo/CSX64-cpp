@@ -102,6 +102,7 @@ CSX64::u64 CSX64::Computer::Tick(u64 count)
 		// fetch the instruction
 		if (!GetMemAdv(1, op)) break;
 
+		//std::cout << op << '\n';
 		//Console.WriteLine($"{RIP:x8} - {(OPCode)op}");
 
 		// switch through the opcodes

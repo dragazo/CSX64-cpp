@@ -42,6 +42,9 @@ namespace CSX64
 			NullCoalesce
 		};
 
+		// maps expr op values to a human-readable form
+		static const std::unordered_map<Expr::OPs, std::string> Op_to_Str;
+
 	private:
 		std::string _Token;
 
@@ -229,9 +232,12 @@ namespace CSX64
 		static std::istream &ReadFrom(std::istream &reader, Expr &expr);
 
 		friend inline void swap(Expr &a, Expr &b) { a = std::move(b); }
-	};
 
-	
+		// --------------------------------
+
+		// writes a human-readable form of the given expression. use WriteTo() for the binary form.
+		friend std::ostream &operator<<(std::ostream &ostr, const Expr &expr);
+	};
 }
 
 #endif

@@ -51,6 +51,9 @@
     <ClCompile Include="AsmTables.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="ExeDir.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Utility.h">
@@ -81,6 +84,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Computer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ExeDir.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

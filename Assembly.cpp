@@ -400,7 +400,7 @@ namespace CSX64
 			// advance to after the new line
 			pos = end + 1;
 		}
-		
+
 		// -- minimize symbols and holes -- //
 
 		// link each symbol to internal symbols (minimizes file size)
@@ -572,10 +572,10 @@ namespace CSX64
 
 			// append segments
 			std::memcpy(text.data() + (text.size() - obj->Text.size()), obj->Text.data(), obj->Text.size());
-			std::memcpy(text.data() + (rodata.size() - obj->Rodata.size()), obj->Rodata.data(), obj->Rodata.size());
-			std::memcpy(text.data() + (data.size() - obj->Data.size()), obj->Data.data(), obj->Data.size());
+			std::memcpy(rodata.data() + (rodata.size() - obj->Rodata.size()), obj->Rodata.data(), obj->Rodata.size());
+			std::memcpy(data.data() + (data.size() - obj->Data.size()), obj->Data.data(), obj->Data.size());
 			bsslen += obj->BssLen;
-			
+
 			// for each external symbol
 			for (const std::string &external : obj->ExternalSymbols)
 			{
@@ -627,9 +627,16 @@ namespace CSX64
 			for (const std::string &global : obj.GlobalSymbols)
 			{
 				// if it can't be evaluated internally, it's an error (i.e. cannot define a global in terms of another file's globals)
-				if (!obj.Symbols[global].Evaluate(obj.Symbols, _res, _floating, _err))
+				if (!obj.Symbols.at(global).Evaluate(obj.Symbols, _res, _floating, _err))
 					return LinkResult{LinkError::MissingSymbol, "Global symbol \"" + global + "\" could not be evaluated internally"};
 			}
+		}
+
+		// this needs to be done after the previous loop to ensure globals have been evaluated before copying them
+		for (auto &entry : included)
+		{
+			// alias the object file
+			ObjectFile &obj = *entry.first;
 
 			// for each external symbol
 			for (const std::string &external : obj.ExternalSymbols)

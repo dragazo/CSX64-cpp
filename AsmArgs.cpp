@@ -252,11 +252,11 @@ bool AssembleArgs::__TryParseImm(const std::string &token, Expr *&expr)
 	std::vector<char> unaryOps; // holds unary ops for processing
 	std::vector<Expr*> stack;   // the stack used to manage operator precedence rules
 
-								// top of stack shall be refered to as current
+	// top of stack shall be refered to as current
 
 	stack.push_back(nullptr); // stack will always have a null at its base (simplifies code slightly)
 
-							  // skip white space
+	// skip white space
 	for (; pos < token.size() && std::isspace(token[pos]); ++pos);
 	// if we're past the end, token was empty
 	if (pos >= token.size()) { res = {AssembleError::FormatError, "line " + tostr(line) + ": Empty expression encountered"}; return false; }
@@ -397,7 +397,7 @@ bool AssembleArgs::__TryParseImm(const std::string &token, Expr *&expr)
 		for (; end < token.size(); ++end)
 		{
 			if (TryGetOp(token, end, op, oplen)) break; // break when we find an op
-														// if we hit a non-white character, there are tokens with no binary ops between them
+			// if we hit a non-white character, there are tokens with no binary ops between them
 			else if (!std::isspace(token[end])) { res = {AssembleError::FormatError, "line " + tostr(line) + ": Encountered two tokens with no binary op between them: " + token}; return false; }
 		}
 		// if we didn't find any binary ops, we're done
@@ -447,7 +447,7 @@ bool AssembleArgs::__TryParseImm(const std::string &token, Expr *&expr)
 
 		binPair = false; // flag as invalid binary pair
 
-						 // update unpaired conditionals
+		// update unpaired conditionals
 		if (op == Expr::OPs::Condition) ++unpaired_conditionals;
 		else if (op == Expr::OPs::Pair) --unpaired_conditionals;
 
@@ -471,7 +471,7 @@ bool AssembleArgs::TryParseImm(std::string token, Expr &expr, u64 &sizecode, boo
 {
 	sizecode = 3; explicit_size = false; // initially no explicit size
 
-										 // handle explicit sizes directives
+	// handle explicit sizes directives
 	std::string utoken = ToUpper(token);
 	if (StartsWithToken(utoken, "BYTE")) { sizecode = 0; explicit_size = true; token = TrimStart(token.substr(4)); }
 	else if (StartsWithToken(utoken, "WORD")) { sizecode = 1; explicit_size = true; token = TrimStart(token.substr(4)); }
@@ -587,7 +587,7 @@ Expr *AssembleArgs::Ptrdiff(Expr *expr)
 			sub[i] = temp;
 		}
 		// otherwise take a copy (so result won't be obliterated by deleting the source)
-		else sub[i] = new Expr(std::move(*add[i]));
+		else sub[i] = new Expr(std::move(*sub[i]));
 	}
 
 	// stitch together the new tree
