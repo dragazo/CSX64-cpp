@@ -162,7 +162,6 @@
     <ClCompile Include="OFile.cpp" />
     <ClCompile Include="Operators.cpp" />
     <ClCompile Include="Syscall.cpp" />
-    <ClCompile Include="ExeTypes.cpp" />
     <ClCompile Include="Utility.cpp" />
   </ItemGroup>
   <ItemGroup>

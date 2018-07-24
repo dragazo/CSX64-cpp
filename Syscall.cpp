@@ -25,7 +25,7 @@ namespace CSX64
 		if (RCX() < ReadonlyBarrier) { Terminate(ErrorCode::AccessViolation); return false; }
 
 		// read from the file
-		fd.BaseStream->read((char*)Memory.data() + RCX(), RDX());
+		fd.BaseStream->read((char*)mem + RCX(), RDX());
 		u64 n = fd.BaseStream->gcount();
 
 		// if we got nothing but it's interactive
@@ -56,7 +56,7 @@ namespace CSX64
 		if (RCX() >= MemorySize() || RCX() + RDX() > MemorySize()) { Terminate(ErrorCode::OutOfBounds); return false; }
 
 		// attempt to write from memory to the file
-		fd.BaseStream->write((char*)Memory.data() + RCX(), RDX());
+		fd.BaseStream->write((char*)mem + RCX(), RDX());
 	}
 
 	bool Computer::Process_sys_open()
@@ -176,7 +176,7 @@ namespace CSX64
 		// otherwise perform the reallocation
 		else
 		{
-			Memory.resize(RBX());
+			realloc(RBX());
 			RAX() = 0;
 		}
 

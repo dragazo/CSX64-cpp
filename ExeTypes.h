@@ -122,11 +122,8 @@ namespace CSX64
 
 		inline u8 &x8h() { return *((u8*)&data + 1); }
 
-		/// <summary>
-		/// Gets/sets the register partition with the specified size code
-		/// </summary>
-		/// <param name="sizecode">the size code to select</param>
-		CPURegister_sizecode_wrapper operator[](int sizecode);
+		// Gets/sets the register partition with the specified size code
+		inline CPURegister_sizecode_wrapper operator[](int sizecode);
 	};
 	struct CPURegister_sizecode_wrapper
 	{
@@ -145,22 +142,21 @@ namespace CSX64
 			default: throw std::invalid_argument("sizecode must be on range [0,3]");
 			}
 		}
-		inline u64 operator=(u64 value)
+		inline CPURegister_sizecode_wrapper operator=(u64 value)
 		{
 			switch (sizecode)
 			{
-			case 3: return reg.x64() = value;
-			case 2: return reg.x32() = value;
-			case 1: return reg.x16() = value;
-			case 0: return reg.x8() = value;
+			case 3: reg.x64() = value; return *this;
+			case 2: reg.x32() = value; return *this;
+			case 1: reg.x16() = value; return *this;
+			case 0: reg.x8() = value; return *this;
 
 			default: throw std::invalid_argument("sizecode must be on range [0,3]");
 			}
-
-			return *this;
 		}
-		inline u64 operator=(CPURegister_sizecode_wrapper other) { return *this = (u64)other; }
+		inline CPURegister_sizecode_wrapper operator=(CPURegister_sizecode_wrapper other) { *this = (u64)other; return *this; }
 	};
+	CPURegister_sizecode_wrapper CPURegister::operator[](int sizecode) { return {*this, sizecode}; }
 
 	struct ZMMRegister_sizecode_wrapper;
 	// Represents a 512-bit register used by vpu instructions
@@ -188,7 +184,7 @@ namespace CSX64
 
 		// -- sizecode access utilities -- //
 
-		ZMMRegister_sizecode_wrapper uint(int sizecode, int index);
+		inline ZMMRegister_sizecode_wrapper uint(int sizecode, int index);
 	};
 	struct ZMMRegister_sizecode_wrapper
 	{
@@ -208,21 +204,21 @@ namespace CSX64
 			default: throw std::invalid_argument("sizecode must be on range [0,3]");
 			}
 		}
-		inline u64 operator=(u64 value)
+		inline ZMMRegister_sizecode_wrapper operator=(u64 value)
 		{
 			switch (sizecode)
 			{
-			case 3: return reg.uint64(index) = value;
-			case 2: return reg.uint32(index) = value;
-			case 1: return reg.uint16(index) = value;
-			case 0: return reg.uint8(index) = value;
+			case 3: reg.uint64(index) = value; return *this;
+			case 2: reg.uint32(index) = value; return *this;
+			case 1: reg.uint16(index) = value; return *this;
+			case 0: reg.uint8(index) = value; return *this;
 
 			default: throw std::invalid_argument("sizecode must be on range [0,3]");
 			}
 		}
-
-		inline u64 operator=(ZMMRegister_sizecode_wrapper other) { return *this = (u64)other; }
+		inline ZMMRegister_sizecode_wrapper operator=(ZMMRegister_sizecode_wrapper other) { *this = (u64)other; return *this; }
 	};
+	ZMMRegister_sizecode_wrapper ZMMRegister::uint(int sizecode, int index) { return {*this, (i16)index, (i16)sizecode}; }
 
 	/// <summary>
 	/// Represents a file descriptor used by the <see cref="CSX64"/> processor

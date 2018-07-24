@@ -1878,7 +1878,7 @@ bool AssembleArgs::TryProcessFPUBinaryOp(OPCode op, bool integral, bool pop)
 		// if b is st(0) (do this one first since it handles the pop form)
 		if (b == 0)
 		{
-			if (!TryAppendVal(1, (a << 4) | (pop ? 2 : 1ul))) return false;
+			if (!TryAppendVal(1, (a << 4) | (pop ? 2 : (u64)1))) return false;
 		}
 		// if a is st(0)
 		else if (a == 0)
@@ -2108,7 +2108,7 @@ bool AssembleArgs::TryProcessFCOM(OPCode op, bool integral, bool pop, bool pop2,
 		// first arg must be st0
 		if (reg_a != 0) { res = {AssembleError::UsageError, "line " + tostr(line) + ": First operand must be ST(0)"};   return false; }
 
-		if (!TryAppendVal(1, (unordered ? 128 : 0ul) | (reg_b << 4) | (pop ? 12 : 11ul))) return false;
+		if (!TryAppendVal(1, (unordered ? 128 : 0ul) | (reg_b << 4) | (pop ? 12 : 11))) return false;
 	}
 	else { res = {AssembleError::ArgCount, "line " + tostr(line) + ": Too many operands"};   return false; }
 

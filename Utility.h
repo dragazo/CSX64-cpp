@@ -120,50 +120,12 @@ namespace CSX64
 
 	u64 Rand64(std::default_random_engine &engine);
 
-	/// <summary>
-	/// Returns true if this value is a power of two. (zero returns false)
-	/// </summary>
-	bool IsPowerOf2(u64 val);
-
-	/// <summary>
-	/// Extracts 2 distinct powers of 2 from the specified value. Returns true if the value is made up of exactly two non-zero powers of 2.
-	/// </summary>
-	/// <param name="val">the value to process</param>
-	/// <param name="a">the first (larger) power of 2</param>
-	/// <param name="b">the second (smaller) power of 2</param>
-	bool Extract2PowersOf2(u64 val, u64 &a, u64 &b);
-
-	void ExtractDouble(double val, double &exp, double &sig);
-	double AssembleDouble(double exp, double sig);
-
-	/// <summary>
-	/// Returns true if the floating-point value is denormalized (including +-0)
-	/// </summary>
-	/// <param name="val">the value to test</param>
-	bool IsDenorm(double val);
-
 	// -- memory utilities -- //
 
-	// writes a value to the array. T should be a POD type
-	template<typename T>
-	bool Write(std::vector<u8> &arr, u64 pos, const T &val)
-	{
-		// make sure we're not exceeding memory bounds
-		if (pos >= arr.size() || pos + sizeof(T) > arr.size()) return false;
-
-		std::memcpy(&arr[pos], &val, sizeof(T));
-		return true;
-	}
-	// reads a value from the array. T should be a POD type
-	template<typename T>
-	bool Read(std::vector<u8> &arr, u64 pos, T &val)
-	{
-		// make sure we're not exceeding memory bounds
-		if (pos >= arr.size() || pos + sizeof(T) > arr.size()) return false;
-
-		std::memcpy(&val, &arr[pos], sizeof(T));
-		return true;
-	}
+	// allocates aligned memory. must be deallocated by aligned_free(). calling with 0 returns nullptr
+	void *aligned_malloc(std::size_t size, std::size_t align);
+	// deallocates memory allocated by aligned_malloc(). calling with nullptr is no-op.
+	void aligned_free(void *ptr);
 
 	/// <summary>
 	/// Writes a value to the array
@@ -217,23 +179,9 @@ namespace CSX64
 	/// <param name="size">the size to align to</param>
 	void Align(std::vector<u8> &arr, u64 size);
 
-	/// <summary>
-	/// Writes an ASCII C-style string to memory. Returns true on success
-	/// </summary>
-	/// <param name="arr">the data array to write to</param>
-	/// <param name="pos">the position in the array to begin writing</param>
-	/// <param name="str">the string to write</param>
-	bool WriteCString(std::vector<u8> &arr, u64 pos, const std::string &str);
-	/// <summary>
-	/// Reads an ASCII C-style string from memory. Returns true on success
-	/// </summary>
-	/// <param name="arr">the data array to read from</param>
-	/// <param name="pos">the position in the array to begin reading</param>
-	/// <param name="str">the string read</param>
-	bool ReadCString(const std::vector<u8> &arr, u64 pos, std::string &str);
-
 	// -- string stuff -- //
 
+	// converts the argument into a string via operator<<
 	template<typename T>
 	std::string tostr(const T &val)
 	{
@@ -241,7 +189,7 @@ namespace CSX64
 		ostr << val;
 		return ostr.str();
 	}
-
+	// converts the argument into a hexx string via operator<<
 	template<typename T>
 	std::string tohex(T val)
 	{
@@ -250,13 +198,7 @@ namespace CSX64
 		return ostr.str();
 	}
 
-	std::string TrimStart(const std::string &str);
-	std::string TrimEnd(const std::string &str);
-	std::string TrimEnd(std::string &&str);
-	std::string Trim(const std::string &str);
-
-	bool TryExtractStringChars(const std::string &token, std::string &chars, std::string &err);
-
+	// converts a string to uppercase (std::toupper)
 	template<typename T>
 	std::string ToUpper(T &&str)
 	{
@@ -265,6 +207,17 @@ namespace CSX64
 			res[i] = std::toupper(res[i]);
 		return res;
 	}
+
+	// removes leading white space (std::isspace)
+	std::string TrimStart(const std::string &str);
+	// removes trailing white space (std::isspace)
+	std::string TrimEnd(const std::string &str);
+	std::string TrimEnd(std::string &&str);
+	// removes leading and trailing white space (std::isspace)
+	std::string Trim(const std::string &str);
+
+	// extracts the characters that a quoted assembly string token would yield
+	bool TryExtractStringChars(const std::string &token, std::string &chars, std::string &err);
 
 	/// <summary>
 	/// Gets the numeric value of a hexadecimal digit. returns true if the character was in the hex range.
@@ -287,10 +240,6 @@ namespace CSX64
 	/// <param name="str">the string to test</param>
 	/// <param name="ch">the character to look for</param>
 	bool Contains(const std::string &str, char ch);
-	/// <summary>
-	/// Removes ALL white space from a string
-	/// </summary>
-	std::string RemoveWhiteSpace(const std::string &str);
 
 	/// <summary>
 	/// Returns true if the string starts with the specified character
@@ -320,87 +269,126 @@ namespace CSX64
 	// -- CSX64 encoding utilities -- //
 
 	/// <summary>
+	/// Returns true if this value is a power of two. (zero returns false)
+	/// </summary>
+	constexpr bool IsPowerOf2(u64 val) { return val != 0 && (val & (val - 1)) == 0; }
+
+	/// <summary>
+	/// Extracts 2 distinct powers of 2 from the specified value. Returns true if the value is made up of exactly two non-zero powers of 2.
+	/// </summary>
+	/// <param name="val">the value to process</param>
+	/// <param name="a">the first (larger) power of 2</param>
+	/// <param name="b">the second (smaller) power of 2</param>
+	bool Extract2PowersOf2(u64 val, u64 &a, u64 &b);
+
+	/// <summary>
 	/// Gets the bitmask for the sign bit of an integer with the specified sizecode
 	/// </summary>
 	/// <param name="sizecode">the sizecode specifying the width of integer to examine</param>
-	u64 SignMask(u64 sizecode);
+	constexpr u64 SignMask(u64 sizecode) { return (u64)1 << ((8 << sizecode) - 1); }
 	/// <summary>
 	/// Gets the bitmask that includes the entire valid domain of an integer with the specified width
 	/// </summary>
 	/// <param name="sizecode">the sizecode specifying the width of integer to examine</param>
-	u64 TruncMask(u64 sizecode);
+	constexpr u64 TruncMask(u64 sizecode) { u64 res = SignMask(sizecode); return res | (res - 1); }
 
 	/// <summary>
 	/// Returns if the value with specified size code is positive
 	/// </summary>
 	/// <param name="val">the value to process</param>
 	/// <param name="sizecode">the current size code of the value</param>
-	bool Positive(u64 val, u64 sizecode);
+	constexpr bool Positive(u64 val, u64 sizecode) { return (val & SignMask(sizecode)) == 0; }
 	/// <summary>
 	/// Returns if the value with specified size code is negative
 	/// </summary>
 	/// <param name="val">the value to process</param>
 	/// <param name="sizecode">the current size code of the value</param>
-	bool Negative(u64 val, u64 sizecode);
+	constexpr bool Negative(u64 val, u64 sizecode) { return (val & SignMask(sizecode)) != 0; }
 
 	/// <summary>
 	/// Sign extends a value to 64-bits
 	/// </summary>
 	/// <param name="val">the value to sign extend</param>
 	/// <param name="sizecode">the current size code</param>
-	u64 SignExtend(u64 val, u64 sizecode);
+	constexpr u64 SignExtend(u64 val, u64 sizecode) { return Positive(val, sizecode) ? val : val | ~TruncMask(sizecode); }
 	/// <summary>
 	/// Truncates the value to the specified size code (can also be used to zero extend a value)
 	/// </summary>
 	/// <param name="val">the value to truncate</param>
 	/// <param name="sizecode">the size code to truncate to</param>
-	u64 Truncate(u64 val, u64 sizecode);
+	constexpr u64 Truncate(u64 val, u64 sizecode) { return val & TruncMask(sizecode); }
 
 	/// <summary>
 	/// Parses a 2-bit size code into an actual size (in bytes) 0:1  1:2  2:4  3:8
 	/// </summary>
 	/// <param name="sizecode">the code to parse</param>
-	u64 Size(u64 sizecode);
+	constexpr u64 Size(u64 sizecode) { return (u64)1 << sizecode; }
 	/// <summary>
 	/// Parses a 2-bit size code into an actual size (in bits) 0:8  1:16  2:32  3:64
 	/// </summary>
 	/// <param name="sizecode">the code to parse</param>
-	u64 SizeBits(u64 sizecode);
+	constexpr u64 SizeBits(u64 sizecode) { return (u64)8 << sizecode; }
 
 	/// <summary>
 	/// Gets the sizecode of the specified size. Throws <see cref="ArgumentException"/> if the size is not a power of 2
 	/// </summary>
 	/// <param name="size">the size</param>
 	/// <exception cref="ArgumentException"></exception>
-	u64 Sizecode(u64 size);
+	constexpr u64 Sizecode(u64 size)
+	{
+		if (!IsPowerOf2(size)) throw std::invalid_argument("argument was not a power of 2");
+
+		// compute sizecode by repeated shifting
+		for (int i = 0; ; ++i)
+		{
+			size >>= 1;
+			if (size == 0) return i;
+		}
+	}
 
 	/// <summary>
 	/// returns an elementary word size in bytes sufficient to hold the specified number of bits
 	/// </summary>
 	/// <param name="bits">the number of bits in the representation</param>
-	u64 BitsToBytes(u64 bits);
+	constexpr u64 BitsToBytes(u64 bits)
+	{
+		if (bits <= 8) return 1;
+		else if (bits <= 16) return 2;
+		else if (bits <= 32) return 4;
+		else if (bits <= 64) return 8;
+		else throw std::invalid_argument("bit size must be in range [0,64]");
+	}
 
 	/// <summary>
 	/// Interprets a double as its raw bits
 	/// </summary>
 	/// <param name="val">value to interpret</param>
-	u64 DoubleAsUInt64(double val);
+	constexpr u64 DoubleAsUInt64(double val) { return *(u64*)&val; }
 	/// <summary>
 	/// Interprets raw bits as a double
 	/// </summary>
 	/// <param name="val">value to interpret</param>
-	double AsDouble(u64 val);
+	constexpr double AsDouble(u64 val) { return *(double*)&val; }
 
 	/// <summary>
 	/// Interprets a float as its raw bits (placed in low 32 bits)
 	/// </summary>
 	/// <param name="val">the float to interpret</param>
-	u64 FloatAsUInt64(float val);
+	constexpr u64 FloatAsUInt64(float val) { return *(std::uint32_t*)&val; }
 	/// <summary>
 	/// Interprets raw bits as a float (low 32 bits)
 	/// </summary>
 	/// <param name="val">the bits to interpret</param>
-	float AsFloat(std::uint32_t val);
+	constexpr float AsFloat(u32 val) { return *(float*)&val; }
+
+	void ExtractDouble(double val, double &exp, double &sig);
+	double AssembleDouble(double exp, double sig);
+
+	/// <summary>
+	/// Returns true if the floating-point value is denormalized (including +-0)
+	/// </summary>
+	/// <param name="val">the value to test</param>
+	constexpr bool IsDenorm(double val) { return (DoubleAsUInt64(val) & 0x7ff0000000000000ul) == 0; }
 }
 
 #endif

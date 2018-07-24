@@ -27,7 +27,9 @@ namespace CSX64
 
 	//protected:
 
-		std::vector<u8> Memory;
+		void *mem;
+		u64 mem_size;
+
 		FileDescriptor FileDescriptors[FDCount];
 
 		std::default_random_engine Rand;
@@ -41,7 +43,7 @@ namespace CSX64
 		/// <summary>
 		/// Gets the amount of memory (in bytes) the computer currently has access to
 		/// </summary>
-		u64 MemorySize() const { return Memory.size(); }
+		u64 MemorySize() const { return mem_size; }
 		/// <summary>
 		/// Gets the amount of memory (in bytes) the computer initially had access to
 		/// </summary>
@@ -82,7 +84,7 @@ namespace CSX64
 		/// <summary>
 		/// Validates the machine for operation, but does not prepare it for execute (see Initialize)
 		/// </summary>
-		Computer()
+		Computer() : mem(nullptr), mem_size(0)
 		{
 			// define initial state
 			Running = false;
@@ -90,7 +92,31 @@ namespace CSX64
 		}
 		~Computer()
 		{
+			aligned_free(mem);
 			CloseFiles();
+		}
+		
+		// reallocates the current array to be the specified size
+		void realloc(u64 size)
+		{
+			// get the new array
+			void *ptr = aligned_malloc(size, 64); // 64-byte aligned in case we want to use mm512 intrinsics later on
+			// copy over the data
+			std::memcpy(ptr, mem, std::min(mem_size, size));
+
+			// delete old array
+			aligned_free(mem);
+
+			// use new array
+			mem = ptr;
+			mem_size = size;
+		}
+		// trashes the current array and creates a new array with the specified size
+		void alloc(u64 size)
+		{
+			// trick realloc() to do our work for us
+			mem_size = 0;
+			realloc(size);
 		}
 
 		/// <summary>
@@ -228,30 +254,33 @@ namespace CSX64
 		// Writes a string containing all non-vpu register/flag states"/>
 		std::ostream &WriteCPUDebugString(std::ostream &ostr)
 		{
+			std::ios::fmtflags flags = ostr.flags();
 			ostr << std::hex << std::setfill('0');
 
 			ostr << "RAX: " << std::setw(16) << RAX() << "     CF: " << CF() << "     RFLAGS: " << std::setw(16) << RFLAGS() << '\n';
 			ostr << "RBX: " << std::setw(16) << RBX() << "     PF: " << PF() << "     RIP:    " << std::setw(16) << RIP() << '\n';
 			ostr << "RCX: " << std::setw(16) << RCX() << "     AF: " << AF() << '\n';
-			ostr << "RDX: " << std::setw(16) << RDX() << "     ZF: " << ZF() << "     ST0: " << std::setw(16) << RFLAGS() << '\n';
-			ostr << "RSI: " << std::setw(16) << RSI() << "     SF: " << SF() << "     ST1: " << std::setw(16) << RFLAGS() << '\n';
-			ostr << "RDI: " << std::setw(16) << RDI() << "     OF: " << OF() << "     ST2: " << std::setw(16) << RFLAGS() << '\n';
-			ostr << "RBP: " << std::setw(16) << RBP() << "               ST3: " << CF() << "     RFLAGS: " << std::setw(16) << RFLAGS() << '\n';
-			ostr << "RSP: " << std::setw(16) << RSP() << "     b:  " << CF() << "     RFLAGS: " << std::setw(16) << RFLAGS() << '\n';
-			ostr << "R8:  " << std::setw(16) << R8() << "     be: " << CF() << "     RFLAGS: " << std::setw(16) << RFLAGS() << '\n';
-			ostr << "R9:  " << std::setw(16) << R9() << "     a:  " << CF() << "     RFLAGS: " << std::setw(16) << RFLAGS() << '\n';
-			ostr << "R10: " << std::setw(16) << R10() << "    ae: " << CF() << "     RFLAGS: " << std::setw(16) << RFLAGS() << '\n';
-			ostr << "R11: " << std::setw(16) << R11() << "         " << CF() << "     RFLAGS: " << std::setw(16) << RFLAGS() << '\n';
-			ostr << "R12: " << std::setw(16) << R12() << "     l:  " << CF() << "     RFLAGS: " << std::setw(16) << RFLAGS() << '\n';
-			ostr << "R13: " << std::setw(16) << R13() << "     le: " << CF() << "     RFLAGS: " << std::setw(16) << RFLAGS() << '\n';
-			ostr << "R14: " << std::setw(16) << R14() << "     g:  " << CF() << "     RFLAGS: " << std::setw(16) << RFLAGS() << '\n';
-			ostr << "R15: " << std::setw(16) << R15() << "     ge: " << CF() << "     RFLAGS: " << std::setw(16) << RFLAGS() << '\n';
+			ostr << "RDX: " << std::setw(16) << RDX() << "     ZF: " << ZF() << "     ST0: " << (ST_Tag(0) != FPU_Tag_empty ? tostr(ST(0)) : "Empty") << '\n';
+			ostr << "RSI: " << std::setw(16) << RSI() << "     SF: " << SF() << "     ST1: " << (ST_Tag(1) != FPU_Tag_empty ? tostr(ST(1)) : "Empty") << '\n';
+			ostr << "RDI: " << std::setw(16) << RDI() << "     OF: " << OF() << "     ST2: " << (ST_Tag(2) != FPU_Tag_empty ? tostr(ST(2)) : "Empty") << '\n';
+			ostr << "RBP: " << std::setw(16) << RBP() << "               ST3: " << (ST_Tag(3) != FPU_Tag_empty ? tostr(ST(3)) : "Empty") << '\n';
+			ostr << "RSP: " << std::setw(16) << RSP() << "     b:  " << CF() << "     ST4: " << (ST_Tag(4) != FPU_Tag_empty ? tostr(ST(4)) : "Empty") << '\n';
+			ostr << "R8:  " << std::setw(16) << R8() << "     be: " << CF() << "     ST5: " << (ST_Tag(5) != FPU_Tag_empty ? tostr(ST(5)) : "Empty") << '\n';
+			ostr << "R9:  " << std::setw(16) << R9() << "     a:  " << CF() << "     ST6: " << (ST_Tag(6) != FPU_Tag_empty ? tostr(ST(6)) : "Empty") << '\n';
+			ostr << "R10: " << std::setw(16) << R10() << "     ae: " << CF() << "     ST7: " << (ST_Tag(7) != FPU_Tag_empty ? tostr(ST(7)) : "Empty") << '\n';
+			ostr << "R11: " << std::setw(16) << R11() << "         " << CF() << '\n';
+			ostr << "R12: " << std::setw(16) << R12() << "     l:  " << CF() << "     C0: " << FPU_C0() << '\n';
+			ostr << "R13: " << std::setw(16) << R13() << "     le: " << CF() << "     C1: " << FPU_C1() << '\n';
+			ostr << "R14: " << std::setw(16) << R14() << "     g:  " << CF() << "     C2: " << FPU_C2() << '\n';
+			ostr << "R15: " << std::setw(16) << R15() << "     ge: " << CF() << "     C3: " << FPU_C3() << '\n';
 
+			ostr.flags(flags);
 			return ostr;
 		}
 		// Writes a string containing all vpu register states
 		std::ostream &WriteVPUDebugString(std::ostream &ostr)
 		{
+			std::ios::fmtflags flags = ostr.flags();
 			ostr << std::hex << std::setfill('0');
 
 			for (int i = 0; i < 32; ++i)
@@ -264,6 +293,7 @@ namespace CSX64
 				ostr << '\n';
 			}
 
+			ostr.flags(flags);
 			return ostr;
 		}
 		// Writes a string containing both <see cref="GetCPUDebugString"/> and <see cref="GetVPUDebugString"/>
@@ -282,34 +312,39 @@ namespace CSX64
 	public:
 		// -- public memory utilities -- //
 
-		/// <summary>
-		/// Reads a C-style string from memory. Returns true if successful, otherwise fails with OutOfBounds and returns false
-		/// </summary>
-		/// <param name="pos">the address in memory of the first character in the string</param>
-		/// <param name="charsize">the size of each character in bytes</param>
-		/// <param name="str">the resulting string</param>
-		/// <param name="_abide_slow">if the memory access should abide by SMF. only pass false if it makes sense, otherwise slow should be slow</param>
+		// Reads a C-style string from memory. Returns true if successful, otherwise fails with OutOfBounds and returns false
 		bool GetCString(u64 pos, std::string &str)
 		{
-			// refer to utility function
-			if (!ReadCString(Memory, pos, str)) { Terminate(ErrorCode::OutOfBounds); return false; }
+			str.clear();
+
+			// read the string
+			const char *ptr = (const char*)mem + pos;
+			for (; ; ++pos, ++ptr)
+			{
+				// ensure we're in bounds
+				if (pos >= mem_size) { Terminate(ErrorCode::OutOfBounds); return false; }
+
+				// if it's not a terminator, append it
+				if (*ptr != 0) str.push_back(*ptr);
+				// otherwise we're done reading
+				else break;
+			}
 
 			return true;
 		}
-		/// <summary>
-		/// Writes a C-style string to memory. Returns true if successful, otherwise fails with OutOfBounds and returns false
-		/// </summary>
-		/// <param name="pos">the address in memory of the first character to write</param>
-		/// <param name="charsize">the size of each character in bytes</param>
-		/// <param name="str">the string to write</param>
-		/// <param name="_abide_slow">if the memory access should abide by SMF. only pass false if it makes sense, otherwise slow should be slow</param>
+		// Writes a C-style string to memory. Returns true if successful, otherwise fails with OutOfBounds and returns false
 		bool SetCString(u64 pos, const std::string &str)
 		{
 			// make sure we're not in the readonly segment
 			if (pos < ReadonlyBarrier) { Terminate(ErrorCode::AccessViolation); return false; }
 
-			// refer to utility function
-			if (!WriteCString(Memory, pos, str)) { Terminate(ErrorCode::OutOfBounds); return false; }
+			// make sure we're not exceeding memory bounds
+			if (pos >= mem_size || pos + (str.size() + 1) > mem_size) return false;
+
+			// write the string
+			std::memcpy((char*)mem + pos, str.data(), str.size());
+			// write a null terminator
+			((char*)mem + pos)[str.size()] = 0;
 
 			return true;
 		}
@@ -317,42 +352,42 @@ namespace CSX64
 		template<typename T>
 		bool GetMem(u64 pos, T &val)
 		{
-			// refer to utility function
-			if (!Read(Memory, pos, val)) { Terminate(ErrorCode::OutOfBounds); return false; }
+			// make sure we're in bounds
+			if (pos >= mem_size || pos + sizeof(T) > mem_size) { Terminate(ErrorCode::OutOfBounds); return false; }
+
+			// read the memory
+			std::memcpy(&val, (char*)mem + pos, sizeof(T));
 			return true;
 		}
 		template<typename T>
 		bool SetMem(u64 pos, const T &val)
 		{
-			// refer to utility function
-			if (!Write(Memory, pos, val)) { Terminate(ErrorCode::OutOfBounds); return false; }
+			// make sure we're in bounds
+			if (pos >= mem_size || pos + sizeof(T) > mem_size) { Terminate(ErrorCode::OutOfBounds); return false; }
+
+			// write the memory
+			std::memcpy((char*)mem + pos, &val, sizeof(T));
 			return true;
 		}
 
 		template<typename T>
 		bool Pop(T &val)
 		{
-			// refer to utility function
-			if (!Read(Memory, RSP(), val)) { Terminate(ErrorCode::OutOfBounds); return false; }
+			if (!GetMem(RSP(), val)) return false;
 			RSP() += sizeof(T);
 			return true;
 		}
 		template<typename T>
 		bool Push(const T &val)
 		{
-			// refer to utility function
 			RSP() -= sizeof(T);
-			if (!Write(Memory, RSP(), val)) { Terminate(ErrorCode::OutOfBounds); return false; }
+			if (!SetMem(RSP(), val)) return false;
 			return true;
 		}
 
 	private: // -- private memory utilities -- //
 
-		/// <summary>
-	/// Pushes a value onto the stack
-	/// </summary>
-	/// <param name="size">the size of the value (in bytes)</param>
-	/// <param name="val">the value to push</param>
+		// Pushes a value onto the stack
 		bool PushRaw(u64 size, u64 val)
 		{
 			RSP() -= size;
@@ -362,11 +397,7 @@ namespace CSX64
 
 			return SetMemRaw(RSP(), size, val);
 		}
-		/// <summary>
 		/// Pops a value from the stack
-		/// </summary>
-		/// <param name="size">the size of the value (in bytes)</param>
-		/// <param name="val">the resulting value</param>
 		bool PopRaw(u64 size, u64 &val)
 		{
 			// do stack barrier test before increment (makes sure the value we're fetching was in the stack segment)
@@ -378,39 +409,86 @@ namespace CSX64
 			return true;
 		}
 
-		/// <summary>
-		/// Reads a value from memory (fails with OutOfBounds if invalid). if SMF is set, delays 
-		/// </summary>
-		/// <param name="pos">Address to read</param>
-		/// <param name="size">Number of bytes to read</param>
-		/// <param name="res">The result</param>
-		bool GetMemRaw(u64 pos, u64 size, u64 &res)
+		template<typename T>
+		bool PushRaw(u64 val)
 		{
-			// refer to utility function
-			if (!Read(Memory, pos, size, res)) { Terminate(ErrorCode::OutOfBounds); return false; }
+			RSP() -= sizeof(T);
+
+			// do the stack barrier test
+			if (RSP() < StackBarrier) { Terminate(ErrorCode::StackOverflow); return false; }
+
+			return SetMemRaw<T>(RSP(), val);
+		}
+		template<typename T>
+		bool PopRaw(u64 &val)
+		{
+			// do stack barrier test before increment (makes sure the value we're fetching was in the stack segment)
+			if (RSP() < StackBarrier) { Terminate(ErrorCode::StackOverflow); return false; }
+
+			if (!GetMemRaw<T>(RSP(), val)) return false;
+			RSP() += sizeof(T);
+
 			return true;
 		}
-		/// <summary>
-		/// Writes a value to memory (fails with OutOfBounds if invalid)
-		/// </summary>
-		/// <param name="pos">Address to write</param>
-		/// <param name="size">Number of bytes to write</param>
-		/// <param name="val">The value to write</param>
+
+		// Reads a value from memory
+		bool GetMemRaw(u64 pos, u64 size, u64 &res)
+		{
+			// make sure access is in bounds
+			if (pos >= mem_size || pos + size > mem_size) { Terminate(ErrorCode::OutOfBounds); return false; }
+			
+			switch (size)
+			{
+			case 8: res = *(u64*)((char*)mem + pos); return true;
+			case 4: res = *(u32*)((char*)mem + pos); return true;
+			case 2: res = *(u16*)((char*)mem + pos); return true;
+			case 1: res = *(u8*)((char*)mem + pos); return true;
+
+			default: Terminate(ErrorCode::UndefinedBehavior); return false;
+			}
+		}
+		// Writes a value to memory (fails with OutOfBounds if invalid)
 		bool SetMemRaw(u64 pos, u64 size, u64 val)
 		{
+			// make sure access is in bounds
+			if (pos >= mem_size || pos + size > mem_size) { Terminate(ErrorCode::OutOfBounds); return false; }
+
 			// make sure we're not in the readonly segment
 			if (pos < ReadonlyBarrier) { Terminate(ErrorCode::AccessViolation); return false; }
 
-			// refer to utility function
-			if (!Write(Memory, pos, size, val)) { Terminate(ErrorCode::OutOfBounds); return false; }
+			switch (size)
+			{
+			case 8: *(u64*)((char*)mem + pos) = val; return true;
+			case 4: *(u32*)((char*)mem + pos) = val; return true;
+			case 2: *(u16*)((char*)mem + pos) = val; return true;
+			case 1: *(u8*)((char*)mem + pos) = val; return true;
+
+			default: Terminate(ErrorCode::UndefinedBehavior); return false;
+			}
+		}
+
+		// gets an integer from memory of type T at pos and stores it in res
+		template<typename T>
+		bool GetMemRaw(u64 pos, u64 &res)
+		{
+			// make sure access is in bounds
+			if (pos >= mem_size || pos + sizeof(T) > mem_size) { Terminate(ErrorCode::OutOfBounds); return false; }
+
+			res = *(T*)((char*)mem + pos);
+			return true;
+		}
+		// writes val to a memory location of type T at pos
+		template<typename T>
+		bool SetMemRaw(u64 pos, u64 val)
+		{
+			// make sure access is in bounds
+			if (pos >= mem_size || pos + sizeof(T) > mem_size) { Terminate(ErrorCode::OutOfBounds); return false; }
+
+			*(T*)((char*)mem + pos) = val;
 			return true;
 		}
 
-		/// <summary>
-		/// Gets a value at and advances the execution pointer (fails with OutOfBounds if invalid)
-		/// </summary>
-		/// <param name="size">Number of bytes to read</param>
-		/// <param name="res">The result</param>
+		// Gets a value and advances the execution pointer (fails with OutOfBounds if invalid)
 		bool GetMemAdv(u64 size, u64 &res)
 		{
 			// make sure we can get the memory
@@ -418,6 +496,15 @@ namespace CSX64
 			RIP() += size;
 			return true;
 		}
+		template<typename T>
+		bool GetMemAdv(u64 &res)
+		{
+			// make sure we can get the memory
+			if (!GetMemRaw<T>(RIP(), res)) return false;
+			RIP() += sizeof(T);
+			return true;
+		}
+
 		/// <summary>
 		/// Gets an address and advances the execution pointer
 		/// </summary>
@@ -666,7 +753,7 @@ namespace CSX64
 				 */
 			bool FetchTernaryOpFormat(u64 &s, u64 &a, u64 &b)
 			{
-				if (!GetMemAdv(1, s)) { a = b = 0; return false; }
+				if (!GetMemAdv<u8>(s)) return false;
 				u64 sizecode = (s >> 2) & 3;
 
 				// make sure dest will be valid for storing (high flag)
@@ -710,7 +797,7 @@ namespace CSX64
 				bool get_a = true, int _a_sizecode = -1, int _b_sizecode = -1, bool allow_b_mem = true)
 			{
 				// read settings
-				if (!GetMemAdv(1, s1) || !GetMemAdv(1, s2)) { s2 = 0; return false; }
+				if (!GetMemAdv<u8>(s1) || !GetMemAdv<u8>(s2)) return false;
 
 				// if they requested an explicit size for a, change it in the settings byte
 				if (_a_sizecode != -1) s1 = (s1 & 0xf3) | ((u64)_a_sizecode << 2);
@@ -821,7 +908,7 @@ namespace CSX64
 			bool FetchUnaryOpFormat(u64 &s, u64 &m, u64 &a, bool get_a = true, int _a_sizecode = -1)
 			{
 				// read settings
-				if (!GetMemAdv(1, s)) return false;
+				if (!GetMemAdv<u8>(s)) return false;
 
 				// if they requested an explicit size for a, change it in the settings byte
 				if (_a_sizecode != -1) s = (s & 0xf3) | ((u64)_a_sizecode << 2);
@@ -873,13 +960,13 @@ namespace CSX64
 			bool FetchShiftOpFormat(u64 &s, u64 &m, u64 &val, u64 &count)
 			{
 				// read settings byte
-				if (!GetMemAdv(1, s) || !GetMemAdv(1, count)) return false;
+				if (!GetMemAdv<u8>(s) || !GetMemAdv<u8>(count)) return false;
 				u64 sizecode = (s >> 2) & 3;
 
 				// if count set CL flag, replace it with that
 				if ((count & 0x80) != 0) count = CL();
 				// mask count
-				count = count & (sizecode == 3 ? 0x3ful : 0x1ful);
+				count = count & (sizecode == 3 ? 0x3f : 0x1f);
 
 				// if dest is a register
 				if ((s & 1) == 0)
@@ -924,7 +1011,7 @@ namespace CSX64
 			*/
 			bool FetchIMMRMFormat(u64 &s, u64 &a, int _a_sizecode = -1)
 			{
-				if (!GetMemAdv(1, s)) return false;
+				if (!GetMemAdv<u8>(s)) return false;
 
 				u64 a_sizecode = _a_sizecode == -1 ? (s >> 2) & 3 : (u64)_a_sizecode;
 
@@ -955,7 +1042,7 @@ namespace CSX64
 			*/
 			bool FetchRR_RMFormat(u64 &s1, u64 &s2, u64 &dest, u64 &a, u64 &b)
 			{
-				if (!GetMemAdv(1, s1) || !GetMemAdv(1, s2)) return false;
+				if (!GetMemAdv<u8>(s1) || !GetMemAdv<u8>(s2)) return false;
 				u64 sizecode = (s1 >> 2) & 3;
 
 				// if dest is high
@@ -1004,21 +1091,26 @@ namespace CSX64
 				return true;
 			}
 
+			#define p2(b) b, !b, !b, b
+			#define p4(b) p2(b), p2(!b), p2(!b), p2(b)
+			#define p6(b) p4(b), p4(!b), p4(!b), p4(b)
+			// (even) parity table is computed by preprocessor - used for updating PF flag
+			static constexpr bool parity_table[256] = {p6(true), p6(false), p6(false), p6(true)};
+			#undef p6
+			#undef p4
+			#undef p2
+
 			// updates the flags for integral ops (identical for most integral ops)
 			void UpdateFlagsZSP(u64 value, u64 sizecode)
 			{
 				ZF() = value == 0;
 				SF() = Negative(value, sizecode);
-
-				// compute parity flag (only of low 8 bits)
-				bool parity = true;
-				for (u64 i = 128; i != 0; i >>= 1) if ((value & i) != 0) parity = !parity;
-				PF() = parity;
+				PF() = parity_table[value & 0xff];
 			}
 
 			// -- impl -- //
 
-			const u64 ModifiableFlags = 0x003f0fd5ul;
+			static constexpr u64 ModifiableFlags = 0x003f0fd5ul;
 
 			/*
 			[8: mode]
@@ -1034,7 +1126,7 @@ namespace CSX64
 			bool ProcessSTLDF()
 			{
 				u64 ext;
-				if (!GetMemAdv(1, ext)) return false;
+				if (!GetMemAdv<u8>(ext)) return false;
 
 				switch (ext)
 				{
@@ -1077,7 +1169,7 @@ namespace CSX64
 			bool ProcessFlagManip()
 			{
 				u64 ext;
-				if (!GetMemAdv(1, ext)) return false;
+				if (!GetMemAdv<u8>(ext)) return false;
 
 				switch (ext)
 				{
@@ -1119,7 +1211,7 @@ namespace CSX64
 			bool ProcessSETcc()
 			{
 				u64 ext, s, m, _dest;
-				if (!GetMemAdv(1, ext)) return false;
+				if (!GetMemAdv<u8>(ext)) return false;
 				if (!FetchUnaryOpFormat(s, m, _dest, false, 0)) return false;
 
 				// get the flag
@@ -1182,7 +1274,7 @@ namespace CSX64
 			bool ProcessMOVcc()
 			{
 				u64 ext, s1, s2, m, _dest, src;
-				if (!GetMemAdv(1, ext)) return false;
+				if (!GetMemAdv<u8>(ext)) return false;
 				if (!FetchBinaryOpFormat(s1, s2, m, _dest, src, false)) return false;
 
 				// get the flag
@@ -1241,7 +1333,7 @@ namespace CSX64
 			{
 				u64 a, b, temp_1, temp_2;
 
-				if (!GetMemAdv(1, a)) return false;
+				if (!GetMemAdv<u8>(a)) return false;
 				u64 sizecode = (a >> 2) & 3;
 
 				// if a is high
@@ -1325,7 +1417,7 @@ namespace CSX64
 			bool ProcessJcc()
 			{
 				u64 ext, s, val;
-				if (!GetMemAdv(1, ext)) return false;
+				if (!GetMemAdv<u8>(ext)) return false;
 				if (!FetchIMMRMFormat(s, val)) return false;
 				u64 sizecode = (s >> 2) & 3;
 
@@ -1369,7 +1461,7 @@ namespace CSX64
 
 				// get the cc continue flag
 				bool continue_flag;
-				if (!GetMemAdv(1, ext)) return false;
+				if (!GetMemAdv<u8>(ext)) return false;
 				switch (ext)
 				{
 				case 0: continue_flag = true; break; // LOOP
@@ -1417,7 +1509,7 @@ namespace CSX64
 			bool ProcessPOP()
 			{
 				u64 s, val;
-				if (!GetMemAdv(1, s)) return false;
+				if (!GetMemAdv<u8>(s)) return false;
 				u64 sizecode = (s >> 2) & 3;
 
 				// 8-bit pop not allowed
@@ -1443,7 +1535,7 @@ namespace CSX64
 			bool ProcessLEA()
 			{
 				u64 s, address;
-				if (!GetMemAdv(1, s) || !GetAddressAdv(address)) return false;
+				if (!GetMemAdv<u8>(s) || !GetAddressAdv(address)) return false;
 				u64 sizecode = (s >> 2) & 3;
 
 				// LEA doesn't allow 8-bit addressing
@@ -1464,7 +1556,7 @@ namespace CSX64
 				UpdateFlagsZSP(res, sizecode);
 				CF() = res < a;
 				AF() = (res & 0xf) < (a & 0xf); // AF is just like CF but only the low nibble
-				OF() = Positive(a, sizecode) == Positive(b, sizecode) && Positive(a, sizecode) != Positive(res, sizecode);
+				OF() = Positive(a ^ b, sizecode) && Negative(a ^ res, sizecode); // overflow if sign(a)=sign(b) and sign(a)!=sign(res)
 
 				return StoreBinaryOpFormat(s1, s2, m, res);
 			}
@@ -1479,7 +1571,7 @@ namespace CSX64
 				UpdateFlagsZSP(res, sizecode);
 				CF() = a < b; // if a < b, a borrow was taken from the highest bit
 				AF() = (a & 0xf) < (b & 0xf); // AF is just like CF but only the low nibble
-				OF() = Positive(a, sizecode) != Positive(b, sizecode) && Positive(a, sizecode) != Positive(res, sizecode);
+				OF() = Negative(a ^ b, sizecode) && Negative(a ^ res, sizecode); // overflow if sign(a)!=sign(b) and sign(a)!=sign(res)
 
 				return !apply || StoreBinaryOpFormat(s1, s2, m, res);
 			}
@@ -1487,7 +1579,7 @@ namespace CSX64
 			bool ProcessMUL_x()
 			{
 				u64 ext;
-				if (!GetMemAdv(1, ext)) return false;
+				if (!GetMemAdv<u8>(ext)) return false;
 
 				switch (ext)
 				{
@@ -1557,7 +1649,7 @@ namespace CSX64
 			bool ProcessIMUL()
 			{
 				u64 mode;
-				if (!GetMemAdv(1, mode)) return false;
+				if (!GetMemAdv<u8>(mode)) return false;
 
 				switch (mode)
 				{
@@ -1922,7 +2014,7 @@ namespace CSX64
 				if (count != 0)
 				{
 					u64 res = val, temp;
-					u64 high_mask = 1ul << (SizeBits(sizecode) - 1); // mask for highest bit
+					u64 high_mask = (u64)1 << (SizeBits(sizecode) - 1); // mask for highest bit
 					for (u16 i = 0; i < count; ++i)
 					{
 						temp = res << 1; // shift res left by 1, store in temp
@@ -1949,7 +2041,7 @@ namespace CSX64
 				if (count != 0)
 				{
 					u64 res = val, temp;
-					u64 high_mask = 1ul << (SizeBits(sizecode) - 1); // mask for highest bit
+					u64 high_mask = (u64)1 << (SizeBits(sizecode) - 1); // mask for highest bit
 					for (u16 i = 0; i < count; ++i)
 					{
 						temp = res >> 1; // shift res right by 1, store in temp
@@ -1974,7 +2066,8 @@ namespace CSX64
 				u64 res = a & b;
 
 				UpdateFlagsZSP(res, sizecode);
-				OF() = CF() = false;
+				OF() = false;
+				CF() = false;
 				AF() = Rand() & 1;
 
 				return !apply || StoreBinaryOpFormat(s1, s2, m, res);
@@ -1988,7 +2081,8 @@ namespace CSX64
 				u64 res = a | b;
 
 				UpdateFlagsZSP(res, sizecode);
-				OF() = CF() = false;
+				OF() = false;
+				CF() = false;
 				AF() = Rand() & 1;
 
 				return StoreBinaryOpFormat(s1, s2, m, res);
@@ -2002,7 +2096,8 @@ namespace CSX64
 				u64 res = a ^ b;
 
 				UpdateFlagsZSP(res, sizecode);
-				OF() = CF() = false;
+				OF() = false;
+				CF() = false;
 				AF() = Rand() & 1;
 
 				return StoreBinaryOpFormat(s1, s2, m, res);
@@ -2069,7 +2164,9 @@ namespace CSX64
 				u64 sizecode = (s >> 2) & 3;
 
 				UpdateFlagsZSP(a, sizecode);
-				CF() = OF() = AF() = false;
+				CF() = false;
+				OF() = false;
+				AF() = false;
 
 				return true;
 			}
@@ -2107,7 +2204,7 @@ namespace CSX64
 				int pos = (b >> 8) % SizeBits(sizecode);
 				int len = (b & 0xff) % SizeBits(sizecode);
 
-				u64 res = (a >> pos) & ((1ul << len) - 1);
+				u64 res = (a >> pos) & (((u64)1 << len) - 1);
 
 				EFLAGS() = 2; // clear all the (public) flags (flag 1 must always be set)
 				ZF() = res == 0; // ZF is set on zero
@@ -2199,12 +2296,12 @@ namespace CSX64
 			bool ProcessBTx()
 			{
 				u64 ext, s1, s2, m, a, b;
-				if (!GetMemAdv(1, ext)) return false;
+				if (!GetMemAdv<u8>(ext)) return false;
 
 				if (!FetchBinaryOpFormat(s1, s2, m, a, b, true, -1, 0, false)) return false;
 				u64 sizecode = (s1 >> 2) & 3;
 
-				u64 mask = 1ul << (b % SizeBits(sizecode)); // performed modulo-n
+				u64 mask = (u64)1 << (b % SizeBits(sizecode)); // performed modulo-n
 
 				CF() = (a & mask) != 0;
 				OF() = Rand() & 1;
@@ -2235,7 +2332,7 @@ namespace CSX64
 			bool ProcessCxy()
 			{
 				u64 ext;
-				if (!GetMemAdv(1, ext)) return false;
+				if (!GetMemAdv<u8>(ext)) return false;
 
 				switch (ext)
 				{
@@ -2268,7 +2365,7 @@ namespace CSX64
 			bool ProcessMOVxX()
 			{
 				u64 s1, s2, src;
-				if (!GetMemAdv(1, s1) || !GetMemAdv(1, s2)) return false;
+				if (!GetMemAdv<u8>(s1) || !GetMemAdv<u8>(s2)) return false;
 
 				// if source is register
 				if ((s2 & 128) == 0)
@@ -2335,7 +2432,7 @@ namespace CSX64
 			bool ProcessADXX()
 			{
 				u64 ext, s1, s2, m, a, b;
-				if (!GetMemAdv(1, ext)) return false;
+				if (!GetMemAdv<u8>(ext)) return false;
 
 				if (!FetchBinaryOpFormat(s1, s2, m, a, b)) return false;
 				u64 sizecode = (s1 >> 2) & 3;
@@ -2379,7 +2476,7 @@ namespace CSX64
 			bool ProcessAAX()
 			{
 				u64 ext;
-				if (!GetMemAdv(1, ext)) return false;
+				if (!GetMemAdv<u8>(ext)) return false;
 				if (ext > 1) { Terminate(ErrorCode::UndefinedBehavior); return false; }
 
 				if ((AL() & 0xf) > 9 || AF())
@@ -2463,7 +2560,7 @@ namespace CSX64
 			bool FetchFPUBinaryFormat(u64 &s, long double &a, long double &b)
 			{
 				u64 m;
-				if (!GetMemAdv(1, s)) return false;
+				if (!GetMemAdv<u8>(s)) return false;
 
 				// switch through mode
 				switch (s & 7)
@@ -2542,7 +2639,7 @@ namespace CSX64
 			bool ProcessFSTLD_WORD()
 			{
 				u64 m, s;
-				if (!GetMemAdv(1, s)) return false;
+				if (!GetMemAdv<u8>(s)) return false;
 
 				// handle FSTSW AX case specially (doesn't have an address)
 				if (s == 0)
@@ -2555,10 +2652,10 @@ namespace CSX64
 				// switch through mode
 				switch (s)
 				{
-				case 1: return SetMemRaw(m, 2, FPU_status);
-				case 2: return SetMemRaw(m, 2, FPU_control);
+				case 1: return SetMemRaw<u16>(m, FPU_status);
+				case 2: return SetMemRaw<u16>(m, FPU_control);
 				case 3:
-					if (!GetMemRaw(m, 2, m)) return false;
+					if (!GetMemRaw<u16>(m, m)) return false;
 					FPU_control = m;
 					return true;
 
@@ -2569,7 +2666,7 @@ namespace CSX64
 			bool ProcessFLD_const()
 			{
 				u64 ext;
-				if (!GetMemAdv(1, ext)) return false;
+				if (!GetMemAdv<u8>(ext)) return false;
 
 				FPU_C0() = Rand() & 1;
 				FPU_C1() = Rand() & 1;
@@ -2602,7 +2699,7 @@ namespace CSX64
 			bool ProcessFLD()
 			{
 				u64 s, m;
-				if (!GetMemAdv(1, s)) return false;
+				if (!GetMemAdv<u8>(s)) return false;
 
 				FPU_C0() = Rand() & 1;
 				FPU_C1() = Rand() & 1;
@@ -2620,12 +2717,12 @@ namespace CSX64
 					if (!GetAddressAdv(m)) return false;
 					switch (s & 7)
 					{
-					case 1: if (!GetMemRaw(m, 4, m)) return false; return PushFPU(AsFloat(m));
-					case 2: if (!GetMemRaw(m, 8, m)) return false; return PushFPU(AsDouble(m));
+					case 1: if (!GetMemRaw<u32>(m, m)) return false; return PushFPU(AsFloat(m));
+					case 2: if (!GetMemRaw<u64>(m, m)) return false; return PushFPU(AsDouble(m));
 
-					case 3: if (!GetMemRaw(m, 2, m)) return false; return PushFPU((i64)SignExtend(m, 1));
-					case 4: if (!GetMemRaw(m, 4, m)) return false; return PushFPU((i64)SignExtend(m, 2));
-					case 5: if (!GetMemRaw(m, 8, m)) return false; return PushFPU((i64)m);
+					case 3: if (!GetMemRaw<u16>(m, m)) return false; return PushFPU((i64)SignExtend(m, 1));
+					case 4: if (!GetMemRaw<u32>(m, m)) return false; return PushFPU((i64)SignExtend(m, 2));
+					case 5: if (!GetMemRaw<u64>(m, m)) return false; return PushFPU((i64)m);
 
 					default: Terminate(ErrorCode::UndefinedBehavior); return false;
 					}
@@ -2652,7 +2749,7 @@ namespace CSX64
 			bool ProcessFST()
 			{
 				u64 s, m;
-				if (!GetMemAdv(1, s)) return false;
+				if (!GetMemAdv<u8>(s)) return false;
 
 				FPU_C0() = Rand() & 1;
 				FPU_C1() = Rand() & 1;
@@ -2674,14 +2771,14 @@ namespace CSX64
 					if (!GetAddressAdv(m)) return false;
 					switch (s & 15)
 					{
-					case 2: case 3: if (!SetMemRaw(m, 4, FloatAsUInt64(ST(0)))) return false; break;
-					case 4: case 5: if (!SetMemRaw(m, 8, DoubleAsUInt64(ST(0)))) return false; break;
-					case 6: case 7: if (!SetMemRaw(m, 2, (u64)(i64)PerformRoundTrip(ST(0)))) return false; break;
-					case 8: case 9: if (!SetMemRaw(m, 4, (u64)(i64)PerformRoundTrip(ST(0)))) return false; break;
-					case 10: if (!SetMemRaw(m, 8, (u64)(i64)PerformRoundTrip(ST(0)))) return false; break;
-					case 11: if (!SetMemRaw(m, 2, (u64)(i64)ST(0))) return false; break;
-					case 12: if (!SetMemRaw(m, 4, (u64)(i64)ST(0))) return false; break; // !! WORK !! make sure these truncate regardless of std::fesetround()
-					case 13: if (!SetMemRaw(m, 8, (u64)(i64)ST(0))) return false; break;
+					case 2: case 3: if (!SetMemRaw<u32>(m, FloatAsUInt64(ST(0)))) return false; break;
+					case 4: case 5: if (!SetMemRaw<u64>(m, DoubleAsUInt64(ST(0)))) return false; break;
+					case 6: case 7: if (!SetMemRaw<u16>(m, (u64)(i64)PerformRoundTrip(ST(0)))) return false; break;
+					case 8: case 9: if (!SetMemRaw<u32>(m, (u64)(i64)PerformRoundTrip(ST(0)))) return false; break;
+					case 10: if (!SetMemRaw<u64>(m, (u64)(i64)PerformRoundTrip(ST(0)))) return false; break;
+					case 11: if (!SetMemRaw<u16>(m, (u64)(i64)ST(0))) return false; break;
+					case 12: if (!SetMemRaw<u32>(m, (u64)(i64)ST(0))) return false; break; // !! WORK !! make sure these truncate regardless of std::fesetround()
+					case 13: if (!SetMemRaw<u64>(m, (u64)(i64)ST(0))) return false; break;
 						
 					default: Terminate(ErrorCode::UndefinedBehavior); return false;
 					}
@@ -2727,7 +2824,7 @@ namespace CSX64
 			bool ProcessFMOVcc()
 			{
 				u64 s;
-				if (!GetMemAdv(1, s)) return false;
+				if (!GetMemAdv<u8>(s)) return false;
 
 				// get the flag
 				bool flag;
@@ -3133,11 +3230,11 @@ namespace CSX64
 					if (!GetAddressAdv(m)) return false;
 					switch (s & 15)
 					{
-					case 3: case 4: if (!GetMemRaw(m, 4, m)) return false; b = AsFloat(m); break;
-					case 5: case 6: if (!GetMemRaw(m, 8, m)) return false; b = AsDouble(m); break;
+					case 3: case 4: if (!GetMemRaw<u32>(m, m)) return false; b = AsFloat(m); break;
+					case 5: case 6: if (!GetMemRaw<u64>(m, m)) return false; b = AsDouble(m); break;
 
-					case 7: case 8: if (!GetMemRaw(m, 2, m)) return false; b = (i64)SignExtend(m, 1); break;
-					case 9: case 10: if (!GetMemRaw(m, 4, m)) return false; b = (i64)SignExtend(m, 2); break;
+					case 7: case 8: if (!GetMemRaw<u16>(m, m)) return false; b = (i64)SignExtend(m, 1); break;
+					case 9: case 10: if (!GetMemRaw<u32>(m, m)) return false; b = (i64)SignExtend(m, 2); break;
 
 					default: Terminate(ErrorCode::UndefinedBehavior); return false;
 					}
@@ -3264,7 +3361,7 @@ namespace CSX64
 			bool ProcessFINCDECSTP()
 			{
 				u64 ext;
-				if (!GetMemAdv(1, ext)) return false;
+				if (!GetMemAdv<u8>(ext)) return false;
 
 				// does not modify tag word
 				switch (ext & 1)
@@ -3285,7 +3382,7 @@ namespace CSX64
 			bool ProcessFFREE()
 			{
 				u64 i;
-				if (!GetMemAdv(1, i)) return false;
+				if (!GetMemAdv<u8>(i)) return false;
 
 				// mark as not in use
 				ST_Free(i);
@@ -3313,7 +3410,7 @@ namespace CSX64
 			{
 				// read settings bytes
 				u64 s1, s2, _src, m, temp;
-				if (!GetMemAdv(1, s1) || !GetMemAdv(1, s2)) return false;
+				if (!GetMemAdv<u8>(s1) || !GetMemAdv<u8>(s2)) return false;
 				u64 reg_sizecode = s1 & 3;
 				u64 elem_sizecode = (s2 >> 2) & 3;
 
@@ -3387,7 +3484,7 @@ namespace CSX64
 			{
 				// read settings bytes
 				u64 s1, s2, _src1, _src2, res, m;
-				if (!GetMemAdv(1, s1) || !GetMemAdv(1, s2)) return false;
+				if (!GetMemAdv<u8>(s1) || !GetMemAdv<u8>(s2)) return false;
 				u64 dest_sizecode = s1 & 3;
 				u64 elem_sizecode = (s2 >> 2) & 3;
 

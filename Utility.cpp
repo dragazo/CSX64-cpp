@@ -14,6 +14,7 @@
 #include <random>
 #include <unordered_map>
 #include <unordered_set>
+#include <memory>
 
 #include "Utility.h"
 
@@ -141,102 +142,37 @@ namespace CSX64
 		return ((u64)engine() << 32) | engine();
 	}
 
-	/// <summary>
-	/// Returns true if this value is a power of two. (zero returns false)
-	/// </summary>
-	bool IsPowerOf2(u64 val)
-	{
-		return val != 0 && (val & (val - 1)) == 0;
-	}
-
-	/// <summary>
-	/// Extracts 2 distinct powers of 2 from the specified value. Returns true if the value is made up of exactly two non-zero powers of 2.
-	/// </summary>
-	/// <param name="val">the value to process</param>
-	/// <param name="a">the first (larger) power of 2</param>
-	/// <param name="b">the second (smaller) power of 2</param>
-	bool Extract2PowersOf2(u64 val, u64 &a, u64 &b)
-	{
-		// isolate the lowest power of 2
-		b = val & (~val + 1);
-		// disable the lowest power of 2
-		val = val & (val - 1);
-
-		// isolate the next lowest power of 2
-		a = val & (~val + 1);
-		// disable the next lowest power of 2
-		val = val & (val - 1);
-		
-		// if val is now zero and a and b are nonzero, we got 2 distinct powers of 2
-		return val == 0 && a != 0 && b != 0;
-	}
-
-	void ExtractDouble(double val, double &exp, double &sig)
-	{
-		if (std::isnan(val))
-		{
-			exp = sig = std::numeric_limits<double>::quiet_NaN();
-		}
-		else if (std::isinf(val))
-		{
-			if (val > 0)
-			{
-				exp = std::numeric_limits<double>::infinity();
-				sig = 1;
-			}
-			else
-			{
-				exp = std::numeric_limits<double>::infinity();
-				sig = -1;
-			}
-		}
-		else
-		{
-			// get the raw bits
-			u64 bits = DoubleAsUInt64(val);
-
-			// get the raw exponent
-			u64 raw_exp = (bits >> 52) & 0x7ff;
-
-			// get exponent and subtract bias
-			exp = (double)raw_exp - 1023;
-			// get significand (m.0) and offset to 0.m
-			sig = (double)(bits & 0xfffffffffffff) / (1ul << 52);
-
-			// if it's denormalized, add 1 to exponent
-			if (raw_exp == 0) exp += 1;
-			// otherwise add the invisible 1 to get 1.m
-			else sig += 1;
-
-			// handle negative case
-			if (val < 0) sig = -sig;
-		}
-	}
-	double AssembleDouble(double exp, double sig)
-	{
-		return sig * pow(2, exp);
-	}
-
-	/// <summary>
-	/// Returns true if the floating-point value is denormalized (including +-0)
-	/// </summary>
-	/// <param name="val">the value to test</param>
-	bool IsDenorm(double val)
-	{
-		// denorm has exponent field of zero
-		return (DoubleAsUInt64(val) & 0x7ff0000000000000ul) == 0;
-	}
-
 	// -- memory utilities -- //
 
-	/// <summary>
-	/// Writes a value to the array
-	/// </summary>
-	/// <param name="arr">the data to write to</param>
-	/// <param name="pos">the index to begin at</param>
-	/// <param name="size">the size of the value in bytes</param>
-	/// <param name="val">the value to write</param>
-	/// <exception cref="ArgumentException"></exception>
+	void *aligned_malloc(std::size_t size, std::size_t align)
+	{
+		// calling with 0 yields nullptr
+		if (size == 0) return nullptr;
+
+		// allocate enough space for a void*, padding, and the array
+		size += sizeof(void*) + align - 1;
+
+		// grab that much space
+		void *raw = std::malloc(size);
+
+		// get the pointer to return (before alignment)
+		void *ret = (char*)raw + sizeof(void*);
+
+		// align the return pointer
+		ret = (void*)Align((u64)ret, align);
+
+		// store the raw pointer before start of ret array
+		*(void**)((char*)ret - sizeof(void*)) = raw;
+
+		// return ret pointer
+		return ret;
+	}
+	void aligned_free(void *ptr)
+	{
+		// free the raw pointer (freeing nullptr does nothing)
+		if (ptr) std::free(*(void**)((char*)ptr - sizeof(void*)));
+	}
+
 	bool Write(std::vector<u8> &arr, u64 pos, u64 size, u64 val)
 	{
 		// make sure we're not exceeding memory bounds
@@ -251,13 +187,6 @@ namespace CSX64
 
 		return true;
 	}
-	/// <summary>
-	/// Reads a value from the array
-	/// </summary>
-	/// <param name="arr">the data to write to</param>
-	/// <param name="pos">the index to begin at</param>
-	/// <param name="size">the size of the value in bytes</param>
-	/// <param name="res">the read value</param>
 	bool Read(const std::vector<u8> &arr, u64 pos, u64 size, u64 &res)
 	{
 		// make sure we're not exceeding memory bounds
@@ -271,12 +200,6 @@ namespace CSX64
 		return true;
 	}
 
-	/// <summary>
-	/// Appends a value to an array of bytes in a list
-	/// </summary>
-	/// <param name="data">the byte array</param>
-	/// <param name="size">the size in bytes of the value to write</param>
-	/// <param name="val">the value to write</param>
 	void Append(std::vector<u8> &arr, u64 size, u64 val)
 	{
 		// write the value (little-endian)
@@ -287,86 +210,22 @@ namespace CSX64
 		}
 	}
 	
-	/// <summary>
-	/// Gets the amount to offset address by to make it a multiple of size. if address is already a multiple of size, returns 0.
-	/// </summary>
-	/// <param name="address">the address to examine</param>
-	/// <param name="size">the size to align to</param>
 	u64 AlignOffset(u64 address, u64 size)
 	{
 		u64 pos = address % size;
 		return pos == 0 ? 0 : size - pos;
 	}
-	/// <summary>
-	/// Where address is the starting point, returns the next address aligned to the specified size
-	/// </summary>
-	/// <param name="address">the starting address</param>
-	/// <param name="size">the size to align to</param>
-	/// <returns></returns>
 	u64 Align(u64 address, u64 size)
 	{
 		return address + AlignOffset(address, size);
 	}
-	/// <summary>
-	/// Adds the specified amount of zeroed padding (in bytes) to the array
-	/// </summary>
-	/// <param name="arr">the data array to pad</param>
-	/// <param name="count">the amount of padding in bytes</param>
 	void Pad(std::vector<u8> &arr, u64 count)
 	{
 		for (; count > 0; --count) arr.push_back(0);
 	}
-	/// <summary>
-	/// Pads the array with 0's until the length is a multiple of the specified size
-	/// </summary>
-	/// <param name="arr">the array to align</param>
-	/// <param name="size">the size to align to</param>
 	void Align(std::vector<u8> &arr, u64 size)
 	{
 		Pad(arr, AlignOffset(arr.size(), size));
-	}
-
-	/// <summary>
-	/// Writes an ASCII C-style string to memory. Returns true on success
-	/// </summary>
-	/// <param name="arr">the data array to write to</param>
-	/// <param name="pos">the position in the array to begin writing</param>
-	/// <param name="str">the string to write</param>
-	bool WriteCString(std::vector<u8> &arr, u64 pos, const std::string &str)
-	{
-		// make sure we're not exceeding memory bounds
-		if (pos >= arr.size() || pos + (str.size() + 1) > arr.size()) return false;
-
-		// write each character
-		for (std::size_t i = 0; i < str.size(); ++i) arr[pos + i] = str[i];
-		// write a null terminator
-		arr[pos + str.size()] = 0;
-
-		return true;
-	}
-	/// <summary>
-	/// Reads an ASCII C-style string from memory. Returns true on success
-	/// </summary>
-	/// <param name="arr">the data array to read from</param>
-	/// <param name="pos">the position in the array to begin reading</param>
-	/// <param name="str">the string read</param>
-	bool ReadCString(const std::vector<u8> &arr, u64 pos, std::string &str)
-	{
-		str.clear();
-
-		// read the string
-		for (; ; ++pos)
-		{
-			// ensure we're in bounds
-			if (pos >= arr.size()) return false;
-
-			// if it's not a terminator, append it
-			if (arr[pos] != 0) str.push_back(arr[pos]);
-			// otherwise we're done reading
-			else break;
-		}
-
-		return true;
 	}
 
 	// -- string stuff -- //
@@ -477,18 +336,6 @@ namespace CSX64
 
 		return false;
 	}
-	/// <summary>
-	/// Removes ALL white space from a string
-	/// </summary>
-	std::string RemoveWhiteSpace(const std::string &str)
-	{
-		std::string res;
-
-		for (int i = 0; i < str.size(); ++i)
-			if (!std::isspace(str[i])) res.push_back(str[i]);
-
-		return res;
-	}
 
 	bool StartsWith(const std::string &str, char ch)
 	{
@@ -559,140 +406,61 @@ namespace CSX64
 
 	// -- CSX64 encoding utilities -- //
 
-	/// <summary>
-	/// Gets the bitmask for the sign bit of an integer with the specified sizecode
-	/// </summary>
-	/// <param name="sizecode">the sizecode specifying the width of integer to examine</param>
-	u64 SignMask(u64 sizecode)
+	bool Extract2PowersOf2(u64 val, u64 &a, u64 &b)
 	{
-		return 1ul << ((8 << sizecode) - 1);
-	}
-	/// <summary>
-	/// Gets the bitmask that includes the entire valid domain of an integer with the specified width
-	/// </summary>
-	/// <param name="sizecode">the sizecode specifying the width of integer to examine</param>
-	u64 TruncMask(u64 sizecode)
-	{
-		u64 res = SignMask(sizecode);
-		return res | (res - 1);
+		b = val & (~val + 1);  // isolate the lowest power of 2
+		val = val & (val - 1); // disable the lowest power of 2
+
+		a = val & (~val + 1);  // isolate the next lowest power of 2
+		val = val & (val - 1); // disable the next lowest power of 2
+
+		// if val is now zero and a and b are nonzero, we got 2 distinct powers of 2
+		return val == 0 && a != 0 && b != 0;
 	}
 
-	/// <summary>
-	/// Returns if the value with specified size code is positive
-	/// </summary>
-	/// <param name="val">the value to process</param>
-	/// <param name="sizecode">the current size code of the value</param>
-	bool Positive(u64 val, u64 sizecode)
+	void ExtractDouble(double val, double &exp, double &sig)
 	{
-		return (val & SignMask(sizecode)) == 0;
-	}
-	/// <summary>
-	/// Returns if the value with specified size code is negative
-	/// </summary>
-	/// <param name="val">the value to process</param>
-	/// <param name="sizecode">the current size code of the value</param>
-	bool Negative(u64 val, u64 sizecode)
-	{
-		return (val & SignMask(sizecode)) != 0;
-	}
-
-	/// <summary>
-	/// Sign extends a value to 64-bits
-	/// </summary>
-	/// <param name="val">the value to sign extend</param>
-	/// <param name="sizecode">the current size code</param>
-	u64 SignExtend(u64 val, u64 sizecode)
-	{
-		return Positive(val, sizecode) ? val : val | ~TruncMask(sizecode);
-	}
-	/// <summary>
-	/// Truncates the value to the specified size code (can also be used to zero extend a value)
-	/// </summary>
-	/// <param name="val">the value to truncate</param>
-	/// <param name="sizecode">the size code to truncate to</param>
-	u64 Truncate(u64 val, u64 sizecode)
-	{
-		return val & TruncMask(sizecode);
-	}
-
-	/// <summary>
-	/// Parses a 2-bit size code into an actual size (in bytes) 0:1  1:2  2:4  3:8
-	/// </summary>
-	/// <param name="sizecode">the code to parse</param>
-	u64 Size(u64 sizecode)
-	{
-		return 1ul << sizecode;
-	}
-	/// <summary>
-	/// Parses a 2-bit size code into an actual size (in bits) 0:8  1:16  2:32  3:64
-	/// </summary>
-	/// <param name="sizecode">the code to parse</param>
-	u64 SizeBits(u64 sizecode)
-	{
-		return 8ul << sizecode;
-	}
-
-	/// <summary>
-	/// Gets the sizecode of the specified size. Throws <see cref="ArgumentException"/> if the size is not a power of 2
-	/// </summary>
-	/// <param name="size">the size</param>
-	/// <exception cref="ArgumentException"></exception>
-	u64 Sizecode(u64 size)
-	{
-		//if (!IsPowerOf2(size)) throw new ArgumentException("argument to Sizecode() was not a power of 2");
-
-		// compute sizecode by repeated shifting
-		for (int i = 0; ; ++i)
+		if (std::isnan(val))
 		{
-			size >>= 1;
-			if (size == 0) return i;
+			exp = sig = std::numeric_limits<double>::quiet_NaN();
+		}
+		else if (std::isinf(val))
+		{
+			if (val > 0)
+			{
+				exp = std::numeric_limits<double>::infinity();
+				sig = 1;
+			}
+			else
+			{
+				exp = std::numeric_limits<double>::infinity();
+				sig = -1;
+			}
+		}
+		else
+		{
+			// get the raw bits
+			u64 bits = DoubleAsUInt64(val);
+
+			// get the raw exponent
+			u64 raw_exp = (bits >> 52) & 0x7ff;
+
+			// get exponent and subtract bias
+			exp = (double)raw_exp - 1023;
+			// get significand (m.0) and offset to 0.m
+			sig = (double)(bits & 0xfffffffffffff) / ((u64)1 << 52);
+
+			// if it's denormalized, add 1 to exponent
+			if (raw_exp == 0) exp += 1;
+			// otherwise add the invisible 1 to get 1.m
+			else sig += 1;
+
+			// handle negative case
+			if (val < 0) sig = -sig;
 		}
 	}
-
-	/// <summary>
-	/// returns an elementary word size in bytes sufficient to hold the specified number of bits
-	/// </summary>
-	/// <param name="bits">the number of bits in the representation</param>
-	u64 BitsToBytes(u64 bits)
+	double AssembleDouble(double exp, double sig)
 	{
-		if (bits <= 8) return 1;
-		else if (bits <= 16) return 2;
-		else if (bits <= 32) return 4;
-		else if (bits <= 64) return 8;
-		else throw std::invalid_argument("bit size must be in range [0,64]");
-	}
-
-	/// <summary>
-	/// Interprets a double as its raw bits
-	/// </summary>
-	/// <param name="val">value to interpret</param>
-	u64 DoubleAsUInt64(double val)
-	{
-		return *(u64*)&val;
-	}
-	/// <summary>
-	/// Interprets raw bits as a double
-	/// </summary>
-	/// <param name="val">value to interpret</param>
-	double AsDouble(u64 val)
-	{
-		return *(double*)&val;
-	}
-
-	/// <summary>
-	/// Interprets a float as its raw bits (placed in low 32 bits)
-	/// </summary>
-	/// <param name="val">the float to interpret</param>
-	u64 FloatAsUInt64(float val)
-	{
-		return *(std::uint32_t*)&val;
-	}
-	/// <summary>
-	/// Interprets raw bits as a float (low 32 bits)
-	/// </summary>
-	/// <param name="val">the bits to interpret</param>
-	float AsFloat(std::uint32_t val)
-	{
-		return *(float*)&val;
+		return sig * pow(2, exp);
 	}
 }

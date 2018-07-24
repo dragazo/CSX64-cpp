@@ -15,14 +15,12 @@ bool CSX64::Computer::Initialize(std::vector<u8> &exe, std::vector<std::string> 
 	if (size > MaxMemory) return false;
 
 	// get new memory array (does not include header)
-    Memory.clear();
-	Memory.resize(size);
-	InitMemorySize = size;
+	alloc(size);
 
 	// copy over the text/rodata/data segments (not including header)
-	std::memcpy(Memory.data(), exe.data() + 32, exe.size() - 32);
+	std::memcpy(mem, exe.data() + 32, exe.size() - 32);
 	// zero the bss segment
-	std::memset(Memory.data() + (exe.size() - 32), 0, bss_seglen);
+	std::memset((char*)mem + (exe.size() - 32), 0, bss_seglen);
 	// randomize the stack segment
 	//for (u64 i = exe.size() - 32 + bss_seglen; i < Memory.size(); ++i) Memory[i] = Rand();
 
@@ -49,7 +47,7 @@ bool CSX64::Computer::Initialize(std::vector<u8> &exe, std::vector<std::string> 
 	Error = ErrorCode::None;
 
 	// get the stack pointer
-	u64 stack = Memory.size();
+	u64 stack = size;
 	RBP() = stack; // RBP points to before we start pushing args
 
 	// if we have cmd line args, load them
@@ -128,8 +126,8 @@ CSX64::u64 CSX64::Computer::Tick(u64 count)
 		case OPCode::Jcc: ProcessJcc(); break;
 		case OPCode::LOOPcc: ProcessLOOPcc(); break;
 
-		case OPCode::CALL: if (!ProcessJMP(op)) break; PushRaw(8, op); break;
-		case OPCode::RET: if (!PopRaw(8, op)) break; RIP() = op; break;
+		case OPCode::CALL: if (!ProcessJMP(op)) break; PushRaw<u64>(op); break;
+		case OPCode::RET: if (!PopRaw<u64>(op)) break; RIP() = op; break;
 
 		case OPCode::PUSH: ProcessPUSH(); break;
 		case OPCode::POP: ProcessPOP(); break;
@@ -266,7 +264,7 @@ CSX64::u64 CSX64::Computer::Tick(u64 count)
 			// misc instructions
 
 		case OPCode::DEBUG: // all debugging features
-			if (!GetMemAdv(1, op)) break;
+			if (!GetMemAdv<u8>(op)) break;
 			switch (op)
 			{
 			case 0: WriteCPUDebugString(std::cout); break;

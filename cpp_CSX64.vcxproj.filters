@@ -42,9 +42,6 @@
     <ClCompile Include="HoleData.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="ExeTypes.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="AsmArgs.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
