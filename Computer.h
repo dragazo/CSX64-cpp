@@ -84,16 +84,15 @@ namespace CSX64
 		/// <summary>
 		/// Validates the machine for operation, but does not prepare it for execute (see Initialize)
 		/// </summary>
-		Computer() : mem(nullptr), mem_size(0)
+		inline Computer() : mem(nullptr), mem_size(0)
 		{
 			// define initial state
 			Running = false;
 			Error = ErrorCode::None;
 		}
-		~Computer()
+		inline ~Computer()
 		{
 			aligned_free(mem);
-			CloseFiles();
 		}
 		
 		// reallocates the current array to be the specified size

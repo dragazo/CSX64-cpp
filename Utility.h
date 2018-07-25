@@ -43,6 +43,10 @@ namespace CSX64
 	// reads a binary representation of the string from the stream
 	std::istream &BinRead(std::istream &istr, std::string &str);
 
+	// -- misc stream stuff -- //
+
+	u64 smart_readsome(std::istream &istr, char *buf, u64 max);
+
 	// -- misc utilities -- //
 
 	// computes the full (unsigned) product of a * b and stores the result in high:low

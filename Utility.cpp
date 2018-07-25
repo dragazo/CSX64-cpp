@@ -51,6 +51,39 @@ namespace CSX64
 		return istr;
 	}
 
+	// -- misc stream stuff -- //
+
+	// reads up to max characters from the stream, stopping early on eof or if there is nothing more to read (e.g. console input).
+	// acts as a workaround for what is standard behavior in C# and sys_read, but is for some reason not the case in C++.
+	u64 smart_readsome(std::istream &istr, char *buf, u64 max)
+	{
+		u64 cnt = 0, got;
+
+		// pause for input on terminal (does nothing on non-terminal)
+		istr.peek();
+
+		// while the stream is good and we can still take on more chars
+		while (istr && cnt < max)
+		{
+			// use readsome to empty the current buffer
+			got = istr.readsome(buf, max);
+			cnt += got;
+			buf += got;
+			max -= got;
+
+			// if we got nothing
+			if (got == 0)
+			{
+				// if there're more chars available after a buffer refresh, refresh it
+				if (istr.rdbuf()->in_avail() > 0) istr.peek();
+				// otherwise we're out of stuff
+				else break;
+			}
+		}
+
+		return cnt;
+	}
+
 	// -- misc utilities -- //
 
 	void UnsignedMul(u64 a, u64 b, u64 &res_high, u64 &res_low)

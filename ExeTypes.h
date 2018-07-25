@@ -30,6 +30,26 @@ namespace CSX64
 		sys_rename, sys_unlink,
 		sys_mkdir, sys_rmdir,
 	};
+	enum class OpenFlags
+	{
+		// access flags
+		read = 1,
+		write = 2,
+		read_write = 3,
+
+		// creation flags
+		create = 4,
+		temp = 8,
+		trunc = 16,
+
+		// status flags
+		append = 32,
+		binary = 64, // this one's non-standard but we need it
+	};
+	enum class SeekMode
+	{
+		set, cur, end
+	};
 
 	// acts as a reference to T, but gets/sets the value from a location of type U
 	// meant for use with integral types
@@ -225,31 +245,28 @@ namespace CSX64
 	/// </summary>
 	class FileDescriptor
 	{
+	private:
+		bool managed;
+		bool interactive;
+
+		std::iostream *stream = nullptr;
+
 	public:
+		// gets if this file is managed (i.e. stream will be deleted on close)
+		inline bool Managed() const { return managed; }
+		// gets if this file is interactive (i.e. Computer object reading past eof sets SuspendedRead state).
+		inline bool Interactive() const { return interactive; }
 
-		/// <summary>
-		/// Marks that this stream is managed by the processor.
-		/// Managed files can be opened and closed by the processor, and are closed upon client program termination
-		/// </summary>
-		bool Managed;
-		/// <summary>
-		/// Marks that the stream has an associated interactive input from external code (i.e. not client code).
-		/// Reading past EOF on an interactive stream sets the SuspendedRead flag of the associated <see cref="CSX64"/>
-		/// </summary>
-		bool Interactive;
+		// gets a pointer to the currently-opened stream (nullptr if not in use).
+		inline std::iostream *Stream() const { return stream; }
+		// gets if this file descriptor is currently bound to a stream.
+		inline bool InUse() { return stream; }
 
-		/// <summary>
-		/// The underlying stream associated with this file descriptor.
-		/// If you close this, you should also null it, or - preferably - call <see cref="Close"/> instead of closing it yourself.
-		/// </summary>
-		std::iostream *BaseStream = nullptr;
+		// ----------------------------
 
-		/// <summary>
-		/// Returns true iff the file descriptor is currently in use
-		/// </summary>
-		inline bool InUse() { return BaseStream; }
+		inline ~FileDescriptor() { Close(); }
 
-		// ---------------------
+		// ----------------------------
 
 		/// <summary>
 		/// Assigns the given stream to this file descriptor. Throws <see cref="AccessViolationException"/> if already in use
@@ -258,73 +275,26 @@ namespace CSX64
 		/// <param name="managed">marks that this stream is considered "managed". see CSX64 manual for more information</param>
 		/// <param name="interactive">marks that this stream is considered "interactive" see CSX64 manual for more information</param>
 		/// <exception cref="AccessViolationException"></exception>
-		void Open(std::iostream *stream, bool managed, bool interactive)
+		inline void Open(std::iostream *stream, bool managed, bool interactive)
 		{
 			if (InUse()) throw std::runtime_error("Attempt to assign to a FileDescriptor that was currently in use");
 
-			BaseStream = stream;
-			Managed = managed;
-			Interactive = interactive;
+			this->stream = stream;
+			this->managed = managed;
+			this->interactive = interactive;
 		}
 		/// <summary>
 		/// Unlinks the stream and makes this file descriptor unused. If managed, first closes the stream.
 		/// If not currenty in use, does nothing. Returns true if successful (no errors).
 		/// </summary>
-		bool Close()
+		inline bool Close()
 		{
-			// closing unused file is no-op
-			if (InUse())
-			{
-				// if the file is managed, we need to deallocate it
-				if (Managed) delete BaseStream;
-
-				// unlink the stream
-				BaseStream = nullptr;
-			}
+			// if the file is managed, we need to close (and deallocate) it
+			if (managed) delete stream;
+			// unlink the stream
+			stream = nullptr;
 
 			return true;
-		}
-
-		/// <summary>
-		/// Flushes the stream tied to this file descriptor. Throws <see cref="AccessViolationException"/> if already in use.
-		/// Returns true on success (no errors).
-		/// </summary>
-		/// <exception cref="AccessViolationException"></exception>
-		bool Flush()
-		{
-			if (!InUse()) throw std::runtime_error("Attempt to access a FileDescriptor that was not in use");
-
-			// flush the stream
-			try { BaseStream->flush(); return true; }
-			catch (...) { return false; }
-		}
-
-		/// <summary>
-		/// Sets the current position in the file. Throws <see cref="AccessViolationException"/> if already in use.
-		/// Returns true on success (no errors).
-		/// </summary>
-		/// <exception cref="AccessViolationException"></exception>
-		bool Seek(i64 offset, int origin)
-		{
-			if (!InUse()) throw std::runtime_error("Attempt to access a FileDescriptor that was not in use");
-			
-			// seek to new position (seek both to make sure it works for all types of streams)
-			try { BaseStream->seekg(offset, origin); BaseStream->seekp(offset, origin); return true; }
-			catch (...) { return false; }
-		}
-		/// <summary>
-		/// Gets the current position in the file. Throws <see cref="AccessViolationException"/> if already in use.
-		/// Returns true on success (no errors).
-		/// </summary>
-		/// <param name="pos">the position in the file if successful</param>
-		/// <exception cref="AccessViolationException"></exception>
-		bool Tell(i64 &pos)
-		{
-			if (!InUse()) throw std::runtime_error("Attempt to access a FileDescriptor that was not in use");
-
-			// return position (the getter can throw)
-			try { pos = BaseStream->tellg(); return true; }
-			catch (...) { pos = -1; return false; }
 		}
 	};
 }

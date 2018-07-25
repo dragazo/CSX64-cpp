@@ -134,6 +134,25 @@ void AddPredefines()
 	DefineSymbol("err_fpuaccessviolation", (u64)ErrorCode::FPUAccessViolation);
 	DefineSymbol("err_alignmentviolation", (u64)ErrorCode::AlignmentViolation);
 	DefineSymbol("err_unknownop", (u64)ErrorCode::UnknownOp);
+
+	// -- file open modes -- //
+
+	DefineSymbol("O_RDONLY", (u64)OpenFlags::read);
+	DefineSymbol("O_WRONLY", (u64)OpenFlags::write);
+	DefineSymbol("O_RDWR", (u64)OpenFlags::read_write);
+
+	DefineSymbol("O_CREAT", (u64)OpenFlags::create);
+	DefineSymbol("O_TMPFILE", (u64)OpenFlags::temp);
+	DefineSymbol("O_TRUNC", (u64)OpenFlags::trunc);
+
+	DefineSymbol("O_APPEND", (u64)OpenFlags::append);
+	DefineSymbol("O_BINARY", (u64)OpenFlags::binary);
+
+	// -- file seek modes -- //
+
+	DefineSymbol("SEEK_SET", (u64)SeekMode::set);
+	DefineSymbol("SEEK_CUR", (u64)SeekMode::cur);
+	DefineSymbol("SEEK_END", (u64)SeekMode::end);
 }
 
 // -- file io -- //
@@ -411,9 +430,6 @@ int main(int argc, const char *argv[])
 {
 	using namespace CSX64;
 
-	// initialize exe dir vars
-	init_exe_dir();
-	
 	ProgramAction action = ProgramAction::ExecuteConsole; // requested action
 	std::vector<std::string> pathspec;                    // input paths
 	const char *entry_point = nullptr;                    // main entry point for linker
@@ -491,6 +507,10 @@ int main(int argc, const char *argv[])
 
 	case ProgramAction::Link:
 		if (pathspec.empty()) { std::cout << ("Linker expected at least 1 file to link\n"); return 0; }
+
+		// initialize exe dir now
+		init_exe_dir();
+
 		return Link(pathspec, output ? output : "a.exe", entry_point ? entry_point : "main");
 	}
 
