@@ -248,8 +248,6 @@ namespace CSX64
 		/// <param name="count">The maximum number of operations to perform</param>
 		u64 Tick(u64 count);
 
-		// FINISH THIS LATER
-
 		// Writes a string containing all non-vpu register/flag states"/>
 		std::ostream &WriteCPUDebugString(std::ostream &ostr)
 		{
@@ -546,6 +544,12 @@ namespace CSX64
 
 	public:
 
+		// (even) parity table is computed by preprocessor - used for updating PF flag
+		static const bool parity_table[];
+
+		// holds handlers for all 8-bit opcodes
+		static bool(Computer::* const opcode_handlers[])();
+
 		u64 &RFLAGS() { return _RFLAGS; }
 		std::uint32_t &EFLAGS() { return *(std::uint32_t*)&_RFLAGS; }
 		u16 &FLAGS() { return *(u16*)&_RFLAGS; }
@@ -740,7 +744,6 @@ namespace CSX64
 		}
 
 		private: // -- operators -- //
-
 
 				 /*
 				 [4: dest][2: size][1:dh][1: mem]   [size: imm]
@@ -1090,15 +1093,6 @@ namespace CSX64
 				return true;
 			}
 
-			#define p2(b) b, !b, !b, b
-			#define p4(b) p2(b), p2(!b), p2(!b), p2(b)
-			#define p6(b) p4(b), p4(!b), p4(!b), p4(b)
-			// (even) parity table is computed by preprocessor - used for updating PF flag
-			static constexpr bool parity_table[256] = {p6(true), p6(false), p6(false), p6(true)};
-			#undef p6
-			#undef p4
-			#undef p2
-
 			// updates the flags for integral ops (identical for most integral ops)
 			void UpdateFlagsZSP(u64 value, u64 sizecode)
 			{
@@ -1108,6 +1102,9 @@ namespace CSX64
 			}
 
 			// -- impl -- //
+
+			bool ProcessNOP() { return true; }
+			bool ProcessHLT() { Terminate(ErrorCode::Abort); return true; }
 
 			static constexpr u64 ModifiableFlags = 0x003f0fd5ul;
 
@@ -1377,7 +1374,7 @@ namespace CSX64
 				return true;
 			}
 
-			bool ProcessJMP(u64 &aft)
+			bool ProcessJMP_raw(u64 &aft)
 			{
 				u64 s, val;
 				if (!FetchIMMRMFormat(s, val)) return false;
@@ -1390,6 +1387,11 @@ namespace CSX64
 				RIP() = val; // jump
 
 				return true;
+			}
+			bool ProcessJMP()
+			{
+				u64 temp;
+				return ProcessJMP_raw(temp);
 			}
 			/*
 			[op][cnd]
@@ -1489,6 +1491,18 @@ namespace CSX64
 				return true;
 			}
 
+			bool ProcessCALL()
+			{
+				u64 temp;
+				return ProcessJMP_raw(temp) && PushRaw<u64>(temp);
+			}
+			bool ProcessRET()
+			{
+				u64 temp;
+				if (!PopRaw<u64>(temp)) return false;
+				RIP() = temp;
+			}
+
 			bool ProcessPUSH()
 			{
 				u64 s, a;
@@ -1559,7 +1573,12 @@ namespace CSX64
 
 				return StoreBinaryOpFormat(s1, s2, m, res);
 			}
-			bool ProcessSUB(bool apply = true)
+			bool ProcessSUB()
+			{
+				return ProcessSUB_raw(true);
+			}
+
+			bool ProcessSUB_raw(bool apply)
 			{
 				u64 s1, s2, m, a, b;
 				if (!FetchBinaryOpFormat(s1, s2, m, a, b)) return false;
@@ -2056,7 +2075,7 @@ namespace CSX64
 				else return true;
 			}
 
-			bool ProcessAND(bool apply = true)
+			bool ProcessAND_raw(bool apply)
 			{
 				u64 s1, s2, m, a, b;
 				if (!FetchBinaryOpFormat(s1, s2, m, a, b)) return false;
@@ -2070,6 +2089,11 @@ namespace CSX64
 				AF() = Rand() & 1;
 
 				return !apply || StoreBinaryOpFormat(s1, s2, m, res);
+			}
+
+			bool ProcessAND()
+			{
+				return ProcessAND_raw(true);
 			}
 			bool ProcessOR()
 			{
@@ -2154,6 +2178,15 @@ namespace CSX64
 				u64 res = Truncate(~a, sizecode);
 
 				return StoreUnaryOpFormat(s, m, res);
+			}
+
+			bool ProcessCMP()
+			{
+				return ProcessSUB_raw(false);
+			}
+			bool ProcessTEST()
+			{
+				return ProcessAND_raw(false);
 			}
 
 			bool ProcessCMPZ()
@@ -2508,13 +2541,21 @@ namespace CSX64
 			// -- floating point stuff -- //
 
 			/// <summary>
-			/// Initializes the FPU as if by FINIT
+			/// Initializes the FPU as if by FINIT. always returns true
 			/// </summary>
-			void FINIT()
+			bool FINIT()
 			{
 				FPU_control = 0x3bf;
 				FPU_status = 0;
 				FPU_tag = 0xffff;
+
+				return true;
+			}
+
+			bool ProcessFCLEX()
+			{
+				FPU_status &= 0xff00;
+				return true;
 			}
 
 			/// <summary>
@@ -3750,6 +3791,30 @@ namespace CSX64
 			}
 
 			bool TryProcessVEC_AVG() { return ProcessVPUBinary(3, &Computer::__TryPerformVEC_AVG); }
+
+			// -- misc instructions -- //
+
+			bool ProcessDEBUG()
+			{
+				u64 op;
+				if (!GetMemAdv<u8>(op)) return false;
+
+				switch (op)
+				{
+				case 0: WriteCPUDebugString(std::cout); break;
+				case 1: WriteVPUDebugString(std::cout); break;
+				case 2: WriteFullDebugString(std::cout); break;
+
+				default: Terminate(ErrorCode::UndefinedBehavior); return false;
+				}
+
+				return true;
+			}
+			bool ProcessUNKNOWN()
+			{
+				Terminate(ErrorCode::UnknownOp);
+				return false;
+			}
 	};
 }
 

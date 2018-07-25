@@ -155,6 +155,7 @@
       <DisableLanguageExtensions Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">false</DisableLanguageExtensions>
       <DisableLanguageExtensions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</DisableLanguageExtensions>
     </ClCompile>
+    <ClCompile Include="ExeTables.cpp" />
     <ClCompile Include="Expr.cpp" />
     <ClCompile Include="HoleData.cpp" />
     <ClCompile Include="Interface.cpp" />
@@ -172,6 +173,7 @@
     <ClInclude Include="CoreTypes.h" />
     <ClInclude Include="Computer.h" />
     <ClInclude Include="ExeDir.h" />
+    <ClInclude Include="ExeTables.h" />
     <ClInclude Include="Expr.h" />
     <ClInclude Include="HoleData.h" />
     <ClInclude Include="ExeTypes.h" />
