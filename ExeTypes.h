@@ -249,7 +249,7 @@ namespace CSX64
 		bool managed;
 		bool interactive;
 
-		std::iostream *stream = nullptr;
+		std::iostream *stream;
 
 	public:
 		// gets if this file is managed (i.e. stream will be deleted on close)
@@ -264,18 +264,37 @@ namespace CSX64
 
 		// ----------------------------
 
-		inline ~FileDescriptor() { Close(); }
+		FileDescriptor() : stream(nullptr) {}
+		~FileDescriptor() { Close(); }
+
+		FileDescriptor(const FileDescriptor&) = delete;
+		FileDescriptor(FileDescriptor &&other) : managed(other.managed), interactive(other.interactive), stream(other.stream)
+		{
+			other.stream = nullptr;
+		}
+
+		FileDescriptor &operator=(const FileDescriptor&) = delete;
+		FileDescriptor &operator=(FileDescriptor &&other)
+		{
+			std::swap(managed, other.managed);
+			std::swap(interactive, other.interactive);
+			std::swap(stream, other.stream);
+
+			return *this;
+		}
+
+		friend void swap(FileDescriptor &a, FileDescriptor &b) { a = std::move(b); }
 
 		// ----------------------------
 
 		/// <summary>
-		/// Assigns the given stream to this file descriptor. Throws <see cref="AccessViolationException"/> if already in use
+		/// Assigns the given stream to this file descriptor. Throws <see cref="std::runtime_error"/> if already in use
 		/// </summary>
 		/// <param name="stream">the stream source</param>
 		/// <param name="managed">marks that this stream is considered "managed". see CSX64 manual for more information</param>
 		/// <param name="interactive">marks that this stream is considered "interactive" see CSX64 manual for more information</param>
-		/// <exception cref="AccessViolationException"></exception>
-		inline void Open(std::iostream *stream, bool managed, bool interactive)
+		/// <exception cref="std::runtime_error"></exception>
+		void Open(std::iostream *stream, bool managed, bool interactive)
 		{
 			if (InUse()) throw std::runtime_error("Attempt to assign to a FileDescriptor that was currently in use");
 
@@ -287,7 +306,7 @@ namespace CSX64
 		/// Unlinks the stream and makes this file descriptor unused. If managed, first closes the stream.
 		/// If not currenty in use, does nothing. Returns true if successful (no errors).
 		/// </summary>
-		inline bool Close()
+		bool Close()
 		{
 			// if the file is managed, we need to close (and deallocate) it
 			if (managed) delete stream;

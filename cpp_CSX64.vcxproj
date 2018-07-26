@@ -161,7 +161,6 @@
     <ClCompile Include="Interface.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="OFile.cpp" />
-    <ClCompile Include="Operators.cpp" />
     <ClCompile Include="Syscall.cpp" />
     <ClCompile Include="Utility.cpp" />
   </ItemGroup>
@@ -173,7 +172,6 @@
     <ClInclude Include="CoreTypes.h" />
     <ClInclude Include="Computer.h" />
     <ClInclude Include="ExeDir.h" />
-    <ClInclude Include="ExeTables.h" />
     <ClInclude Include="Expr.h" />
     <ClInclude Include="HoleData.h" />
     <ClInclude Include="ExeTypes.h" />

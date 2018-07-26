@@ -1,5 +1,3 @@
-// -- AssembleArgs impl
-
 #include <string>
 #include <vector>
 

@@ -387,14 +387,14 @@ int RunConsole(std::vector<u8> &exe, std::vector<std::string> &args, bool fsf, b
 	// begin execution
 	hrc::time_point start, stop;
 	start = hrc::now();
-	while (computer.Running) computer.Tick(~(u64)0);
+	while (computer.Running()) computer.Tick(~(u64)0);
 	stop = hrc::now();
 
 	// if there was an error
-	if (computer.Error != ErrorCode::None)
+	if (computer.Error() != ErrorCode::None)
 	{
 		// print error message
-		std::cout << "\n\nError Encountered: " << (int)computer.Error;
+		std::cout << "\n\nError Encountered: " << (int)computer.Error();
 		// return execution error code
 		return ExecErrorReturnCode;
 	}
@@ -404,7 +404,7 @@ int RunConsole(std::vector<u8> &exe, std::vector<std::string> &args, bool fsf, b
 		// print elapsed time
 		if (time) std::cout << "\n\nElapsed Time: " << FormatTime(chrono::duration_cast<chrono::nanoseconds>(stop - start).count());
 		// use return value
-		return computer.ReturnValue;
+		return computer.ReturnValue();
 	}
 }
 

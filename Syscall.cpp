@@ -38,7 +38,7 @@ namespace CSX64
 			else if (n == 0 && fd.Interactive())
 			{
 				--RIP();              // await further data by repeating the syscall
-				SuspendedRead = true; // suspend execution until there's more data
+				suspended_read = true; // suspend execution until there's more data
 			}
 			// otherwise success - return num chars read from file
 			else RAX() = n;
@@ -159,7 +159,7 @@ namespace CSX64
 		if (fd_index >= FDCount) { Terminate(ErrorCode::OutOfBounds); return false; }
 
 		// get fd
-		FileDescriptor fd = FileDescriptors[fd_index];
+		FileDescriptor &fd = FileDescriptors[fd_index];
 		if (!fd.InUse()) { Terminate(ErrorCode::FDNotInUse); return false; }
 
 		int raw_mode = RDX();
@@ -192,7 +192,7 @@ namespace CSX64
 		// special request of 0 returns current break
 		if (RBX() == 0) RAX() = mem_size;
 		// if the request is too high or goes below init size, don't do it - return -1
-		else if (RBX() > MaxMemory || RBX() < InitMemorySize) RAX() = ~(u64)0;
+		else if (RBX() > max_mem_size || RBX() < min_mem_size) RAX() = ~(u64)0;
 		// otherwise perform the reallocation
 		else
 		{

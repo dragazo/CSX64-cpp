@@ -1,4 +1,4 @@
-#include "ExeTables.h"
+#include "Computer.h"
 
 namespace CSX64
 {
@@ -12,7 +12,7 @@ namespace CSX64
 		&Computer::ProcessNOP,
 
 		&Computer::ProcessHLT,
-		&Computer::Syscall,
+		&Computer::ProcessSYSCALL,
 
 		&Computer::ProcessSTLDF,
 
