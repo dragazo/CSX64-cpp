@@ -55,7 +55,7 @@ namespace CSX64
 	private:
 		bool _Clean = false;
 
-		friend AssembleResult Assemble(const std::string &code, ObjectFile &file);
+		friend AssembleResult Assemble(std::istream &code, ObjectFile &file);
 
 	public:
 
@@ -149,7 +149,7 @@ namespace CSX64
 	/// </summary>
 	/// <param name="code">the code to assemble</param>
 	/// <param name="file">the resulting object file if no errors occur</param>
-	AssembleResult Assemble(const std::string &code, ObjectFile &file);
+	AssembleResult Assemble(std::istream &code, ObjectFile &file);
 	/// <summary>
 	/// Links object files together into an executable. Throws <see cref="ArgumentException"/> if any of the object files are dirty.
 	/// Object files may be rendered dirty after this process (regardless of success). Any files that are still clean may be reused.
@@ -160,6 +160,5 @@ namespace CSX64
 	/// <exception cref="ArgumentException"></exception>
 	LinkResult Link(std::vector<u8> &exe, std::vector<ObjectFile> &objs, std::string entry_point = "main");
 }
-
 
 #endif

@@ -8,7 +8,7 @@
 
 namespace CSX64
 {
-bool AssembleArgs::SplitLine(const std::string &rawline)
+bool AssembleArgs::SplitLine(std::string rawline)
 {
 	// (label:) (op (arg, arg, ...))
 

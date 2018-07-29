@@ -194,22 +194,6 @@ int LoadBinaryFile(const std::string &path, std::vector<u8> &exe)
 }
 
 /// <summary>
-/// Loads the contents of a text file. Returns true if there were no errors
-/// </summary>
-/// <param name="path">the file to read
-/// <param name="txt">the resulting text data
-int LoadTextFile(const std::string &path, std::string &txt)
-{
-	std::ifstream f(path); // file handle
-	if (!f) { std::cout << "Failed to open \"" << path << "\"\n"; return FailOpen; }
-
-	// read the whole file into txt - we'll majorly optimize this out later
-	txt.assign(std::istreambuf_iterator<char>(f), std::istreambuf_iterator<char>());
-
-	return 0;
-}
-
-/// <summary>
 /// Serializes an object file to a file. Returns true if there were no errors
 /// </summary>
 /// <param name="path">the destination file to save to
@@ -293,14 +277,13 @@ int LoadObjectFileDir(std::vector<ObjectFile> &objs, const std::string &path)
 /// <param name="to">destination for resulting object file
 int Assemble(const std::string &from, const std::string &to)
 {
-	// read the file contents
-	std::string code;
-	int ret = LoadTextFile(from, code);
-	if (ret != 0) return ret;
+	// open the file
+	std::ifstream f(from);
+	if (!f) { std::cout << "Failed to open \"" << from << "\"\n"; return FailOpen; }
 
 	// assemble the program
 	ObjectFile obj;
-	AssembleResult res = Assemble(code, obj);
+	AssembleResult res = Assemble(f, obj);
 		
 	// if there was no error
 	if (res.Error == AssembleError::None)
@@ -309,7 +292,7 @@ int Assemble(const std::string &from, const std::string &to)
 		return SaveObjectFile(to, obj);
 	}
 	// otherwise show error message
-	else { std::cout << "Assemble Error in " << from << ":\n" << res.ErrorMsg; return (int)res.Error; }
+	else { std::cout << "Assemble Error in " << from << ":\n" << res.ErrorMsg << '\n'; return (int)res.Error; }
 }
 /// <summary>
 /// Assembles the (from) file into an object file and saves it as the same name but with a .o extension
@@ -358,7 +341,7 @@ int Link(std::vector<std::string> &paths, const std::string &to, const std::stri
 		return SaveBinaryFile(to, exe);
 	}
 	// otherwise show error message
-	else { std::cout << "Link Error:\n" << res.ErrorMsg; return (int)res.Error; }
+	else { std::cout << "Link Error:\n" << res.ErrorMsg << '\n'; return (int)res.Error; }
 }
 
 // -- execution -- //
@@ -394,7 +377,7 @@ int RunConsole(std::vector<u8> &exe, std::vector<std::string> &args, bool fsf, b
 	if (computer.Error() != ErrorCode::None)
 	{
 		// print error message
-		std::cout << "\n\nError Encountered: " << (int)computer.Error();
+		std::cout << "\n\nError Encountered: " << (int)computer.Error() << '\n';
 		// return execution error code
 		return ExecErrorReturnCode;
 	}
@@ -402,7 +385,7 @@ int RunConsole(std::vector<u8> &exe, std::vector<std::string> &args, bool fsf, b
 	else
 	{
 		// print elapsed time
-		if (time) std::cout << "\n\nElapsed Time: " << FormatTime(chrono::duration_cast<chrono::nanoseconds>(stop - start).count());
+		if (time) std::cout << "\n\nElapsed Time: " << FormatTime(chrono::duration_cast<chrono::nanoseconds>(stop - start).count()) << '\n';
 		// use return value
 		return computer.ReturnValue();
 	}

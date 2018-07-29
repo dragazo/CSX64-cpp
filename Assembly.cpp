@@ -322,7 +322,7 @@ namespace CSX64
 		return true;
 	}
 	
-	AssembleResult Assemble(const std::string &code, ObjectFile &_file_)
+	AssembleResult Assemble(std::istream &code, ObjectFile &_file_)
 	{
 		AssembleArgs args;
 
@@ -348,20 +348,34 @@ namespace CSX64
 		["__e__"] = new Expr(){FloatResult = Math.E}
 		};*/
 
-		int pos = 0, end = 0; // position in code
-
 		// potential parsing args for an instruction
 		u64 a = 0, b = 0;
 		bool floating, btemp;
 
 		std::string err; // error location for evaluation
-		
+
+		std::string rawline; // raw line to parse
+		int ch;              // character extracted
+
 		const asm_router *router; // router temporary
 
-		if (code.empty()) return AssembleResult{AssembleError::EmptyFile, "The file was empty"};
-
-		while (pos < code.size())
+		while (code)
 		{
+			// get the line to parse
+			rawline.clear();
+			while ((ch = code.get()) != EOF)
+			{
+				if (ch == CommentChar)
+				{
+					code.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+					break;
+				}
+				else if (ch == '\n') break;
+				else rawline.push_back(ch);
+			}
+			++args.line;
+			if (!args.SplitLine(std::move(rawline))) return args.res;
+
 			// update current line pos
 			switch (args.current_seg)
 			{
@@ -372,17 +386,6 @@ namespace CSX64
 
 				// default does nothing - it is ill-formed to make an address outside of any segment
 			}
-
-			// find the next separator
-			for (end = pos; end < code.size() && code[end] != '\n' && code[end] != CommentChar; ++end);
-
-			// advance line counter
-			++args.line;
-			// split the line
-			if (!args.SplitLine(code.substr(pos, end - pos))) return {AssembleError::FormatError, "line " + tostr(args.line) + ": Failed to parse line\n-> " + args.res.ErrorMsg};
-			// if the separator was a comment character, consume the rest of the line as well as no-op
-			if (end < code.size() && code[end] == CommentChar)
-				for (; end < code.size() && code[end] != '\n'; ++end);
 
 			// process marked label
 			if (!args.TryProcessLabel()) return args.res;
@@ -396,9 +399,6 @@ namespace CSX64
 				// perform the assembly action
 				if (!(*router)(args)) return args.res;
 			}
-
-			// advance to after the new line
-			pos = end + 1;
 		}
 
 		// -- minimize symbols and holes -- //

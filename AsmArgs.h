@@ -33,13 +33,23 @@ namespace CSX64
 
 		AssembleResult res;
 
-		// -- Assembly Functions -- //
+	public: // -- ctor/dtor -- //
+
+		AssembleArgs() {}
+		
+		AssembleArgs(const AssembleArgs&) = delete;
+		AssembleArgs(AssembleArgs&&) = delete;
+
+		AssembleArgs &operator=(const AssembleArgs&) = delete;
+		AssembleArgs &operator=(AssembleArgs&&) = delete;
+
+	public: // -- Assembly Functions -- //
 
 		/// <summary>
 		/// Splits the raw line into its separate components. The raw line should not have a comment section.
 		/// </summary>
 		/// <param name="rawline">the raw line to parse</param>
-		bool SplitLine(const std::string &rawline);
+		bool SplitLine(std::string rawline);
 
 		static bool IsValidName(const std::string &token, std::string &err);
 		bool MutateName(std::string &label);

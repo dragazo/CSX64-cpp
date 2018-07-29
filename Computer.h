@@ -11,6 +11,8 @@
 #include <memory>
 #include <cfenv>
 #include <cmath>
+#include <limits>
+#include <type_traits>
 
 #include "CoreTypes.h"
 #include "ExeTypes.h"
@@ -103,7 +105,12 @@ namespace CSX64
 			friend inline std::ostream &operator<<(std::ostream &ostr, ST_Wrapper wrapper)
 			{
 				if (wrapper.Empty()) ostr << "Empty";
-				else ostr << (long double)wrapper;
+				else
+				{
+					std::ios::fmtflags flags = ostr.flags();
+					ostr << std::defaultfloat << std::setprecision(17) << (long double)wrapper;
+					ostr.flags(flags);
+				}
 				return ostr;
 			}
 		};
@@ -269,8 +276,9 @@ namespace CSX64
 		std::ostream &WriteCPUDebugString(std::ostream &ostr)
 		{
 			std::ios::fmtflags flags = ostr.flags();
-			ostr << std::hex << std::setfill('0');
+			ostr << std::hex << std::setfill('0') << std::noboolalpha;
 
+			ostr << '\n';
 			ostr << "RAX: " << std::setw(16) << RAX() << "     CF: " << CF() << "     RFLAGS: " << std::setw(16) << RFLAGS() << '\n';
 			ostr << "RBX: " << std::setw(16) << RBX() << "     PF: " << PF() << "     RIP:    " << std::setw(16) << RIP() << '\n';
 			ostr << "RCX: " << std::setw(16) << RCX() << "     AF: " << AF() << '\n';
@@ -295,15 +303,16 @@ namespace CSX64
 		std::ostream &WriteVPUDebugString(std::ostream &ostr)
 		{
 			std::ios::fmtflags flags = ostr.flags();
-			ostr << std::hex << std::setfill('0');
+			ostr << std::setfill('0');
 
+			ostr << '\n';
 			for (int i = 0; i < 32; ++i)
 			{
-				ostr << "ZMM" << i << ": ";
+				ostr << "ZMM" << std::dec << i << ": ";
 				if (i < 10) ostr << ' ';
 
-				for (int j = 7; j >= 0; --j) ostr << std::setw(16) << ZMMRegisters[i].int64(j);
-
+				ostr << std::hex;
+				for (int j = 7; j >= 0; --j) ostr << std::setw(16) << ZMMRegisters[i].int64(j) << ' ';
 				ostr << '\n';
 			}
 
@@ -314,7 +323,6 @@ namespace CSX64
 		std::ostream &WriteFullDebugString(std::ostream &ostr)
 		{
 			WriteCPUDebugString(ostr);
-			ostr << '\n';
 			WriteVPUDebugString(ostr);
 
 			return ostr;
