@@ -390,25 +390,17 @@ namespace CSX64
 		template<typename T>
 		bool GetMem(u64 pos, T &val)
 		{
-			// make sure we're in bounds
 			if (pos >= mem_size || pos + sizeof(T) > mem_size) { Terminate(ErrorCode::OutOfBounds); return false; }
-
-			// read the memory
-			std::memcpy(&val, (char*)mem + pos, sizeof(T));
+			val = *(T*)((char*)mem + pos);
 			return true;
 		}
 		// writes a POD type T to memory. returns true on success
 		template<typename T>
 		bool SetMem(u64 pos, const T &val)
 		{
-			// make sure we're in bounds
 			if (pos >= mem_size || pos + sizeof(T) > mem_size) { Terminate(ErrorCode::OutOfBounds); return false; }
-
-			// make sure we're not in the readonly segment
 			if (pos < ReadonlyBarrier) { Terminate(ErrorCode::AccessViolation); return false; }
-
-			// write the memory
-			std::memcpy((char*)mem + pos, &val, sizeof(T));
+			*(T*)((char*)mem + pos) = val;
 			return true;
 		}
 
@@ -433,28 +425,28 @@ namespace CSX64
 
 	private: // -- exe memory utilities -- //
 
-		// Pushes a value onto the stack
+		// Pushes a raw value onto the stack
 		bool PushRaw(u64 size, u64 val)
 		{
 			RSP() -= size;
 			if (RSP() < StackBarrier) { Terminate(ErrorCode::StackOverflow); return false; }
 			return SetMemRaw(RSP(), size, val);
 		}
-		/// Pops a value from the stack
-		bool PopRaw(u64 size, u64 &val)
-		{
-			if (RSP() < StackBarrier) { Terminate(ErrorCode::StackOverflow); return false; }
-			if (!GetMemRaw(RSP(), size, val)) return false;
-			RSP() += size;
-			return true;
-		}
-
 		template<typename T>
 		bool PushRaw(u64 val)
 		{
 			RSP() -= sizeof(T);
 			if (RSP() < StackBarrier) { Terminate(ErrorCode::StackOverflow); return false; }
 			return SetMemRaw<T>(RSP(), val);
+		}
+
+		// Pops a value from the stack
+		bool PopRaw(u64 size, u64 &val)
+		{
+			if (RSP() < StackBarrier) { Terminate(ErrorCode::StackOverflow); return false; }
+			if (!GetMemRaw(RSP(), size, val)) return false;
+			RSP() += size;
+			return true;
 		}
 		template<typename T>
 		bool PopRaw(u64 &val)
@@ -465,10 +457,9 @@ namespace CSX64
 			return true;
 		}
 
-		// reads a value from memory. returns true on success
+		// reads a raw value from memory. returns true on success
 		bool GetMemRaw(u64 pos, u64 size, u64 &res)
 		{
-			// make sure access is in bounds
 			if (pos >= mem_size || pos + size > mem_size) { Terminate(ErrorCode::OutOfBounds); return false; }
 			
 			switch (size)
@@ -481,13 +472,25 @@ namespace CSX64
 			default: throw std::runtime_error("GetMemRaw size was non-standard");
 			}
 		}
-		// writes a value to memory. returns true on success
+		template<typename T>
+		bool GetMemRaw(u64 pos, u64 &res)
+		{
+			if (pos >= mem_size || pos + sizeof(T) > mem_size) { Terminate(ErrorCode::OutOfBounds); return false; }
+			res = *(T*)((char*)mem + pos);
+			return true;
+		}
+		template<>
+		bool GetMemRaw<u8>(u64 pos, u64 &res)
+		{
+			if (pos >= mem_size) { Terminate(ErrorCode::OutOfBounds); return false; }
+			res = *((u8*)mem + pos);
+			return true;
+		}
+
+		// writes a raw value to memory. returns true on success
 		bool SetMemRaw(u64 pos, u64 size, u64 val)
 		{
-			// make sure access is in bounds
 			if (pos >= mem_size || pos + size > mem_size) { Terminate(ErrorCode::OutOfBounds); return false; }
-
-			// make sure we're not in the readonly segment
 			if (pos < ReadonlyBarrier) { Terminate(ErrorCode::AccessViolation); return false; }
 
 			switch (size)
@@ -500,33 +503,26 @@ namespace CSX64
 			default: throw std::runtime_error("GetMemRaw size was non-standard");
 			}
 		}
-
-		template<typename T>
-		bool GetMemRaw(u64 pos, u64 &res)
-		{
-			// make sure access is in bounds
-			if (pos >= mem_size || pos + sizeof(T) > mem_size) { Terminate(ErrorCode::OutOfBounds); return false; }
-
-			res = *(T*)((char*)mem + pos);
-			return true;
-		}
 		template<typename T>
 		bool SetMemRaw(u64 pos, u64 val)
 		{
-			// make sure access is in bounds
 			if (pos >= mem_size || pos + sizeof(T) > mem_size) { Terminate(ErrorCode::OutOfBounds); return false; }
-
-			// make sure we're not in the readonly segment
 			if (pos < ReadonlyBarrier) { Terminate(ErrorCode::AccessViolation); return false; }
-
 			*(T*)((char*)mem + pos) = val;
+			return true;
+		}
+		template<>
+		bool SetMemRaw<u8>(u64 pos, u64 val)
+		{
+			if (pos >= mem_size) { Terminate(ErrorCode::OutOfBounds); return false; }
+			if (pos < ReadonlyBarrier) { Terminate(ErrorCode::AccessViolation); return false; }
+			*((u8*)mem + pos) = val;
 			return true;
 		}
 
 		// gets a value and advances the execution pointer. returns true on success
 		bool GetMemAdv(u64 size, u64 &res)
 		{
-			// make sure we can get the memory
 			if (!GetMemRaw(RIP(), size, res)) return false;
 			RIP() += size;
 			return true;
@@ -534,9 +530,21 @@ namespace CSX64
 		template<typename T>
 		bool GetMemAdv(u64 &res)
 		{
-			// make sure we can get the memory
 			if (!GetMemRaw<T>(RIP(), res)) return false;
 			RIP() += sizeof(T);
+			return true;
+		}
+		template<>
+		bool GetMemAdv<u8>(u64 &res)
+		{
+			return GetMemRaw<u8>(RIP()++, res);
+		}
+
+		// reads a byte at RIP and advances the execution pointer
+		bool GetByteAdv(u8 &res)
+		{
+			if (RIP() >= mem_size) { Terminate(ErrorCode::OutOfBounds); return false; }
+			res = *((u8*)mem + RIP()++);
 			return true;
 		}
 
@@ -545,11 +553,11 @@ namespace CSX64
 		{
 			// [1: imm][1:][2: mult_1][2: size][1: r1][1: r2]   ([4: r1][4: r2])   ([size: imm])
 
-			u64 settings, sizecode, regs;
+			u8 settings, sizecode, regs;
 			res = 0; // initialize res - functions as imm parsing location, so it has to start at 0
 
 			// get the settings byte and regs byte if applicable
-			if (!GetMemAdv<u8>(settings) || (settings & 3) != 0 && !GetMemAdv<u8>(regs)) return false;
+			if (!GetByteAdv(settings) || (settings & 3) != 0 && !GetByteAdv(regs)) return false;
 
 			// get the sizecode
 			sizecode = (settings >> 2) & 3;
