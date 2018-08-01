@@ -47,7 +47,10 @@ namespace CSX64
 
 	u64 smart_readsome(std::istream &istr, char *buf, u64 max);
 
-	// -- misc utilities -- //
+	// -- math utilities -- //
+
+	// stores the 2's complement negative of high:low into high:low
+	void Neg_128(u64 &high, u64 &low);
 
 	// computes the full (unsigned) product of a * b and stores the result in high:low
 	void UnsignedMul(u64 a, u64 b, u64 &res_high, u64 &res_low);
@@ -59,8 +62,10 @@ namespace CSX64
 	// computes the (unsigned) division of num by denom and returns the quotient and remainder
 	void SignedDiv(u64 num_high, u64 num_low, u64 denom, u64 &quot_high, u64 &quot_low, u64 &rem);
 
-	// returns true if low is a lossless truncation of high:low
+	// returns true if low is a lossless truncation of (signed) high:low
 	bool TruncGood_128_64(u64 high, u64 low);
+
+	// -- container utilities -- //
 
 	// returns true if the container has at least one entry equal to val
 	template<typename T>

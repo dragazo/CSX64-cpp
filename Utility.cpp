@@ -84,7 +84,14 @@ namespace CSX64
 		return cnt;
 	}
 
-	// -- misc utilities -- //
+	// -- math utilities -- //
+
+	void Neg_128(u64 &high, u64 &low)
+	{
+		high = ~high;
+		low = ~low + 1;
+		if (low == 0) ++high;
+	}
 
 	void UnsignedMul(u64 a, u64 b, u64 &res_high, u64 &res_low)
 	{
@@ -129,29 +136,77 @@ namespace CSX64
 		UnsignedMul(a, b, res_high, res_low);
 
 		// account for sign
-		if (neg)
-		{
-			res_high = ~res_high;
-			res_low = ~res_low + 1;
-			if (res_low < 1) ++res_high;
-		}
+		if (neg) Neg_128(res_high, res_low);
 	}
 
 	void UnsignedDiv(u64 num_high, u64 num_low, u64 denom, u64 &quot_high, u64 &quot_low, u64 &rem)
 	{
-		std::cerr << "64-BIT DIVISION NOT IMPLEMENTED YET\n";
-		abort();
+		// if it's really a 64-bit divide, we can do it with built-in operators (significantly faster on hardware than simulated)
+		if (num_high == 0)
+		{
+			quot_high = 0;
+			quot_low = num_low / denom;
+			rem = num_low % denom;
+		}
+		// otherwise do a real 128-bit divide
+		else
+		{
+			quot_high = quot_low = 0;
+			rem = 0;
+
+			// process the high 64 bits
+			for (u64 mask = 0x8000000000000000; mask; mask >>= 1)
+			{
+				rem <<= 1;
+				if (num_high & mask) ++rem;
+
+				if (rem >= denom)
+				{
+					rem -= denom;
+					quot_high |= mask;
+				}
+			}
+
+			// process the low 64 bits
+			for (u64 mask = 0x8000000000000000; mask; mask >>= 1)
+			{
+				rem <<= 1;
+				if (num_low & mask) ++rem;
+
+				if (rem >= denom)
+				{
+					rem -= denom;
+					quot_low |= mask;
+				}
+			}
+		}
 	}
 	void SignedDiv(u64 num_high, u64 num_low, u64 denom, u64 &quot_high, u64 &quot_low, u64 &rem)
 	{
-		std::cerr << "64-BIT DIVISION NOT IMPLEMENTED YET\n";
-		abort();
+		// we'll do the signed variant in terms of unsigned
+
+		// get net negative flag
+		bool neg = false;
+		if ((i64)num_high < 0) { Neg_128(num_high, num_low); neg = !neg; }
+		if ((i64)denom < 0) { denom = ~denom + 1; neg = !neg; }
+
+		// perform unsigned product
+		UnsignedDiv(num_high, num_low, denom, quot_high, quot_low, rem);
+
+		// account for sign
+		if (neg)
+		{
+			Neg_128(quot_high, quot_low);
+			rem = ~rem + 1;
+		}
 	}
 
 	bool TruncGood_128_64(u64 high, u64 low)
 	{
 		return (i64)low < 0 ? high == ~(u64)0 : high == (u64)0;
 	}
+
+	// -- misc utilities -- //
 
 	std::string remove_ch(const std::string &str, char ch)
 	{
