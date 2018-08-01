@@ -42,7 +42,7 @@ namespace CSX64
 
 			friend class Computer;
 			inline ST_Wrapper(Computer &_c, int _index) : c(_c), index(_index) {}
-			
+
 		public:
 
 			static const u16 tag_normal = 0;
@@ -167,7 +167,7 @@ namespace CSX64
 		// Validates the machine for operation, but does not prepare it for execute (see Initialize)
 		inline Computer() : mem(nullptr), mem_size(0), running(false), error(ErrorCode::None), max_mem_size((u64)8 * 1024 * 1024 * 1024) {}
 		virtual ~Computer() { aligned_free(mem); }
-		
+
 		Computer(const Computer&) = delete;
 		Computer(Computer&&) = delete;
 
@@ -461,7 +461,7 @@ namespace CSX64
 		bool GetMemRaw(u64 pos, u64 size, u64 &res)
 		{
 			if (pos >= mem_size || pos + size > mem_size) { Terminate(ErrorCode::OutOfBounds); return false; }
-			
+
 			switch (size)
 			{
 			case 8: res = *(u64*)((char*)mem + pos); return true;
@@ -734,15 +734,15 @@ namespace CSX64
 		static bool(Computer::* const opcode_handlers[])();
 
 	private: // -- operators -- //
-		
+
 		/*
-				[4: dest][2: size][1:dh][1: mem]   [size: imm]
-				mem = 0: [1: sh][3:][4: src]
-				dest <- f(reg, imm)
-				mem = 1: [address]
-				dest <- f(M[address], imm)
-				(dh and sh mark AH, BH, CH, or DH for dest or src)
-				*/
+		[4: dest][2: size][1:dh][1: mem]   [size: imm]
+		mem = 0: [1: sh][3:][4: src]
+		dest <- f(reg, imm)
+		mem = 1: [address]
+		dest <- f(M[address], imm)
+		(dh and sh mark AH, BH, CH, or DH for dest or src)
+		*/
 		bool FetchTernaryOpFormat(u64 &s, u64 &a, u64 &b)
 		{
 			if (!GetMemAdv<u8>(s)) return false;
@@ -1626,10 +1626,7 @@ namespace CSX64
 				break;
 			}
 
-			SF() = Rand() & 1;
-			ZF() = Rand() & 1;
-			AF() = Rand() & 1;
-			PF() = Rand() & 1;
+			EFLAGS() ^= Rand() & (decltype(SF())::mask | decltype(ZF())::mask | decltype(AF())::mask | decltype(PF())::mask);
 
 			return true;
 		}
@@ -1702,10 +1699,7 @@ namespace CSX64
 				break;
 			}
 
-			SF() = Rand() & 1;
-			ZF() = Rand() & 1;
-			AF() = Rand() & 1;
-			PF() = Rand() & 1;
+			EFLAGS() ^= Rand() & (decltype(SF())::mask | decltype(ZF())::mask | decltype(AF())::mask | decltype(PF())::mask);
 
 			return true;
 		}
@@ -1742,10 +1736,7 @@ namespace CSX64
 				break;
 			}
 
-			SF() = Rand() & 1;
-			ZF() = Rand() & 1;
-			AF() = Rand() & 1;
-			PF() = Rand() & 1;
+			EFLAGS() ^= Rand() & (decltype(SF())::mask | decltype(ZF())::mask | decltype(AF())::mask | decltype(PF())::mask);
 
 			return StoreBinaryOpFormat(s1, s2, m, (u64)res);
 		}
@@ -1782,10 +1773,7 @@ namespace CSX64
 				break;
 			}
 
-			SF() = Rand() & 1;
-			ZF() = Rand() & 1;
-			AF() = Rand() & 1;
-			PF() = Rand() & 1;
+			EFLAGS() ^= Rand() & (decltype(SF())::mask | decltype(ZF())::mask | decltype(AF())::mask | decltype(PF())::mask);
 
 			return StoreTernaryOPFormat(s, (u64)res);
 		}
@@ -1827,12 +1815,7 @@ namespace CSX64
 				break;
 			}
 
-			CF() = Rand() & 1;
-			OF() = Rand() & 1;
-			SF() = Rand() & 1;
-			ZF() = Rand() & 1;
-			AF() = Rand() & 1;
-			PF() = Rand() & 1;
+			EFLAGS() ^= Rand() & (decltype(CF())::mask | decltype(OF())::mask | decltype(SF())::mask | decltype(ZF())::mask | decltype(AF())::mask | decltype(PF())::mask);
 
 			return true;
 		}
@@ -1877,12 +1860,7 @@ namespace CSX64
 				break;
 			}
 
-			CF() = Rand() & 1;
-			OF() = Rand() & 1;
-			SF() = Rand() & 1;
-			ZF() = Rand() & 1;
-			AF() = Rand() & 1;
-			PF() = Rand() & 1;
+			EFLAGS() ^= Rand() & (decltype(CF())::mask | decltype(OF())::mask | decltype(SF())::mask | decltype(ZF())::mask | decltype(AF())::mask | decltype(PF())::mask);
 
 			return true;
 		}
@@ -2230,9 +2208,7 @@ namespace CSX64
 
 			EFLAGS() = 2; // clear all the (public) flags (flag 1 must always be set)
 			ZF() = res == 0; // ZF is set on zero
-			AF() = Rand() & 1; // AF, SF, and PF are undefined
-			SF() = Rand() & 1;
-			PF() = Rand() & 1;
+			EFLAGS() ^= Rand() & (decltype(AF())::mask | decltype(SF())::mask | decltype(PF())::mask); // AF, SF, PF undefined
 
 			return StoreBinaryOpFormat(s1, s2, m, res);
 		}
@@ -2248,8 +2224,7 @@ namespace CSX64
 			SF() = Negative(res, sizecode);
 			CF() = a != 0;
 			OF() = false;
-			AF() = Rand() & 1;
-			PF() = Rand() & 1;
+			EFLAGS() ^= Rand() & (decltype(AF())::mask | decltype(PF())::mask);
 
 			return StoreUnaryOpFormat(s, m, res);
 		}
@@ -2264,8 +2239,7 @@ namespace CSX64
 			SF() = Negative(res, sizecode);
 			CF() = a == 0;
 			ZF() = OF() = false;
-			AF() = Rand() & 1;
-			PF() = Rand() & 1;
+			EFLAGS() ^= Rand() & (decltype(AF())::mask | decltype(PF())::mask);
 
 			return StoreUnaryOpFormat(s, m, res);
 		}
@@ -2281,8 +2255,7 @@ namespace CSX64
 			SF() = Negative(res, sizecode);
 			CF() = a == 0;
 			OF() = false;
-			AF() = Rand() & 1;
-			PF() = Rand() & 1;
+			EFLAGS() ^= Rand() & (decltype(AF())::mask | decltype(PF())::mask);
 
 			return StoreUnaryOpFormat(s, m, res);
 		}
@@ -2301,8 +2274,7 @@ namespace CSX64
 			SF() = Negative(res, sizecode);
 			OF() = false;
 			CF() = false;
-			AF() = Rand() & 1;
-			PF() = Rand() & 1;
+			EFLAGS() ^= Rand() & (decltype(AF())::mask | decltype(PF())::mask);
 
 			return StoreRR_RMFormat(s1, res);
 		}
@@ -2326,10 +2298,7 @@ namespace CSX64
 			u64 mask = (u64)1 << (b % SizeBits(sizecode)); // performed modulo-n
 
 			CF() = (a & mask) != 0;
-			OF() = Rand() & 1;
-			SF() = Rand() & 1;
-			AF() = Rand() & 1;
-			PF() = Rand() & 1;
+			EFLAGS() ^= Rand() & (decltype(OF())::mask | decltype(SF())::mask | decltype(AF())::mask | decltype(PF())::mask);
 
 			switch (ext)
 			{
@@ -2520,10 +2489,7 @@ namespace CSX64
 			}
 			AL() &= 0xf;
 
-			OF() = Rand() & 1;
-			SF() = Rand() & 1;
-			ZF() = Rand() & 1;
-			PF() = Rand() & 1;
+			EFLAGS() ^= Rand() & (decltype(OF())::mask | decltype(SF())::mask | decltype(ZF())::mask | decltype(PF())::mask);
 
 			return true;
 		}
@@ -2687,11 +2653,8 @@ namespace CSX64
 			u64 ext;
 			if (!GetMemAdv<u8>(ext)) return false;
 
-			FPU_C0() = Rand() & 1;
-			FPU_C1() = Rand() & 1;
-			FPU_C2() = Rand() & 1;
-			FPU_C3() = Rand() & 1;
-				
+			FPU_status ^= Rand() & (decltype(FPU_C0())::mask | decltype(FPU_C1())::mask | decltype(FPU_C2())::mask | decltype(FPU_C3())::mask);
+
 			switch (ext)
 			{
 			case 0: return PushFPU(1L); // 1
@@ -2720,10 +2683,7 @@ namespace CSX64
 			u64 s, m;
 			if (!GetMemAdv<u8>(s)) return false;
 
-			FPU_C0() = Rand() & 1;
-			FPU_C1() = Rand() & 1;
-			FPU_C2() = Rand() & 1;
-			FPU_C3() = Rand() & 1;
+			FPU_status ^= Rand() & (decltype(FPU_C0())::mask | decltype(FPU_C1())::mask | decltype(FPU_C2())::mask | decltype(FPU_C3())::mask);
 
 			// switch through mode
 			switch (s & 7)
@@ -2770,10 +2730,7 @@ namespace CSX64
 			u64 s, m;
 			if (!GetMemAdv<u8>(s)) return false;
 
-			FPU_C0() = Rand() & 1;
-			FPU_C1() = Rand() & 1;
-			FPU_C2() = Rand() & 1;
-			FPU_C3() = Rand() & 1;
+			FPU_status ^= Rand() & (decltype(FPU_C0())::mask | decltype(FPU_C1())::mask | decltype(FPU_C2())::mask | decltype(FPU_C3())::mask);
 
 			switch (s & 15)
 			{
@@ -2798,7 +2755,7 @@ namespace CSX64
 				case 11: if (!SetMemRaw<u16>(m, (u64)(i64)ST(0))) return false; break;
 				case 12: if (!SetMemRaw<u32>(m, (u64)(i64)ST(0))) return false; break; // !! WORK !! make sure these truncate regardless of std::fesetround()
 				case 13: if (!SetMemRaw<u64>(m, (u64)(i64)ST(0))) return false; break;
-						
+
 				default: Terminate(ErrorCode::UndefinedBehavior); return false;
 				}
 				break;
@@ -2822,10 +2779,8 @@ namespace CSX64
 			ST(0) = ST(i);
 			ST(i) = temp;
 
-			FPU_C0() = Rand() & 1;
+			FPU_status ^= Rand() & (decltype(FPU_C0())::mask | decltype(FPU_C2())::mask | decltype(FPU_C3())::mask);
 			FPU_C1() = false;
-			FPU_C2() = Rand() & 1;
-			FPU_C3() = Rand() & 1;
 
 			return true;
 		}
@@ -2870,10 +2825,7 @@ namespace CSX64
 				ST(0) = ST(s >> 4);
 			}
 
-			FPU_C0() = Rand() & 1;
-			FPU_C1() = Rand() & 1;
-			FPU_C2() = Rand() & 1;
-			FPU_C3() = Rand() & 1;
+			FPU_status ^= Rand() & (decltype(FPU_C0())::mask | decltype(FPU_C1())::mask | decltype(FPU_C2())::mask | decltype(FPU_C3())::mask);
 
 			return true;
 		}
@@ -2886,10 +2838,7 @@ namespace CSX64
 
 			long double res = a + b;
 
-			FPU_C0() = Rand() & 1;
-			FPU_C1() = Rand() & 1;
-			FPU_C2() = Rand() & 1;
-			FPU_C3() = Rand() & 1;
+			FPU_status ^= Rand() & (decltype(FPU_C0())::mask | decltype(FPU_C1())::mask | decltype(FPU_C2())::mask | decltype(FPU_C3())::mask);
 
 			return StoreFPUBinaryFormat(s, res);
 		}
@@ -2901,10 +2850,7 @@ namespace CSX64
 
 			long double res = a - b;
 
-			FPU_C0() = Rand() & 1;
-			FPU_C1() = Rand() & 1;
-			FPU_C2() = Rand() & 1;
-			FPU_C3() = Rand() & 1;
+			FPU_status ^= Rand() & (decltype(FPU_C0())::mask | decltype(FPU_C1())::mask | decltype(FPU_C2())::mask | decltype(FPU_C3())::mask);
 
 			return StoreFPUBinaryFormat(s, res);
 		}
@@ -2916,10 +2862,7 @@ namespace CSX64
 
 			long double res = b - a;
 
-			FPU_C0() = Rand() & 1;
-			FPU_C1() = Rand() & 1;
-			FPU_C2() = Rand() & 1;
-			FPU_C3() = Rand() & 1;
+			FPU_status ^= Rand() & (decltype(FPU_C0())::mask | decltype(FPU_C1())::mask | decltype(FPU_C2())::mask | decltype(FPU_C3())::mask);
 
 			return StoreFPUBinaryFormat(s, res);
 		}
@@ -2932,10 +2875,7 @@ namespace CSX64
 
 			long double res = a * b;
 
-			FPU_C0() = Rand() & 1;
-			FPU_C1() = Rand() & 1;
-			FPU_C2() = Rand() & 1;
-			FPU_C3() = Rand() & 1;
+			FPU_status ^= Rand() & (decltype(FPU_C0())::mask | decltype(FPU_C1())::mask | decltype(FPU_C2())::mask | decltype(FPU_C3())::mask);
 
 			return StoreFPUBinaryFormat(s, res);
 		}
@@ -2947,10 +2887,7 @@ namespace CSX64
 
 			long double res = a / b;
 
-			FPU_C0() = Rand() & 1;
-			FPU_C1() = Rand() & 1;
-			FPU_C2() = Rand() & 1;
-			FPU_C3() = Rand() & 1;
+			FPU_status ^= Rand() & (decltype(FPU_C0())::mask | decltype(FPU_C1())::mask | decltype(FPU_C2())::mask | decltype(FPU_C3())::mask);
 
 			return StoreFPUBinaryFormat(s, res);
 		}
@@ -2962,10 +2899,7 @@ namespace CSX64
 
 			long double res = b / a;
 
-			FPU_C0() = Rand() & 1;
-			FPU_C1() = Rand() & 1;
-			FPU_C2() = Rand() & 1;
-			FPU_C3() = Rand() & 1;
+			FPU_status ^= Rand() & (decltype(FPU_C0())::mask | decltype(FPU_C1())::mask | decltype(FPU_C2())::mask | decltype(FPU_C3())::mask);
 
 			return StoreFPUBinaryFormat(s, res);
 		}
@@ -2981,10 +2915,7 @@ namespace CSX64
 
 			ST(0) = std::powl(2, val) - 1;
 
-			FPU_C0() = Rand() & 1;
-			FPU_C1() = Rand() & 1;
-			FPU_C2() = Rand() & 1;
-			FPU_C3() = Rand() & 1;
+			FPU_status ^= Rand() & (decltype(FPU_C0())::mask | decltype(FPU_C1())::mask | decltype(FPU_C2())::mask | decltype(FPU_C3())::mask);
 
 			return true;
 		}
@@ -2994,10 +2925,8 @@ namespace CSX64
 
 			ST(0) = std::fabsl(ST(0));
 
-			FPU_C0() = Rand() & 1;
+			FPU_status ^= Rand() & (decltype(FPU_C0())::mask | decltype(FPU_C2())::mask | decltype(FPU_C3())::mask);
 			FPU_C1() = false;
-			FPU_C2() = Rand() & 1;
-			FPU_C3() = Rand() & 1;
 
 			return true;
 		}
@@ -3007,10 +2936,8 @@ namespace CSX64
 
 			ST(0) = -ST(0);
 
-			FPU_C0() = Rand() & 1;
+			FPU_status ^= Rand() & (decltype(FPU_C0())::mask | decltype(FPU_C2())::mask | decltype(FPU_C3())::mask);
 			FPU_C1() = false;
-			FPU_C2() = Rand() & 1;
-			FPU_C3() = Rand() & 1;
 
 			return true;
 		}
@@ -3071,10 +2998,8 @@ namespace CSX64
 
 			ST(0) = res;
 
-			FPU_C0() = Rand() & 1;
+			FPU_status ^= Rand() & (decltype(FPU_C0())::mask | decltype(FPU_C2())::mask | decltype(FPU_C3())::mask);
 			FPU_C1() = res > val;
-			FPU_C2() = Rand() & 1;
-			FPU_C3() = Rand() & 1;
 
 			return true;
 		}
@@ -3084,10 +3009,7 @@ namespace CSX64
 
 			ST(0) = std::sqrtl(ST(0));
 
-			FPU_C0() = Rand() & 1;
-			FPU_C1() = Rand() & 1;
-			FPU_C2() = Rand() & 1;
-			FPU_C3() = Rand() & 1;
+			FPU_status ^= Rand() & (decltype(FPU_C0())::mask | decltype(FPU_C1())::mask | decltype(FPU_C2())::mask | decltype(FPU_C3())::mask);
 
 			return true;
 		}
@@ -3101,10 +3023,7 @@ namespace CSX64
 			PopFPU(); // pop stack and place in the new st(0)
 			ST(0) = ST(1) * std::log2l(ST(0));
 
-			FPU_C0() = Rand() & 1;
-			FPU_C1() = Rand() & 1;
-			FPU_C2() = Rand() & 1;
-			FPU_C3() = Rand() & 1;
+			FPU_status ^= Rand() & (decltype(FPU_C0())::mask | decltype(FPU_C1())::mask | decltype(FPU_C2())::mask | decltype(FPU_C3())::mask);
 
 			return true;
 		}
@@ -3118,10 +3037,7 @@ namespace CSX64
 			PopFPU(); // pop stack and place in the new st(0)
 			ST(0) = b * std::log2(a + 1);
 
-			FPU_C0() = Rand() & 1;
-			FPU_C1() = Rand() & 1;
-			FPU_C2() = Rand() & 1;
-			FPU_C3() = Rand() & 1;
+			FPU_status ^= Rand() & (decltype(FPU_C0())::mask | decltype(FPU_C1())::mask | decltype(FPU_C2())::mask | decltype(FPU_C3())::mask);
 
 			return true;
 		}
@@ -3129,10 +3045,7 @@ namespace CSX64
 		{
 			if (ST(0).Empty()) { Terminate(ErrorCode::FPUAccessViolation); return false; }
 
-			FPU_C0() = Rand() & 1;
-			FPU_C1() = Rand() & 1;
-			FPU_C2() = Rand() & 1;
-			FPU_C3() = Rand() & 1;
+			FPU_status ^= Rand() & (decltype(FPU_C0())::mask | decltype(FPU_C1())::mask | decltype(FPU_C2())::mask | decltype(FPU_C3())::mask);
 
 			// get value and extract exponent/significand
 			double exp, sig;
@@ -3156,10 +3069,7 @@ namespace CSX64
 			// add (truncated) st1 to exponent of st0
 			ST(0) = AssembleDouble(exp + (i64)b, sig);
 
-			FPU_C0() = Rand() & 1;
-			FPU_C1() = Rand() & 1;
-			FPU_C2() = Rand() & 1;
-			FPU_C3() = Rand() & 1;
+			FPU_status ^= Rand() & (decltype(FPU_C0())::mask | decltype(FPU_C1())::mask | decltype(FPU_C2())::mask | decltype(FPU_C3())::mask);
 
 			return true;
 		}
@@ -3262,7 +3172,7 @@ namespace CSX64
 
 			bool x, y, z; // temporaries for cmp flag data
 
-							// do the comparison
+			// do the comparison
 			if (a > b) { x = false; y = false; z = false; }
 			else if (a < b) { x = false; y = false; z = true; }
 			else if (a == b) { x = true; y = false; z = false; }
@@ -3304,10 +3214,8 @@ namespace CSX64
 
 			ST(0) = std::sinl(ST(0));
 
-			FPU_C0() = Rand() & 1;
-			FPU_C1() = Rand() & 1;
+			FPU_status ^= Rand() & (decltype(FPU_C0())::mask | decltype(FPU_C1())::mask | decltype(FPU_C3())::mask);
 			FPU_C2() = false;
-			FPU_C3() = Rand() & 1;
 
 			return true;
 		}
@@ -3317,10 +3225,8 @@ namespace CSX64
 
 			ST(0) = std::cosl(ST(0));
 
-			FPU_C0() = Rand() & 1;
-			FPU_C1() = Rand() & 1;
+			FPU_status ^= Rand() & (decltype(FPU_C0())::mask | decltype(FPU_C1())::mask | decltype(FPU_C3())::mask);
 			FPU_C2() = false;
-			FPU_C3() = Rand() & 1;
 
 			return true;
 		}
@@ -3328,10 +3234,8 @@ namespace CSX64
 		{
 			if (ST(0).Empty()) { Terminate(ErrorCode::FPUAccessViolation); return false; }
 
-			FPU_C0() = Rand() & 1;
-			FPU_C1() = Rand() & 1;
+			FPU_status ^= Rand() & (decltype(FPU_C0())::mask | decltype(FPU_C1())::mask | decltype(FPU_C3())::mask);
 			FPU_C2() = false;
-			FPU_C3() = Rand() & 1;
 
 			// get the value
 			long double val = ST(0);
@@ -3346,10 +3250,8 @@ namespace CSX64
 
 			ST(0) = std::tanl(ST(0));
 
-			FPU_C0() = Rand() & 1;
-			FPU_C1() = Rand() & 1;
+			FPU_status ^= Rand() & (decltype(FPU_C0())::mask | decltype(FPU_C1())::mask | decltype(FPU_C3())::mask);
 			FPU_C2() = false;
-			FPU_C3() = Rand() & 1;
 
 			// also push 1 onto fpu stack
 			return PushFPU(1);
@@ -3364,10 +3266,8 @@ namespace CSX64
 			PopFPU(); // pop stack and place in new st(0)
 			ST(0) = std::atan2l(b, a);
 
-			FPU_C0() = Rand() & 1;
-			FPU_C1() = Rand() & 1;
+			FPU_status ^= Rand() & (decltype(FPU_C0())::mask | decltype(FPU_C1())::mask | decltype(FPU_C3())::mask);
 			FPU_C2() = false;
-			FPU_C3() = Rand() & 1;
 
 			return true;
 		}
@@ -3391,10 +3291,8 @@ namespace CSX64
 			default: return true; // can't happen but compiler is stupid
 			}
 
-			FPU_C0() = Rand() & 1;
+			FPU_status ^= Rand() & (decltype(FPU_C0())::mask | decltype(FPU_C2())::mask | decltype(FPU_C3())::mask);
 			FPU_C1() = false;
-			FPU_C2() = Rand() & 1;
-			FPU_C3() = Rand() & 1;
 
 			return true;
 		}
@@ -3406,10 +3304,7 @@ namespace CSX64
 			// mark as not in use
 			ST(i).Free();
 
-			FPU_C0() = Rand() & 1;
-			FPU_C1() = Rand() & 1;
-			FPU_C2() = Rand() & 1;
-			FPU_C3() = Rand() & 1;
+			FPU_status ^= Rand() & (decltype(FPU_C0())::mask | decltype(FPU_C1())::mask | decltype(FPU_C2())::mask | decltype(FPU_C3())::mask);
 
 			return true;
 		}
@@ -3447,7 +3342,7 @@ namespace CSX64
 			if ((s2 & 0x80) != 0 && !GetMemAdv(BitsToBytes((u64)elem_count), mask)) return false;
 			// get the zmask flag
 			bool zmask = (s2 & 0x40) != 0;
-				
+
 			// switch through mode
 			switch (s2 & 3)
 			{
@@ -3491,7 +3386,7 @@ namespace CSX64
 
 			default: Terminate(ErrorCode::UndefinedBehavior); return false;
 			}
-				
+
 			return true;
 		}
 		/*
