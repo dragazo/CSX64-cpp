@@ -17,11 +17,7 @@
 #include <memory>
 
 #include "Utility.h"
-
-// !! WORK NEEDED !! //
-// 
-// impl 64-bit division un UnsignedDiv() and SignedDiv()
-// 
+#include "BiggerInts/BiggerInts.h"
 
 namespace CSX64
 {
@@ -141,6 +137,8 @@ namespace CSX64
 
 	void UnsignedDiv(u64 num_high, u64 num_low, u64 denom, u64 &quot_high, u64 &quot_low, u64 &rem)
 	{
+		using namespace BiggerInts;
+
 		// if it's really a 64-bit divide, we can do it with built-in operators (significantly faster on hardware than simulated)
 		if (num_high == 0)
 		{
@@ -151,34 +149,10 @@ namespace CSX64
 		// otherwise do a real 128-bit divide
 		else
 		{
-			quot_high = quot_low = 0;
-			rem = 0;
-
-			// process the high 64 bits
-			for (u64 mask = 0x8000000000000000; mask; mask >>= 1)
-			{
-				rem <<= 1;
-				if (num_high & mask) ++rem;
-
-				if (rem >= denom)
-				{
-					rem -= denom;
-					quot_high |= mask;
-				}
-			}
-
-			// process the low 64 bits
-			for (u64 mask = 0x8000000000000000; mask; mask >>= 1)
-			{
-				rem <<= 1;
-				if (num_low & mask) ++rem;
-
-				if (rem >= denom)
-				{
-					rem -= denom;
-					quot_low |= mask;
-				}
-			}
+			auto dm = divmod(build_uint<128>(num_high, num_low), (uint_t<128>)denom);
+			quot_high = dm.first >> (u64)64;
+			quot_low = dm.first;
+			rem = dm.second;
 		}
 	}
 	void SignedDiv(u64 num_high, u64 num_low, u64 denom, u64 &quot_high, u64 &quot_low, u64 &rem)

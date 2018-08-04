@@ -169,6 +169,7 @@
     <ClInclude Include="AsmRouting.h" />
     <ClInclude Include="AsmTables.h" />
     <ClInclude Include="Assembly.h" />
+    <ClInclude Include="BiggerInts\BiggerInts.h" />
     <ClInclude Include="CoreTypes.h" />
     <ClInclude Include="Computer.h" />
     <ClInclude Include="ExeDir.h" />
