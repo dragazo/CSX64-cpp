@@ -23,7 +23,7 @@ namespace CSX64
 		if (!fd.InUse()) { Terminate(ErrorCode::FDNotInUse); return false; }
 
 		// make sure we're in bounds
-		if (RCX() >= mem_size || RCX() + RDX() > mem_size) { Terminate(ErrorCode::OutOfBounds); return false; }
+		if (RCX() >= mem_size || RDX() >= mem_size || RCX() + RDX() > mem_size) { Terminate(ErrorCode::OutOfBounds); return false; }
 		// make sure we're not in the readonly segment
 		if (RCX() < ReadonlyBarrier) { Terminate(ErrorCode::AccessViolation); return false; }
 
@@ -59,7 +59,7 @@ namespace CSX64
 		if (!fd.InUse()) { Terminate(ErrorCode::FDNotInUse); return false; }
 
 		// make sure we're in bounds
-		if (RCX() >= mem_size || RCX() + RDX() > mem_size) { Terminate(ErrorCode::OutOfBounds); return false; }
+		if (RCX() >= mem_size || RDX() >= mem_size || RCX() + RDX() > mem_size) { Terminate(ErrorCode::OutOfBounds); return false; }
 
 		// attempt to write from memory to the file - success = num written, fail = -1
 		try { RAX() = fd.Stream()->write((char*)mem + RCX(), RDX()) ? RDX() : ~(u64)0; }
