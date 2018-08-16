@@ -224,7 +224,7 @@ bool AssembleArgs::TryPad(u64 size)
 	{
 	case AsmSegment::TEXT: Pad(file.Text, size); return true;
 	case AsmSegment::RODATA: Pad(file.Rodata, size); return true;
-	case AsmSegment::DATA: Pad(file.Data, size); return false;
+	case AsmSegment::DATA: Pad(file.Data, size); return true;
 	case AsmSegment::BSS: file.BssLen += size; return true;
 
 	default: res = AssembleResult{AssembleError::FormatError, "line " + tostr(line) + ": Cannot pad this segment"}; return false;
@@ -1139,7 +1139,7 @@ bool AssembleArgs::TryProcessDeclare(u64 size)
 		if (args[i][0] == '"' || args[i][0] == '\'' || args[i][0] == '`')
 		{
 			// get its chars
-			if (!TryExtractStringChars(args[i], chars, err)) { res = {AssembleError::FormatError, "line " + tostr(line) + ": Invalid string literal: {args[i]}\n-> {err}"};   return false; }
+			if (!TryExtractStringChars(args[i], chars, err)) { res = {AssembleError::FormatError, "line " + tostr(line) + ": Invalid string literal: " + args[i] + "\n-> " + err}; return false; }
 
 			// dump into memory (one byte each)
 			for (int j = 0; j < chars.size(); ++j) if (!TryAppendByte((u8)chars[j])) return false;
@@ -1150,13 +1150,13 @@ bool AssembleArgs::TryProcessDeclare(u64 size)
 		else
 		{
 			// can only use standard sizes
-			if (size > 8) { res = {AssembleError::FormatError, "line " + tostr(line) + ": Attempt to write a numeric value in an unsuported format"};   return false; }
-
+			if (size > 8) { res = {AssembleError::FormatError, "line " + tostr(line) + ": Attempt to write a numeric value in an unsuported format"}; return false; }
+			
 			// get the value
 			u64 sizecode;
 			bool explicit_size;
 			if (!TryParseImm(args[i], expr, sizecode, explicit_size)) return false;
-			if (explicit_size) { res = {AssembleError::UsageError, "line " + tostr(line) + ": A size directive in this context is not allowed"};   return false; }
+			if (explicit_size) { res = {AssembleError::UsageError, "line " + tostr(line) + ": A size directive in this context is not allowed"}; return false; }
 
 			// write the value
 			if (!TryAppendExpr(size, std::move(expr))) return false;
@@ -1204,7 +1204,7 @@ bool AssembleArgs::TryProcessEQU()
 
 bool AssembleArgs::TryProcessSegment()
 {
-	if (args.size() != 1) { res = {AssembleError::ArgCount, "line " + tostr(line) + ": Expected 1 operand"};   return false; }
+	if (args.size() != 1) { res = {AssembleError::ArgCount, "line " + tostr(line) + ": Expected 1 operand"}; return false; }
 
 	// get the segment we're going to
 	std::string useg = ToUpper(std::move(args[0]));
@@ -1215,7 +1215,7 @@ bool AssembleArgs::TryProcessSegment()
 	else { res = {AssembleError::ArgError, "line " + tostr(line) + ": Unknown segment specified"}; return false; }
 
 	// if this segment has already been done, fail
-	if ((int)done_segs & (int)current_seg) { res = {AssembleError::FormatError, "line " + tostr(line) + ": Attempt to redeclare segment {current_seg}"};   return false; }
+	if ((int)done_segs & (int)current_seg) { res = {AssembleError::FormatError, "line " + tostr(line) + ": Attempt to redeclare segment {current_seg}"}; return false; }
 	// add to list of completed segments
 	done_segs = (AsmSegment)((int)done_segs | (int)current_seg);
 

@@ -149,10 +149,13 @@ namespace CSX64
 		// otherwise do a real 128-bit divide
 		else
 		{
-			auto dm = divmod(build_uint<128>(num_high, num_low), (uint_t<128>)denom);
-			quot_high = dm.first >> (u64)64;
-			quot_low = dm.first;
-			rem = dm.second;
+			uint_t<128> num;
+			num.high = num_high;
+			num.low = num_low;
+			auto dm = divmod(num, (uint_t<128>)denom);
+			quot_high = dm.first.high;
+			quot_low = dm.first.low;
+			rem = dm.second.low;
 		}
 	}
 	void SignedDiv(u64 num_high, u64 num_low, u64 denom, u64 &quot_high, u64 &quot_low, u64 &rem)
