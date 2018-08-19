@@ -62,7 +62,7 @@ namespace CSX64
 			std::vector<u64> pointers(args.size()); // an array of pointers to args in computer memory
 
 			// for each arg (backwards to make more sense visually, but the order doesn't actually matter)
-			for (int i = args.size() - 1; i >= 0; --i)
+			for (int i = (int)args.size() - 1; i >= 0; --i)
 			{
 				// push the arg onto the stack
 				stack -= args[i].size() + 1;
@@ -119,7 +119,7 @@ namespace CSX64
 	{
 		switch ((SyscallCode)RAX())
 		{
-		case SyscallCode::sys_exit: Exit(RBX()); return true;
+		case SyscallCode::sys_exit: Exit((int)RBX()); return true;
 
 		case SyscallCode::sys_read: return Process_sys_read();
 		case SyscallCode::sys_write: return Process_sys_write();

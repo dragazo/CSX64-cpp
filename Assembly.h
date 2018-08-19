@@ -79,10 +79,10 @@ namespace CSX64
 		std::vector<u8> Text;
 		std::vector<u8> Rodata;
 		std::vector<u8> Data;
-		u32 BssLen = 0;
+		u64 BssLen = 0;
 
 		// Marks that this object file is in a valid, usable state
-		bool Clean() const { return _Clean; }
+		inline constexpr bool Clean() const noexcept { return _Clean; }
 		// marks the object file as dirty
 		void MakeDirty() { _Clean = false; }
 

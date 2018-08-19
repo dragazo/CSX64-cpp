@@ -84,8 +84,8 @@ namespace CSX64
 		std::string path;
 		if (!GetCString(RBX(), path)) return false;
 
-		int raw_flags = RCX(); // flags provided by user
-		int cpp_flags = 0;     // flags to provide to C++
+		int raw_flags = (int)RCX(); // flags provided by user
+		int cpp_flags = 0;          // flags to provide to C++
 		
 		// process raw flags
 		if (raw_flags & (int)OpenFlags::read) cpp_flags |= std::ios::in;
@@ -162,7 +162,7 @@ namespace CSX64
 		FileDescriptor &fd = FileDescriptors[fd_index];
 		if (!fd.InUse()) { Terminate(ErrorCode::FDNotInUse); return false; }
 
-		int raw_mode = RDX();
+		int raw_mode = (int)RDX();
 		int cpp_mode;
 
 		// process raw mode

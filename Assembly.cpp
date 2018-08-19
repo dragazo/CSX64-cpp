@@ -290,7 +290,7 @@ namespace CSX64
 	{
 		using std::swap;
 
-		for (int i = holes.size() - 1; i >= 0; --i)
+		for (int i = (int)holes.size() - 1; i >= 0; --i)
 		{
 			switch (TryPatchHole(seg, symbols, holes[i], res.ErrorMsg))
 			{
@@ -350,7 +350,7 @@ namespace CSX64
 
 		// potential parsing args for an instruction
 		u64 a = 0, b = 0;
-		bool floating, btemp;
+		bool floating;
 
 		std::string err; // error location for evaluation
 

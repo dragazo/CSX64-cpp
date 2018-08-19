@@ -152,7 +152,7 @@ bool AssembleArgs::TryAppendExpr(u64 size, Expr &&expr, std::vector<HoleData> &h
 	// create the hole data
 	HoleData data;
 	data.Address = segment.size();
-	data.Size = size;
+	data.Size = (decltype(data.Size))size;
 	data.Line = line;
 	data.Expr = std::move(expr);
 
@@ -184,8 +184,8 @@ bool AssembleArgs::TryAppendExpr(u64 size, Expr &&expr)
 }
 bool AssembleArgs::TryAppendAddress(u64 a, u64 b, Expr &&hole)
 {
-	if (!TryAppendByte(a)) return false;
-	if (a & 3) { if (!TryAppendByte(b)) return false; }
+	if (!TryAppendByte((u8)a)) return false;
+	if (a & 3) { if (!TryAppendByte((u8)b)) return false; }
 	if (a & 0x80) { if (!TryAppendExpr(Size((a >> 2) & 3), std::move(hole))) return false; }
 
 	return true;
@@ -200,19 +200,19 @@ bool AssembleArgs::TryAlign(u64 size)
 	{
 	case AsmSegment::TEXT:
 		Align(file.Text, size);
-		file.TextAlign = std::max<u32>(file.TextAlign, size);
+		file.TextAlign = std::max(file.TextAlign, (decltype(file.TextAlign))size);
 		return true;
 	case AsmSegment::RODATA:
 		Align(file.Rodata, size);
-		file.RodataAlign = std::max<u32>(file.RodataAlign, size);
+		file.RodataAlign = std::max(file.RodataAlign, (decltype(file.RodataAlign))size);
 		return true;
 	case AsmSegment::DATA:
 		Align(file.Data, size);
-		file.DataAlign = std::max<u32>(file.DataAlign, size);
+		file.DataAlign = std::max(file.DataAlign, (decltype(file.DataAlign))size);
 		return true;
 	case AsmSegment::BSS:
 		file.BssLen = Align(file.BssLen, size);
-		file.BSSAlign = std::max<u32>(file.BSSAlign, size);
+		file.BSSAlign = std::max(file.BSSAlign, (decltype(file.BSSAlign))size);
 		return true;
 
 	default: res = AssembleResult{AssembleError::FormatError, "line " + tostr(line) + ": Cannot align this segment"}; return false;
@@ -621,13 +621,13 @@ bool AssembleArgs::TryParseInstantPrefixedImm(const std::string &token, const st
 
 	int end; // ending of expression token
 
-			 // if this starts parenthetical region
+	// if this starts parenthetical region
 	if (token[prefix.size()] == '(')
 	{
 		int depth = 1; // depth of 1
 
-					   // start searching for ending parens after first parens
-		for (end = prefix.size() + 1; end < token.size() && depth > 0; ++end)
+		// start searching for ending parens after first parens
+		for (end = (int)prefix.size() + 1; end < (int)token.size() && depth > 0; ++end)
 		{
 			if (token[end] == '(') ++depth;
 			else if (token[end] == ')') --depth;
@@ -640,7 +640,7 @@ bool AssembleArgs::TryParseInstantPrefixedImm(const std::string &token, const st
 	else
 	{
 		// take all legal chars
-		for (end = prefix.size(); end < token.size() && (std::isalnum(token[end]) || token[end] == '_' || token[end] == '.'); ++end);
+		for (end = (int)prefix.size(); end < (int)token.size() && (std::isalnum(token[end]) || token[end] == '_' || token[end] == '.'); ++end);
 	}
 
 	// make sure we consumed the entire string
@@ -837,7 +837,7 @@ bool AssembleArgs::TryParseAddressReg(const std::string &label, Expr &hole, bool
 		if (floating) { res = {AssembleError::FormatError, "line " + tostr(line) + ": Register multiplier may not be floating-point"}; return false; }
 
 		// look through from top to bottom
-		for (int i = list.size() - 1; i >= 2; --i)
+		for (int i = (int)list.size() - 1; i >= 2; --i)
 		{
 			// if this will negate the register
 			if (list[i]->OP == Expr::OPs::Neg || list[i]->OP == Expr::OPs::Sub && list[i]->Right == list[i - 1])

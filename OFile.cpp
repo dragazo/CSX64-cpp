@@ -36,19 +36,19 @@ namespace CSX64
 
 		// -- write globals -- //
 
-		BinWrite<u32>(writer, obj.GlobalSymbols.size());
+		BinWrite<u32>(writer, (u32)obj.GlobalSymbols.size());
 		for (const std::string &symbol : obj.GlobalSymbols)
 			BinWrite(writer, symbol);
 		
 		// -- write externals -- //
 
-		BinWrite<u32>(writer, obj.ExternalSymbols.size());
+		BinWrite<u32>(writer, (u32)obj.ExternalSymbols.size());
 		for (const std::string &symbol : obj.ExternalSymbols)
 			BinWrite(writer, symbol);
 
 		// -- write symbols -- //
 
-		BinWrite<u32>(writer, obj.Symbols.size());
+		BinWrite<u32>(writer, (u32)obj.Symbols.size());
 		for(const auto &entry : obj.Symbols)
 		{
 			BinWrite(writer, entry.first);
@@ -64,13 +64,13 @@ namespace CSX64
 
 		// -- write segment holes -- //
 
-		BinWrite<u32>(writer, obj.TextHoles.size());
+		BinWrite<u32>(writer, (u32)obj.TextHoles.size());
 		for (const HoleData &hole : obj.TextHoles) HoleData::WriteTo(writer, hole);
 
-		BinWrite<u32>(writer, obj.RodataHoles.size());
+		BinWrite<u32>(writer, (u32)obj.RodataHoles.size());
 		for (const HoleData &hole : obj.RodataHoles) HoleData::WriteTo(writer, hole);
 
-		BinWrite<u32>(writer, obj.DataHoles.size());
+		BinWrite<u32>(writer, (u32)obj.DataHoles.size());
 		for (const HoleData &hole : obj.DataHoles) HoleData::WriteTo(writer, hole);
 		
 		// -- write segments -- //

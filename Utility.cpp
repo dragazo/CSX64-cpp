@@ -26,7 +26,7 @@ namespace CSX64
 	std::ostream &BinWrite(std::ostream &ostr, const std::string &str)
 	{
 		// write length prefix
-		u16 len = str.size();
+		u16 len = (u16)str.size();
 		BinWrite(ostr, len);
 		// write the string
 		ostr.write(str.data(), len);
@@ -246,7 +246,7 @@ namespace CSX64
 		// write the value (little-endian)
 		for (int i = 0; i < (int)size; ++i)
 		{
-			arr[pos + i] = val;
+			arr[pos + i] = (u8)val;
 			val >>= 8;
 		}
 
@@ -268,9 +268,9 @@ namespace CSX64
 	void Append(std::vector<u8> &arr, u64 size, u64 val)
 	{
 		// write the value (little-endian)
-		for (int i = 0; i < (int)size; ++i)
+		for (u64 i = 0; i < size; ++i)
 		{
-			arr.push_back(val);
+			arr.push_back((u8)val);
 			val >>= 8;
 		}
 	}

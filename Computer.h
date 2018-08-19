@@ -38,10 +38,10 @@ namespace CSX64
 		private:
 
 			Computer &c;
-			int index; // physical index of ST register
+			u32 index; // physical index of ST register
 
 			friend class Computer;
-			inline ST_Wrapper(Computer &_c, int _index) : c(_c), index(_index) {}
+			inline constexpr ST_Wrapper(Computer &_c, u32 _index) noexcept : c(_c), index(_index) {}
 
 		public:
 
@@ -495,10 +495,10 @@ namespace CSX64
 
 			switch (size)
 			{
-			case 8: *(u64*)((char*)mem + pos) = val; return true;
-			case 4: *(u32*)((char*)mem + pos) = val; return true;
-			case 2: *(u16*)((char*)mem + pos) = val; return true;
-			case 1: *(u8*)((char*)mem + pos) = val; return true;
+			case 8: *(u64*)((char*)mem + pos) = (u64)val; return true;
+			case 4: *(u32*)((char*)mem + pos) = (u32)val; return true;
+			case 2: *(u16*)((char*)mem + pos) = (u16)val; return true;
+			case 1: *(u8*)((char*)mem + pos) = (u8)val; return true;
 
 			default: throw std::runtime_error("GetMemRaw size was non-standard");
 			}
@@ -508,7 +508,7 @@ namespace CSX64
 		{
 			if (pos >= mem_size || pos + sizeof(T) > mem_size) { Terminate(ErrorCode::OutOfBounds); return false; }
 			if (pos < ReadonlyBarrier) { Terminate(ErrorCode::AccessViolation); return false; }
-			*(T*)((char*)mem + pos) = val;
+			*(T*)((char*)mem + pos) = (T)val;
 			return true;
 		}
 		template<>
@@ -516,7 +516,7 @@ namespace CSX64
 		{
 			if (pos >= mem_size) { Terminate(ErrorCode::OutOfBounds); return false; }
 			if (pos < ReadonlyBarrier) { Terminate(ErrorCode::AccessViolation); return false; }
-			*((u8*)mem + pos) = val;
+			*((u8*)mem + pos) = (u8)val;
 			return true;
 		}
 
@@ -721,7 +721,7 @@ namespace CSX64
 		FlagWrapper<u16, 14> FPU_C3() { return {FPU_status}; }
 		FlagWrapper<u16, 15> FPU_B() { return {FPU_status}; }
 
-		ST_Wrapper ST(int num) { return {*this, (FPU_TOP() + num) & 7}; }
+		ST_Wrapper ST(u64 num) { return {*this, (u32)((FPU_TOP() + num) & 7)}; }
 
 		ZMMRegister &ZMM(int num) { return ZMMRegisters[num]; }
 
@@ -770,7 +770,7 @@ namespace CSX64
 		}
 		bool StoreTernaryOPFormat(u64 s, u64 res)
 		{
-			if ((s & 2) != 0) CPURegisters[s >> 4].x8h() = res;
+			if ((s & 2) != 0) CPURegisters[s >> 4].x8h() = (u8)res;
 			else CPURegisters[s >> 4][(s >> 2) & 3] = res;
 			return true;
 		}
@@ -879,7 +879,7 @@ namespace CSX64
 			case 0:
 			case 1:
 			case 2:
-				if ((s1 & 2) != 0) CPURegisters[s1 >> 4].x8h() = res;
+				if ((s1 & 2) != 0) CPURegisters[s1 >> 4].x8h() = (u8)res;
 				else CPURegisters[s1 >> 4][sizecode] = res;
 				return true;
 
@@ -935,7 +935,7 @@ namespace CSX64
 			switch (s & 1)
 			{
 			case 0:
-				if ((s & 2) != 0) CPURegisters[s >> 4].x8h() = res;
+				if ((s & 2) != 0) CPURegisters[s >> 4].x8h() = (u8)res;
 				else CPURegisters[s >> 4][sizecode] = res;
 				return true;
 
@@ -985,7 +985,7 @@ namespace CSX64
 			if ((s & 1) == 0)
 			{
 				// if high flag set
-				if ((s & 2) != 0) CPURegisters[s >> 4].x8h() = res;
+				if ((s & 2) != 0) CPURegisters[s >> 4].x8h() = (u8)res;
 				else CPURegisters[s >> 4][sizecode] = res;
 
 				return true;
@@ -1077,7 +1077,7 @@ namespace CSX64
 		bool StoreRR_RMFormat(u64 s1, u64 res)
 		{
 			// if dest is high
-			if ((s1 & 2) != 0) CPURegisters[s1 >> 4].x8h() = res;
+			if ((s1 & 2) != 0) CPURegisters[s1 >> 4].x8h() = (u8)res;
 			else CPURegisters[s1 >> 4][(s1 >> 2) & 3] = res;
 
 			return true;
@@ -1133,7 +1133,7 @@ namespace CSX64
 				// sahf
 			case 6: RFLAGS() = (RFLAGS() & ~ModifiableFlags) | (AH() & ModifiableFlags); return true;
 				// lahf
-			case 7: AH() = RFLAGS(); return true;
+			case 7: AH() = (u8)RFLAGS(); return true;
 
 			default: Terminate(ErrorCode::UndefinedBehavior); return false;
 			}
@@ -1340,7 +1340,7 @@ namespace CSX64
 				{
 					if ((b & 0x0c) != 0 || sizecode != 0) { Terminate(ErrorCode::UndefinedBehavior); return false; }
 					temp_2 = CPURegisters[b & 15].x8h();
-					CPURegisters[b & 15].x8h() = temp_1;
+					CPURegisters[b & 15].x8h() = (u8)temp_1;
 				}
 				else
 				{
@@ -1358,7 +1358,7 @@ namespace CSX64
 			}
 
 			// store a's result (b's was handled internally above)
-			if ((a & 2) != 0) CPURegisters[a >> 4].x8h() = temp_2;
+			if ((a & 2) != 0) CPURegisters[a >> 4].x8h() = (u8)temp_2;
 			else CPURegisters[a >> 4][sizecode] = temp_2;
 
 			return true;
@@ -1491,6 +1491,7 @@ namespace CSX64
 			u64 temp;
 			if (!PopRaw<u64>(temp)) return false;
 			RIP() = temp;
+			return true;
 		}
 
 		bool ProcessPUSH()
@@ -1607,17 +1608,17 @@ namespace CSX64
 			{
 			case 0:
 				res = AL() * a;
-				AX() = res;
+				AX() = (u16)res;
 				CF() = OF() = AH() != 0;
 				break;
 			case 1:
 				res = AX() * a;
-				DX() = (res >> 16); AX() = res;
+				DX() = (u16)(res >> 16); AX() = (u16)res;
 				CF() = OF() = DX() != 0;
 				break;
 			case 2:
 				res = EAX() * a;
-				EDX() = (res >> 32); EAX() = res;
+				EDX() = (u32)(res >> 32); EAX() = (u32)res;
 				CF() = OF() = EDX() != 0;
 				break;
 			case 3:
@@ -1640,7 +1641,7 @@ namespace CSX64
 			{
 			case 2:
 				res = a * b;
-				CPURegisters[s1 >> 4].x32() = (res >> 32); CPURegisters[s2 & 15].x32() = res;
+				CPURegisters[s1 >> 4].x32() = (u32)(res >> 32); CPURegisters[s2 & 15].x32() = (u32)res;
 				break;
 			case 3:
 				UnsignedMul(a, b, CPURegisters[s1 >> 4].x64(), CPURegisters[s2 & 15].x64());
@@ -1680,17 +1681,17 @@ namespace CSX64
 			{
 			case 0:
 				res = (i8)AL() * a;
-				AX() = res;
+				AX() = (u16)res;
 				CF() = OF() = res != (i8)res;
 				break;
 			case 1:
 				res = (i16)AX() * a;
-				DX() = res >> 16; AX() = res;
+				DX() = (u16)(res >> 16); AX() = (u16)res;
 				CF() = OF() = res != (i16)res;
 				break;
 			case 2:
 				res = (i32)EAX() * a;
-				EDX() = res >> 32; EAX() = res;
+				EDX() = (u32)(res >> 32); EAX() = (u32)res;
 				CF() = OF() = res != (i32)res;
 				break;
 			case 3:
@@ -1794,19 +1795,19 @@ namespace CSX64
 				full = AX();
 				quo = full / a; rem = full % a;
 				if (quo > 0xff) { Terminate(ErrorCode::ArithmeticError); return false; }
-				AL() = quo; AH() = rem;
+				AL() = (u8)quo; AH() = (u8)rem;
 				break;
 			case 1:
 				full = ((u64)DX() << 16) | AX();
 				quo = full / a; rem = full % a;
 				if (quo > 0xffff) { Terminate(ErrorCode::ArithmeticError); return false; }
-				AX() = quo; DX() = rem;
+				AX() = (u16)quo; DX() = (u16)rem;
 				break;
 			case 2:
 				full = ((u64)EDX() << 32) | EAX();
 				quo = full / a; rem = full % a;
 				if (quo > 0xffffffff) { Terminate(ErrorCode::ArithmeticError); return false; }
-				EAX() = quo; EDX() = rem;
+				EAX() = (u32)quo; EDX() = (u32)rem;
 				break;
 			case 3:
 				UnsignedDiv(RDX(), RAX(), a, full, quo, rem);
@@ -1839,19 +1840,19 @@ namespace CSX64
 				full = (i16)AX();
 				quo = full / a; rem = full % a;
 				if (quo != (i8)quo) { Terminate(ErrorCode::ArithmeticError); return false; }
-				AL() = quo; AH() = rem;
+				AL() = (u8)quo; AH() = (u8)rem;
 				break;
 			case 1:
 				full = ((i32)DX() << 16) | AX();
 				quo = full / a; rem = full % a;
 				if (quo != (i16)quo) { Terminate(ErrorCode::ArithmeticError); return false; }
-				AX() = quo; DX() = rem;
+				AX() = (u16)quo; DX() = (u16)rem;
 				break;
 			case 2:
 				full = ((i64)EDX() << 32) | EAX();
 				quo = full / a; rem = full % a;
 				if (quo != (i32)quo) { Terminate(ErrorCode::ArithmeticError); return false; }
-				EAX() = quo; EDX() = rem;
+				EAX() = (u32)quo; EDX() = (u32)rem;
 				break;
 			case 3:
 				SignedDiv(RDX(), RAX(), a, (u64&)full, (u64&)quo, (u64&)rem);
@@ -2201,8 +2202,8 @@ namespace CSX64
 			if (!FetchBinaryOpFormat(s1, s2, m, a, b, true, -1, 1)) return false;
 			u64 sizecode = (s1 >> 2) & 3;
 
-			int pos = (b >> 8) % SizeBits(sizecode);
-			int len = (b & 0xff) % SizeBits(sizecode);
+			int pos = (int)((b >> 8) % SizeBits(sizecode));
+			int len = (int)((b & 0xff) % SizeBits(sizecode));
 
 			u64 res = (a >> pos) & (((u64)1 << len) - 1);
 
@@ -2331,9 +2332,9 @@ namespace CSX64
 			case 1: EDX() = (i32)EAX() >= 0 ? 0 : 0xffffffff; return true;
 			case 2: RDX() = (i64)RAX() >= 0 ? 0 : 0xffffffffffffffff; return true;
 
-			case 3: AX() = SignExtend(AL(), 0); return true;
-			case 4: EAX() = SignExtend(AX(), 1); return true;
-			case 5: RAX() = SignExtend(EAX(), 2); return true;
+			case 3: AX() = (u16)SignExtend(AL(), 0); return true;
+			case 4: EAX() = (u32)SignExtend(AX(), 1); return true;
+			case 5: RAX() = (u64)SignExtend(EAX(), 2); return true;
 
 			default: Terminate(ErrorCode::UndefinedBehavior); return false;
 			}
@@ -2398,12 +2399,12 @@ namespace CSX64
 			// store the value
 			switch (s1 & 15)
 			{
-			case 0: CPURegisters[s1 >> 4].x16() = src; break;
-			case 1: CPURegisters[s1 >> 4].x16() = SignExtend(src, 0); break;
+			case 0: CPURegisters[s1 >> 4].x16() = (u16)src; break;
+			case 1: CPURegisters[s1 >> 4].x16() = (u16)SignExtend(src, 0); break;
 
-			case 2: case 3: CPURegisters[s1 >> 4].x32() = src; break;
-			case 4: CPURegisters[s1 >> 4].x32() = SignExtend(src, 0); break;
-			case 5: CPURegisters[s1 >> 4].x32() = SignExtend(src, 1); break;
+			case 2: case 3: CPURegisters[s1 >> 4].x32() = (u32)src; break;
+			case 4: CPURegisters[s1 >> 4].x32() = (u32)SignExtend(src, 0); break;
+			case 5: CPURegisters[s1 >> 4].x32() = (u32)SignExtend(src, 1); break;
 
 			case 6: case 7: CPURegisters[s1 >> 4].x64() = src; break;
 			case 8: CPURegisters[s1 >> 4].x64() = SignExtend(src, 0); break;
@@ -2564,10 +2565,10 @@ namespace CSX64
 				if (!GetAddressAdv(m)) return false;
 				switch (s & 7)
 				{
-				case 3: if (!GetMemRaw(m, 4, m)) return false; b = AsFloat(m); return true;
-				case 4: if (!GetMemRaw(m, 8, m)) return false; b = AsDouble(m); return true;
-				case 5: if (!GetMemRaw(m, 2, m)) return false; b = (i64)SignExtend(m, 1); return true;
-				case 6: if (!GetMemRaw(m, 4, m)) return false; b = (i64)SignExtend(m, 2); return true;
+				case 3: if (!GetMemRaw<u32>(m, m)) return false; b = (long double)AsFloat((u32)m); return true;
+				case 4: if (!GetMemRaw<u64>(m, m)) return false; b = (long double)AsDouble(m); return true;
+				case 5: if (!GetMemRaw<u16>(m, m)) return false; b = (long double)(i64)SignExtend(m, 1); return true;
+				case 6: if (!GetMemRaw<u32>(m, m)) return false; b = (long double)(i64)SignExtend(m, 2); return true;
 
 				default: Terminate(ErrorCode::UndefinedBehavior); return false;
 				}
@@ -2641,7 +2642,7 @@ namespace CSX64
 			case 2: return SetMemRaw<u16>(m, FPU_control);
 			case 3:
 				if (!GetMemRaw<u16>(m, m)) return false;
-				FPU_control = m;
+				FPU_control = (u16)m;
 				return true;
 
 			default: Terminate(ErrorCode::UndefinedBehavior); return false;
@@ -2696,12 +2697,12 @@ namespace CSX64
 				if (!GetAddressAdv(m)) return false;
 				switch (s & 7)
 				{
-				case 1: if (!GetMemRaw<u32>(m, m)) return false; return PushFPU(AsFloat(m));
-				case 2: if (!GetMemRaw<u64>(m, m)) return false; return PushFPU(AsDouble(m));
+				case 1: if (!GetMemRaw<u32>(m, m)) return false; return PushFPU((long double)AsFloat((u32)m));
+				case 2: if (!GetMemRaw<u64>(m, m)) return false; return PushFPU((long double)AsDouble(m));
 
-				case 3: if (!GetMemRaw<u16>(m, m)) return false; return PushFPU((i64)SignExtend(m, 1));
-				case 4: if (!GetMemRaw<u32>(m, m)) return false; return PushFPU((i64)SignExtend(m, 2));
-				case 5: if (!GetMemRaw<u64>(m, m)) return false; return PushFPU((i64)m);
+				case 3: if (!GetMemRaw<u16>(m, m)) return false; return PushFPU((long double)(i64)SignExtend(m, 1));
+				case 4: if (!GetMemRaw<u32>(m, m)) return false; return PushFPU((long double)(i64)SignExtend(m, 2));
+				case 5: if (!GetMemRaw<u64>(m, m)) return false; return PushFPU((long double)(i64)m);
 
 				default: Terminate(ErrorCode::UndefinedBehavior); return false;
 				}
@@ -2747,13 +2748,13 @@ namespace CSX64
 				if (!GetAddressAdv(m)) return false;
 				switch (s & 15)
 				{
-				case 2: case 3: if (!SetMemRaw<u32>(m, FloatAsUInt64(ST(0)))) return false; break;
-				case 4: case 5: if (!SetMemRaw<u64>(m, DoubleAsUInt64(ST(0)))) return false; break;
+				case 2: case 3: if (!SetMemRaw<u32>(m, FloatAsUInt64((float)ST(0)))) return false; break;
+				case 4: case 5: if (!SetMemRaw<u64>(m, DoubleAsUInt64((double)ST(0)))) return false; break;
 				case 6: case 7: if (!SetMemRaw<u16>(m, (u64)(i64)PerformRoundTrip(ST(0)))) return false; break;
 				case 8: case 9: if (!SetMemRaw<u32>(m, (u64)(i64)PerformRoundTrip(ST(0)))) return false; break;
 				case 10: if (!SetMemRaw<u64>(m, (u64)(i64)PerformRoundTrip(ST(0)))) return false; break;
 				case 11: if (!SetMemRaw<u16>(m, (u64)(i64)ST(0))) return false; break;
-				case 12: if (!SetMemRaw<u32>(m, (u64)(i64)ST(0))) return false; break; // !! WORK !! make sure these truncate regardless of std::fesetround()
+				case 12: if (!SetMemRaw<u32>(m, (u64)(i64)ST(0))) return false; break;
 				case 13: if (!SetMemRaw<u64>(m, (u64)(i64)ST(0))) return false; break;
 
 				default: Terminate(ErrorCode::UndefinedBehavior); return false;
@@ -3159,11 +3160,11 @@ namespace CSX64
 				if (!GetAddressAdv(m)) return false;
 				switch (s & 15)
 				{
-				case 3: case 4: if (!GetMemRaw<u32>(m, m)) return false; b = AsFloat(m); break;
-				case 5: case 6: if (!GetMemRaw<u64>(m, m)) return false; b = AsDouble(m); break;
+				case 3: case 4: if (!GetMemRaw<u32>(m, m)) return false; b = (long double)AsFloat((u32)m); break;
+				case 5: case 6: if (!GetMemRaw<u64>(m, m)) return false; b = (long double)AsDouble(m); break;
 
-				case 7: case 8: if (!GetMemRaw<u16>(m, m)) return false; b = (i64)SignExtend(m, 1); break;
-				case 9: case 10: if (!GetMemRaw<u32>(m, m)) return false; b = (i64)SignExtend(m, 2); break;
+				case 7: case 8: if (!GetMemRaw<u16>(m, m)) return false; b = (long double)(i64)SignExtend(m, 1); break;
+				case 9: case 10: if (!GetMemRaw<u32>(m, m)) return false; b = (long double)(i64)SignExtend(m, 2); break;
 
 				default: Terminate(ErrorCode::UndefinedBehavior); return false;
 				}
@@ -3352,8 +3353,8 @@ namespace CSX64
 				src = (int)_src & 0x1f;
 
 				for (int i = 0; i < elem_count; ++i, mask >>= 1)
-					if ((mask & 1) != 0) ZMMRegisters[reg].uint(elem_sizecode, i) = ZMMRegisters[src].uint(elem_sizecode, i);
-					else if (zmask) ZMMRegisters[reg].uint(elem_sizecode, i) = 0;
+					if ((mask & 1) != 0) ZMMRegisters[reg].uint((int)elem_sizecode, i) = ZMMRegisters[src].uint((int)elem_sizecode, i);
+					else if (zmask) ZMMRegisters[reg].uint((int)elem_sizecode, i) = 0;
 
 					break;
 			case 1:
@@ -3365,9 +3366,9 @@ namespace CSX64
 					if ((mask & 1) != 0)
 					{
 						if (!GetMemRaw(m, Size(elem_sizecode), temp)) return false;
-						ZMMRegisters[reg].uint(elem_sizecode, i) = temp;
+						ZMMRegisters[reg].uint((int)elem_sizecode, i) = temp;
 					}
-					else if (zmask) ZMMRegisters[reg].uint(elem_sizecode, i) = 0;
+					else if (zmask) ZMMRegisters[reg].uint((int)elem_sizecode, i) = 0;
 
 					break;
 			case 2:
@@ -3378,7 +3379,7 @@ namespace CSX64
 				for (int i = 0; i < elem_count; ++i, mask >>= 1, m += Size(elem_sizecode))
 					if ((mask & 1) != 0)
 					{
-						if (!SetMemRaw(m, Size(elem_sizecode), ZMMRegisters[reg].uint(elem_sizecode, i))) return false;
+						if (!SetMemRaw(m, Size(elem_sizecode), ZMMRegisters[reg].uint((int)elem_sizecode, i))) return false;
 					}
 					else if (zmask && !SetMemRaw(m, Size(elem_sizecode), 0)) return false;
 
@@ -3435,10 +3436,10 @@ namespace CSX64
 					if ((mask & 1) != 0)
 					{
 						// hand over to the delegate for processing
-						if (!(this->*func)(elem_sizecode, res, ZMMRegisters[src1].uint(elem_sizecode, i), ZMMRegisters[src2].uint(elem_sizecode, i), i)) return false;
-						ZMMRegisters[dest].uint(elem_sizecode, i) = res;
+						if (!(this->*func)(elem_sizecode, res, ZMMRegisters[src1].uint((int)elem_sizecode, i), ZMMRegisters[src2].uint((int)elem_sizecode, i), i)) return false;
+						ZMMRegisters[dest].uint((int)elem_sizecode, i) = res;
 					}
-					else if (zmask) ZMMRegisters[dest].uint(elem_sizecode, i) = 0;
+					else if (zmask) ZMMRegisters[dest].uint((int)elem_sizecode, i) = 0;
 			}
 			// otherwise src is memory
 			else
@@ -3453,10 +3454,10 @@ namespace CSX64
 						if (!GetMemRaw(m, Size(elem_sizecode), res)) return false;
 
 						// hand over to the delegate for processing
-						if (!(this->*func)(elem_sizecode, res, ZMMRegisters[src1].uint(elem_sizecode, i), res, i)) return false;
-						ZMMRegisters[dest].uint(elem_sizecode, i) = res;
+						if (!(this->*func)(elem_sizecode, res, ZMMRegisters[src1].uint((int)elem_sizecode, i), res, i)) return false;
+						ZMMRegisters[dest].uint((int)elem_sizecode, i) = res;
 					}
-					else if (zmask) ZMMRegisters[dest].uint(elem_sizecode, i) = 0;
+					else if (zmask) ZMMRegisters[dest].uint((int)elem_sizecode, i) = 0;
 			}
 
 			return true;
@@ -3467,7 +3468,7 @@ namespace CSX64
 			// 64-bit fp
 			if (elem_sizecode == 3) res = DoubleAsUInt64(AsDouble(a) + AsDouble(b));
 			// 32-bit fp
-			else res = FloatAsUInt64(AsFloat(a) + AsFloat(b));
+			else res = FloatAsUInt64(AsFloat((u32)a) + AsFloat((u32)b));
 
 			return true;
 		}
@@ -3476,7 +3477,7 @@ namespace CSX64
 			// 64-bit fp
 			if (elem_sizecode == 3) res = DoubleAsUInt64(AsDouble(a) - AsDouble(b));
 			// 32-bit fp
-			else res = FloatAsUInt64(AsFloat(a) - AsFloat(b));
+			else res = FloatAsUInt64(AsFloat((u32)a) - AsFloat((u32)b));
 
 			return true;
 		}
@@ -3485,7 +3486,7 @@ namespace CSX64
 			// 64-bit fp
 			if (elem_sizecode == 3) res = DoubleAsUInt64(AsDouble(a) * AsDouble(b));
 			// 32-bit fp
-			else res = FloatAsUInt64(AsFloat(a) * AsFloat(b));
+			else res = FloatAsUInt64(AsFloat((u32)a) * AsFloat((u32)b));
 
 			return true;
 		}
@@ -3494,7 +3495,7 @@ namespace CSX64
 			// 64-bit fp
 			if (elem_sizecode == 3) res = DoubleAsUInt64(AsDouble(a) / AsDouble(b));
 			// 32-bit fp
-			else res = FloatAsUInt64(AsFloat(a) / AsFloat(b));
+			else res = FloatAsUInt64(AsFloat((u32)a) / AsFloat((u32)b));
 
 			return true;
 		}
@@ -3602,7 +3603,7 @@ namespace CSX64
 		{
 			// this exploits c++ returning false on comparison to NaN. see http://www.felixcloutier.com/x86/MINPD.html for the actual algorithm
 			if (elem_sizecode == 3) res = AsDouble(a) < AsDouble(b) ? a : b;
-			else res = AsFloat(a) < AsFloat(b) ? a : b;
+			else res = AsFloat((u32)a) < AsFloat((u32)b) ? a : b;
 
 			return true;
 		}
@@ -3610,7 +3611,7 @@ namespace CSX64
 		{
 			// this exploits c++ returning false on comparison to NaN. see http://www.felixcloutier.com/x86/MAXPD.html for the actual algorithm
 			if (elem_sizecode == 3) res = AsDouble(a) > AsDouble(b) ? a : b;
-			else res = AsFloat(a) > AsFloat(b) ? a : b;
+			else res = AsFloat((u32)a) > AsFloat((u32)b) ? a : b;
 
 			return true;
 		}
@@ -3651,7 +3652,7 @@ namespace CSX64
 			// 64-bit fp
 			if (elem_sizecode == 3) res = DoubleAsUInt64(index % 2 == 0 ? AsDouble(a) - AsDouble(b) : AsDouble(a) + AsDouble(b));
 			// 32-bit fp
-			else res = FloatAsUInt64(index % 2 == 0 ? AsFloat(a) - AsFloat(b) : AsFloat(a) + AsFloat(b));
+			else res = FloatAsUInt64(index % 2 == 0 ? AsFloat((u32)a) - AsFloat((u32)b) : AsFloat((u32)a) + AsFloat((u32)b));
 
 			return true;
 		}

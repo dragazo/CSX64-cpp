@@ -58,28 +58,28 @@ namespace CSX64
 	{
 		U &dest;
 
-		inline operator T() { return dest; }
-		inline ReferenceRouter operator=(T val) { dest = val; return *this; }
-		inline ReferenceRouter operator=(ReferenceRouter wrapper) { dest = (T)wrapper.dest; return *this; }
+		inline constexpr operator T() const noexcept { return (T)dest; }
+		inline constexpr ReferenceRouter operator=(T val) noexcept { dest = val; return *this; }
+		inline constexpr ReferenceRouter operator=(ReferenceRouter wrapper) noexcept { dest = (T)wrapper.dest; return *this; }
 
-		inline ReferenceRouter operator++() { *this = *this + 1; return *this; }
-		inline ReferenceRouter operator--() { *this = *this - 1; return *this; }
+		inline constexpr ReferenceRouter operator++() noexcept { *this = *this + 1; return *this; }
+		inline constexpr ReferenceRouter operator--() noexcept { *this = *this - 1; return *this; }
 
-		inline T operator++(int) { T val = *this; *this = *this + 1; return val; }
-		inline T operator--(int) { T val = *this; *this = *this - 1; return val; }
+		inline constexpr T operator++(int) noexcept { T val = *this; *this = *this + 1; return val; }
+		inline constexpr T operator--(int) noexcept { T val = *this; *this = *this - 1; return val; }
 
-		inline ReferenceRouter operator+=(T val) { *this = *this + val; return *this; }
-		inline ReferenceRouter operator-=(T val) { *this = *this - val; return *this; }
-		inline ReferenceRouter operator*=(T val) { *this = *this * val; return *this; }
-		inline ReferenceRouter operator/=(T val) { *this = *this / val; return *this; }
-		inline ReferenceRouter operator%=(T val) { *this = *this % val; return *this; }
+		inline constexpr ReferenceRouter operator+=(T val) noexcept { *this = *this + val; return *this; }
+		inline constexpr ReferenceRouter operator-=(T val) noexcept { *this = *this - val; return *this; }
+		inline constexpr ReferenceRouter operator*=(T val) noexcept { *this = *this * val; return *this; }
+		inline constexpr ReferenceRouter operator/=(T val) noexcept { *this = *this / val; return *this; }
+		inline constexpr ReferenceRouter operator%=(T val) noexcept { *this = *this % val; return *this; }
 
-		inline ReferenceRouter operator&=(T val) { *this = *this & val; return *this; }
-		inline ReferenceRouter operator|=(T val) { *this = *this | val; return *this; }
-		inline ReferenceRouter operator^=(T val) { *this = *this ^ val; return *this; }
+		inline constexpr ReferenceRouter operator&=(T val) noexcept { *this = *this & val; return *this; }
+		inline constexpr ReferenceRouter operator|=(T val) noexcept { *this = *this | val; return *this; }
+		inline constexpr ReferenceRouter operator^=(T val) noexcept { *this = *this ^ val; return *this; }
 
-		inline ReferenceRouter operator<<=(int val) { *this = *this << val; return *this; }
-		inline ReferenceRouter operator>>=(int val) { *this = *this >> val; return *this; }
+		inline constexpr ReferenceRouter operator<<=(int val) noexcept { *this = *this << val; return *this; }
+		inline constexpr ReferenceRouter operator>>=(int val) noexcept { *this = *this >> val; return *this; }
 	};
 	// acts as a reference to a bitfield in an integer of type "T"
 	template<typename T, int pos, int len>
@@ -91,28 +91,28 @@ namespace CSX64
 		static constexpr T low_mask = __mask | (__mask - 1);
 		static constexpr T high_mask = low_mask << pos;
 
-		inline operator T() { return (data >> pos) & low_mask; }
-		inline BitfieldWrapper operator=(T val) { data = (data & ~high_mask) | ((val & low_mask) << pos); return *this; }
-		inline BitfieldWrapper operator=(BitfieldWrapper wrapper) { data = (data & ~high_mask) | (wrapper.data & high_mask); return *this; }
+		inline constexpr operator T() const noexcept { return (data >> pos) & low_mask; }
+		inline constexpr BitfieldWrapper operator=(T val) noexcept { data = (data & ~high_mask) | ((val & low_mask) << pos); return *this; }
+		inline constexpr BitfieldWrapper operator=(BitfieldWrapper wrapper) noexcept { data = (data & ~high_mask) | (wrapper.data & high_mask); return *this; }
 
-		inline BitfieldWrapper operator++() { *this = *this + 1; return *this; }
-		inline BitfieldWrapper operator--() { *this = *this - 1; return *this; }
+		inline constexpr BitfieldWrapper operator++() noexcept { *this = *this + 1; return *this; }
+		inline constexpr BitfieldWrapper operator--() noexcept { *this = *this - 1; return *this; }
 
-		inline T operator++(int) { T val = *this; *this = *this + 1; return val; }
-		inline T operator--(int) { T val = *this; *this = *this - 1; return val; }
+		inline constexpr T operator++(int) noexcept { T val = *this; *this = *this + 1; return val; }
+		inline constexpr T operator--(int) noexcept { T val = *this; *this = *this - 1; return val; }
 
-		inline BitfieldWrapper operator+=(T val) { *this = *this + val; return *this; }
-		inline BitfieldWrapper operator-=(T val) { *this = *this - val; return *this; }
-		inline BitfieldWrapper operator*=(T val) { *this = *this * val; return *this; }
-		inline BitfieldWrapper operator/=(T val) { *this = *this / val; return *this; }
-		inline BitfieldWrapper operator%=(T val) { *this = *this % val; return *this; }
+		inline constexpr BitfieldWrapper operator+=(T val) noexcept { *this = *this + val; return *this; }
+		inline constexpr BitfieldWrapper operator-=(T val) noexcept { *this = *this - val; return *this; }
+		inline constexpr BitfieldWrapper operator*=(T val) noexcept { *this = *this * val; return *this; }
+		inline constexpr BitfieldWrapper operator/=(T val) noexcept { *this = *this / val; return *this; }
+		inline constexpr BitfieldWrapper operator%=(T val) noexcept { *this = *this % val; return *this; }
 
-		inline BitfieldWrapper operator&=(T val) { *this = *this & val; return *this; }
-		inline BitfieldWrapper operator|=(T val) { *this = *this | val; return *this; }
-		inline BitfieldWrapper operator^=(T val) { *this = *this ^ val; return *this; }
+		inline constexpr BitfieldWrapper operator&=(T val) noexcept { *this = *this & val; return *this; }
+		inline constexpr BitfieldWrapper operator|=(T val) noexcept { *this = *this | val; return *this; }
+		inline constexpr BitfieldWrapper operator^=(T val) noexcept { *this = *this ^ val; return *this; }
 
-		inline BitfieldWrapper operator<<=(int val) { *this = *this << val; return *this; }
-		inline BitfieldWrapper operator>>=(int val) { *this = *this >> val; return *this; }
+		inline constexpr BitfieldWrapper operator<<=(int val) noexcept { *this = *this << val; return *this; }
+		inline constexpr BitfieldWrapper operator>>=(int val) noexcept { *this = *this >> val; return *this; }
 	};
 	// acts a reference to a 1-bit flag in an integer of type "T"
 	template<typename T, int pos>
@@ -122,9 +122,9 @@ namespace CSX64
 
 		static constexpr T mask = (T)1 << pos;
 
-		inline operator bool() { return data & mask; }
-		inline FlagWrapper operator=(bool val) { data = val ? data | mask : data & ~mask; return *this; }
-		inline FlagWrapper operator=(FlagWrapper wrapper) { data = (data & ~mask) | (wrapper.data & mask); return *this; }
+		inline constexpr operator bool() const noexcept { return data & mask; }
+		inline constexpr FlagWrapper operator=(bool val) noexcept { data = val ? data | mask : data & ~mask; return *this; }
+		inline constexpr FlagWrapper operator=(FlagWrapper wrapper) noexcept { data = (data & ~mask) | (wrapper.data & mask); return *this; }
 	};
 
 	struct CPURegister_sizecode_wrapper;
@@ -135,22 +135,22 @@ namespace CSX64
 		u64 data;
 
 	public:
-		inline u64 &x64() { return data; }
-		inline ReferenceRouter<u32, u64> x32() { return {data}; }
-		inline u16 &x16() { return *(u16*)&data; }
-		inline u8 &x8() { return *(u8*)&data; }
+		inline constexpr u64 &x64() noexcept { return data; }
+		inline constexpr ReferenceRouter<u32, u64> x32() noexcept { return {data}; }
+		inline constexpr u16 &x16() noexcept { return *(u16*)&data; }
+		inline constexpr u8 &x8() noexcept { return *(u8*)&data; }
 
-		inline u8 &x8h() { return *((u8*)&data + 1); }
+		inline constexpr u8 &x8h() noexcept { return *((u8*)&data + 1); }
 
 		// Gets/sets the register partition with the specified size code
-		inline CPURegister_sizecode_wrapper operator[](int sizecode);
+		inline CPURegister_sizecode_wrapper operator[](u64 sizecode);
 	};
 	struct CPURegister_sizecode_wrapper
 	{
 		CPURegister &reg;
-		int sizecode;
+		u32 sizecode;
 
-		inline operator u64()
+		inline constexpr operator u64() const
 		{
 			switch (sizecode)
 			{
@@ -162,21 +162,21 @@ namespace CSX64
 			default: throw std::invalid_argument("sizecode must be on range [0,3]");
 			}
 		}
-		inline CPURegister_sizecode_wrapper operator=(u64 value)
+		inline constexpr CPURegister_sizecode_wrapper operator=(u64 value)
 		{
 			switch (sizecode)
 			{
-			case 3: reg.x64() = value; return *this;
-			case 2: reg.x32() = value; return *this;
-			case 1: reg.x16() = value; return *this;
-			case 0: reg.x8() = value; return *this;
+			case 3: reg.x64() = (u64)value; return *this;
+			case 2: reg.x32() = (u32)value; return *this;
+			case 1: reg.x16() = (u16)value; return *this;
+			case 0: reg.x8() = (u8)value; return *this;
 
 			default: throw std::invalid_argument("sizecode must be on range [0,3]");
 			}
 		}
-		inline CPURegister_sizecode_wrapper operator=(CPURegister_sizecode_wrapper other) { *this = (u64)other; return *this; }
+		inline constexpr CPURegister_sizecode_wrapper operator=(CPURegister_sizecode_wrapper other) { *this = (u64)other; return *this; }
 	};
-	CPURegister_sizecode_wrapper CPURegister::operator[](int sizecode) { return {*this, sizecode}; }
+	CPURegister_sizecode_wrapper CPURegister::operator[](u64 sizecode) { return {*this, (u32)sizecode}; }
 
 	struct ZMMRegister_sizecode_wrapper;
 	// Represents a 512-bit register used by vpu instructions
@@ -212,7 +212,7 @@ namespace CSX64
 		i16 index;
 		i16 sizecode;
 
-		inline operator u64()
+		inline constexpr operator u64() const
 		{
 			switch (sizecode)
 			{
@@ -224,19 +224,19 @@ namespace CSX64
 			default: throw std::invalid_argument("sizecode must be on range [0,3]");
 			}
 		}
-		inline ZMMRegister_sizecode_wrapper operator=(u64 value)
+		inline constexpr ZMMRegister_sizecode_wrapper operator=(u64 value)
 		{
 			switch (sizecode)
 			{
-			case 3: reg.uint64(index) = value; return *this;
-			case 2: reg.uint32(index) = value; return *this;
-			case 1: reg.uint16(index) = value; return *this;
-			case 0: reg.uint8(index) = value; return *this;
+			case 3: reg.uint64(index) = (u64)value; return *this;
+			case 2: reg.uint32(index) = (u32)value; return *this;
+			case 1: reg.uint16(index) = (u16)value; return *this;
+			case 0: reg.uint8(index) = (u8)value; return *this;
 
 			default: throw std::invalid_argument("sizecode must be on range [0,3]");
 			}
 		}
-		inline ZMMRegister_sizecode_wrapper operator=(ZMMRegister_sizecode_wrapper other) { *this = (u64)other; return *this; }
+		inline constexpr ZMMRegister_sizecode_wrapper operator=(ZMMRegister_sizecode_wrapper other) { *this = (u64)other; return *this; }
 	};
 	ZMMRegister_sizecode_wrapper ZMMRegister::uint(int sizecode, int index) { return {*this, (i16)index, (i16)sizecode}; }
 
@@ -253,18 +253,18 @@ namespace CSX64
 
 	public:
 		// gets if this file is managed (i.e. stream will be deleted on close)
-		inline bool Managed() const { return managed; }
+		inline bool Managed() const noexcept { return managed; }
 		// gets if this file is interactive (i.e. Computer object reading past eof sets SuspendedRead state).
-		inline bool Interactive() const { return interactive; }
+		inline bool Interactive() const noexcept { return interactive; }
 
 		// gets a pointer to the currently-opened stream (nullptr if not in use).
-		inline std::iostream *Stream() const { return stream; }
+		inline std::iostream *Stream() const noexcept { return stream; }
 		// gets if this file descriptor is currently bound to a stream.
-		inline bool InUse() { return stream; }
+		inline bool InUse() const noexcept { return stream; }
 
 		// ----------------------------
 
-		FileDescriptor() : stream(nullptr) {}
+		constexpr FileDescriptor() : stream(nullptr), managed(false), interactive(false) {}
 		~FileDescriptor() { Close(); }
 
 		FileDescriptor(const FileDescriptor&) = delete;
