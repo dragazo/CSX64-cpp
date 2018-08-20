@@ -681,7 +681,10 @@ namespace CSX64
 		FlagWrapper<u64, 20> VIP() { return {_RFLAGS}; }
 		FlagWrapper<u64, 21> ID() { return {_RFLAGS}; }
 
+		// File System Flag - denotes if the client is allowed to perform potentially-dangerous file system syscalls (open, delete, mkdir, etc.)
 		FlagWrapper<u64, 32> FSF() { return {_RFLAGS}; }
+		// One-Tick-REP Flag - denotes if REP instructions are performed in a single tick (more efficient, but could result in expensive ticks)
+		FlagWrapper<u64, 33> OTRF() { return {_RFLAGS}; }
 
 		bool cc_b() { return CF(); }
 		bool cc_be() { return CF() || ZF(); }
@@ -2491,6 +2494,81 @@ namespace CSX64
 			AL() &= 0xf;
 
 			EFLAGS() ^= Rand() & (decltype(OF())::mask | decltype(SF())::mask | decltype(ZF())::mask | decltype(PF())::mask);
+
+			return true;
+		}
+
+		// helper for MOVS - performs the actual move
+		inline bool __ProcessSTRING_MOVS(u64 sizecode)
+		{
+			u64 temp;
+
+			switch (sizecode)
+			{
+			case 0:
+				if (!GetMemRaw<u8>(RSI(), temp) || !SetMemRaw<u8>(RDI(), temp)) return false;
+				if (DF()) { --RSI(); --RDI(); }
+				else { ++RSI(); ++RDI(); }
+				return true;
+			case 1:
+				if (!GetMemRaw<u16>(RSI(), temp) || !SetMemRaw<u16>(RDI(), temp)) return false;
+				if (DF()) { RSI() -= 2; RDI() -= 2; }
+				else { RSI() += 2; RDI() += 2; }
+				return true;
+			case 2: if (!GetMemRaw<u32>(RSI(), temp) || !SetMemRaw<u32>(RDI(), temp)) return false;
+				if (DF()) { RSI() -= 4; RDI() -= 4; }
+				else { RSI() += 4; RDI() += 4; }
+				return true;
+			case 3: if (!GetMemRaw<u64>(RSI(), temp) || !SetMemRaw<u64>(RDI(), temp)) return false;
+				if (DF()) { RSI() -= 8; RDI() -= 8; }
+				else { RSI() += 8; RDI() += 8; }
+				return true;
+
+			// just to be on the safe side
+			default: throw std::domain_error("provided sizecode was out of range");
+			}
+		}
+		/*
+		[6: mode][2: size]
+			mode = 0:     MOVS
+			mode = 1: REP MOVS
+			else UND
+		*/
+		bool ProcessSTRING()
+		{
+			u64 s;
+			if (!GetMemAdv<u8>(s)) return false;
+			u64 sizecode = s & 3;
+			
+			// switch through mode
+			switch ((s >> 2) & 7)
+			{
+			case 0: // MOVS
+				if (!__ProcessSTRING_MOVS(sizecode)) return false;
+				break;
+
+			case 1: // REP MOVS
+
+				// if we can do the whole thing in a single tick
+				if (OTRF())
+				{
+					for (; RCX(); --RCX())
+						if (!__ProcessSTRING_MOVS(sizecode)) return false;
+				}
+				// otherwise perform a single iteration (if count is nonzero)
+				else if (RCX())
+				{
+					if (!__ProcessSTRING_MOVS(sizecode)) return false;
+					--RCX();
+
+					// reset RIP to repeat instruction
+					RIP() -= 2;
+				}
+				break;
+
+			// otherwise unknown mode
+			default: Terminate(ErrorCode::UndefinedBehavior); return false;
+			}
 
 			return true;
 		}

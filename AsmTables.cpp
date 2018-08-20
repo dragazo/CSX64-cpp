@@ -352,7 +352,7 @@ namespace CSX64
 	{"MOVE", asm_router_MOVZ},
 	{"MOVNZ", asm_router_MOVNZ},
 	{"MOVNE", asm_router_MOVNZ},
-	{"MOVS", asm_router_MOVS},
+	// MOVS (mov) requires disambiguation
 	{"MOVNS", asm_router_MOVNS},
 	{"MOVP", asm_router_MOVP},
 	{"MOVPE", asm_router_MOVP},
@@ -496,6 +496,16 @@ namespace CSX64
 	{"AAA", asm_router_AAA},
 	{"AAS", asm_router_AAS},
 
+	// MOVS (string) requires disambiguation
+
+	{"MOVSB", asm_router_MOVSB},
+	{"MOVSW", asm_router_MOVSW},
+	// MOVSD (string) requires disambiguation
+	{"MOVSQ", asm_router_MOVSQ},
+
+	// REP pseudo-instruction - will extract the actual instruction internally
+	{"REP", asm_router_REP},
+
 	// -- x87 -- //
 
 	{"FNOP", asm_router_FNOP},
@@ -618,7 +628,7 @@ namespace CSX64
 	{"MOVQ", asm_router_MOVQ},
 	{"MOVD", asm_router_MOVD},
 
-	{"MOVSD", asm_router_MOVSD},
+	// MOVSD (vec) requires disambiguation
 	{"MOVSS", asm_router_MOVSS},
 
 	{"MOVDQA", asm_router_MOVDQA},
@@ -752,6 +762,12 @@ namespace CSX64
 	{"DEBUG_CPU", asm_router_DEBUG_CPU},
 	{"DEBUG_VPU", asm_router_DEBUG_VPU},
 	{"DEBUG_FULL", asm_router_DEBUG_FULL},
+
+	// -- disambiguators -- //
+
+	{"MOVS", asm_router_MOVS_disambig},
+
+	{"MOVSD", asm_router_MOVSD_disambig},
 
 	};
 }

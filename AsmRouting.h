@@ -98,7 +98,7 @@ namespace CSX64
 
 	inline bool asm_router_MOVZ(AssembleArgs &args) { return args.TryProcessBinaryOp(OPCode::MOVcc, true, 0); } // MOVE
 	inline bool asm_router_MOVNZ(AssembleArgs &args) { return args.TryProcessBinaryOp(OPCode::MOVcc, true, 1); } // MOVNE
-	inline bool asm_router_MOVS(AssembleArgs &args) { return args.TryProcessBinaryOp(OPCode::MOVcc, true, 2); }
+	inline bool asm_router_MOVS_mov(AssembleArgs &args) { return args.TryProcessBinaryOp(OPCode::MOVcc, true, 2); }
 	inline bool asm_router_MOVNS(AssembleArgs &args) { return args.TryProcessBinaryOp(OPCode::MOVcc, true, 3); }
 	inline bool asm_router_MOVP(AssembleArgs &args) { return args.TryProcessBinaryOp(OPCode::MOVcc, true, 4); } // MOVPE
 	inline bool asm_router_MOVNP(AssembleArgs &args) { return args.TryProcessBinaryOp(OPCode::MOVcc, true, 5); } // MOVPO
@@ -241,6 +241,15 @@ namespace CSX64
 	inline bool asm_router_AAA(AssembleArgs &args) { return args.TryProcessNoArgOp(OPCode::AAX, true, 0); }
 	inline bool asm_router_AAS(AssembleArgs &args) { return args.TryProcessNoArgOp(OPCode::AAX, true, 1); }
 
+	inline bool asm_router_MOVS_string(AssembleArgs &args) { return args.TryProcessMOVS_string(OPCode::string, false); }
+
+	inline bool asm_router_MOVSB(AssembleArgs &args) { return args.TryProcessNoArgOp(OPCode::string, true, 0); }
+	inline bool asm_router_MOVSW(AssembleArgs &args) { return args.TryProcessNoArgOp(OPCode::string, true, 1); }
+	inline bool asm_router_MOVSD_string(AssembleArgs &args) { return args.TryProcessNoArgOp(OPCode::string, true, 2); }
+	inline bool asm_router_MOVSQ(AssembleArgs &args) { return args.TryProcessNoArgOp(OPCode::string, true, 3); }
+
+	inline bool asm_router_REP(AssembleArgs &args) { return args.TryProcessREP(); }
+
 	// -- x87 -- //
 
 	inline bool asm_router_FNOP(AssembleArgs &args) { return args.TryProcessNoArgOp(OPCode::NOP); }
@@ -367,7 +376,7 @@ namespace CSX64
 	inline bool asm_router_MOVQ(AssembleArgs &args) { return args.TryProcessVPUMove(OPCode::VPU_MOV, 3, false, false, true); }
 	inline bool asm_router_MOVD(AssembleArgs &args) { return args.TryProcessVPUMove(OPCode::VPU_MOV, 2, false, false, true); }
 
-	inline bool asm_router_MOVSD(AssembleArgs &args) { return args.TryProcessVPUMove(OPCode::VPU_MOV, 3, false, false, true); }
+	inline bool asm_router_MOVSD_vec(AssembleArgs &args) { return args.TryProcessVPUMove(OPCode::VPU_MOV, 3, false, false, true); }
 	inline bool asm_router_MOVSS(AssembleArgs &args) { return args.TryProcessVPUMove(OPCode::VPU_MOV, 2, false, false, true); }
 
 	inline bool asm_router_MOVDQA(AssembleArgs &args) { return args.TryProcessVPUMove(OPCode::VPU_MOV, 3, false, true, false); } // size codes for these 2 don't matter
@@ -493,6 +502,20 @@ namespace CSX64
 	inline bool asm_router_DEBUG_CPU(AssembleArgs &args) { return args.TryProcessNoArgOp(OPCode::DEBUG, true, 0); }
 	inline bool asm_router_DEBUG_VPU(AssembleArgs &args) { return args.TryProcessNoArgOp(OPCode::DEBUG, true, 1); }
 	inline bool asm_router_DEBUG_FULL(AssembleArgs &args) { return args.TryProcessNoArgOp(OPCode::DEBUG, true, 2); }
+
+	// -- disambiguators -- //
+
+	inline bool asm_router_MOVS_disambig(AssembleArgs &args)
+	{
+		// MOVS (string) has 2 memory operands
+		return args.args.size() == 2 && args.args[0].back() == ']' && args.args[1].back() == ']' ? asm_router_MOVS_string(args) : asm_router_MOVS_mov(args);
+	}
+
+	inline bool asm_router_MOVSD_disambig(AssembleArgs &args)
+	{
+		// MOVSD (string) takes no operands
+		return args.args.size() == 0 ? asm_router_MOVSD_string(args) : asm_router_MOVSD_vec(args);
+	}
 }
 
 #endif

@@ -362,6 +362,9 @@ int RunConsole(std::vector<u8> &exe, std::vector<std::string> &args, bool fsf, b
 	// set private flags
 	computer.FSF() = fsf;
 
+	// this usage is just going for raw speed, so enable OTRF
+	computer.OTRF() = true;
+
 	// tie standard streams - stdin is non-interactive because we don't control it
 	computer.GetFD(0).Open(static_cast<std::iostream*>(&std::cin), false, false);
 	computer.GetFD(1).Open(static_cast<std::iostream*>(&std::cout), false, false);

@@ -1824,6 +1824,65 @@ bool AssembleArgs::TryProcessMOVxX(OPCode op, bool sign)
 	return true;
 }
 
+bool AssembleArgs::__TryGetStringOpSize(u64 &sizecode)
+{
+	// must have 2 args
+	if (args.size() != 2) return false;
+
+	// args must both be memory
+	u64 a, b, sz_1, sz_2;
+	Expr expr;
+	bool expl_1, expl_2;
+	if (!TryParseAddress(args[0], a, b, expr, sz_1, expl_1) || !TryParseAddress(args[1], a, b, expr, sz_2, expl_2)) return false;
+
+	// need an explicit size (that is consistent)
+	if (expl_1 && expl_2) { if (sz_1 != sz_2) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Operand size mismatch"}; return false; } sizecode = sz_1; }
+	else if (expl_1) sizecode = sz_1;
+	else if (expl_2) sizecode = sz_2;
+	else { res = {AssembleError::UsageError, "line " + tostr(line) + ": Could not deduce operand size"}; return false; }
+
+	// make sure sizecode is in range
+	if (sizecode > 3) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Specified operand size is not supported"}; return false; }
+
+	return true;
+}
+bool AssembleArgs::TryProcessMOVS_string(OPCode op, bool rep)
+{
+	u64 sizecode;
+	if (!__TryGetStringOpSize(sizecode)) return false;
+	
+	if (!TryAppendByte((u8)op)) return false;
+	if (!TryAppendByte((u8)((rep ? 4 : 0) | sizecode))) return false;
+
+	return true;
+}
+
+bool AssembleArgs::TryProcessREP()
+{
+	if (args.size() == 0) { res = {AssembleError::ArgCount, "line " + tostr(line) + ": REP expected an instruction to augment"}; return false; }
+
+	// first arg contains the instrucion to execute - find first white-space delimiter
+	std::size_t len;
+	for (len = 0; len < args[0].size() && !std::isspace(args[0][len]); ++len);
+
+	// extract that as the "actual" instruction to modify - convert to uppercase
+	std::string actual = ToUpper(args[0].substr(0, len));
+
+	// if we got the whole arg, remove first arg entirely
+	if (len == args[0].size()) args.erase(args.begin());
+	// otherwise, remove what we took and chop off leading white space
+	else args[0] = TrimStart(args[0].substr(len));
+	
+	// route to proper handlers
+	if (actual == "MOVS") return TryProcessMOVS_string(OPCode::string, true);
+	else if (actual == "MOVSB") return TryProcessNoArgOp(OPCode::string, true, 4 | 0);
+	else if (actual == "MOVSW") return TryProcessNoArgOp(OPCode::string, true, 4 | 1);
+	else if (actual == "MOVSD") return TryProcessNoArgOp(OPCode::string, true, 4 | 2);
+	else if (actual == "MOVSQ") return TryProcessNoArgOp(OPCode::string, true, 4 | 3);
+	// otherwise this is illegal usage of REP
+	else { res = {AssembleError::UsageError, "line " + tostr(line) + ": REP cannot be used with the specified instruction"}; return false; }
+}
+
 bool AssembleArgs::TryProcessFPUBinaryOp(OPCode op, bool integral, bool pop)
 {
 	// write op code

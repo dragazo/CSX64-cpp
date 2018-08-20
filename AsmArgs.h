@@ -145,6 +145,12 @@ namespace CSX64
 		bool __TryProcessMOVxX_settings_byte(bool sign, u64 dest, u64 dest_sizecode, u64 src_sizecode);
 		bool TryProcessMOVxX(OPCode op, bool sign);
 
+		// gets the sizecode specified by a binary string operation (e.g. MOVS (string))
+		bool __TryGetStringOpSize(u64 &sizecode);
+		bool TryProcessMOVS_string(OPCode op, bool rep);
+
+		bool TryProcessREP();
+
 		// -- x87 op formats -- //
 
 		bool TryProcessFPUBinaryOp(OPCode op, bool integral, bool pop);
