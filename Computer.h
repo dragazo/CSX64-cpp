@@ -45,10 +45,10 @@ namespace CSX64
 
 		public:
 
-			static const u16 tag_normal = 0;
-			static const u16 tag_zero = 1;
-			static const u16 tag_special = 2;
-			static const u16 tag_empty = 3;
+			static constexpr u16 tag_normal = 0;
+			static constexpr u16 tag_zero = 1;
+			static constexpr u16 tag_special = 2;
+			static constexpr u16 tag_empty = 3;
 
 			static u16 ComputeFPUTag(long double val)
 			{
@@ -90,15 +90,15 @@ namespace CSX64
 			// -------------------------------------
 
 			// gets the tag for this ST register
-			inline u16 Tag() { return (c.FPU_tag >> (index * 2)) & 3; }
+			inline constexpr u16 Tag() const noexcept { return (c.FPU_tag >> (index * 2)) & 3; }
 
-			inline bool Normal() { return Tag() == tag_normal; }
-			inline bool Zero() { return Tag() == tag_zero; }
-			inline bool Special() { return Tag() == tag_special; }
-			inline bool Empty() { return Tag() == tag_empty; }
+			inline constexpr bool Normal() const noexcept { return Tag() == tag_normal; }
+			inline constexpr bool Zero() const noexcept { return Tag() == tag_zero; }
+			inline constexpr bool Special() const noexcept { return Tag() == tag_special; }
+			inline constexpr bool Empty() const noexcept { return Tag() == tag_empty; }
 
 			// marks the ST register as empty
-			inline void Free() { c.FPU_tag |= 3 << (index * 2); }
+			inline constexpr void Free() noexcept { c.FPU_tag |= 3 << (index * 2); }
 
 			// -------------------------------------
 
@@ -147,20 +147,20 @@ namespace CSX64
 	public: // -- data access -- //
 
 		// The maximum amount of memory the client can request
-		u64 MaxMemory() const { return max_mem_size; }
-		void MaxMemory(u64 max) { max_mem_size = max; }
+		inline constexpr u64 MaxMemory() const noexcept { return max_mem_size; }
+		inline constexpr void MaxMemory(u64 max) noexcept { max_mem_size = max; }
 
 		// Gets the amount of memory (in bytes) the computer currently has access to
-		u64 MemorySize() const { return mem_size; }
+		inline constexpr u64 MemorySize() const noexcept { return mem_size; }
 
 		// Flag marking if the program is still executing (still true even in halted state)
-		bool Running() const { return running; }
+		inline constexpr bool Running() const noexcept { return running; }
 		// Gets if the processor is awaiting data from an interactive stream
-		bool SuspendedRead() const { return suspended_read; }
+		inline constexpr bool SuspendedRead() const noexcept { return suspended_read; }
 		// Gets the current error code
-		ErrorCode Error() const { return error; }
+		inline constexpr ErrorCode Error() const noexcept { return error; }
 		// The return value from the program after errorless termination
-		int ReturnValue() const { return return_value; }
+		inline constexpr int ReturnValue() const noexcept { return return_value; }
 
 	public: // -- ctor/dtor -- //
 
@@ -578,155 +578,155 @@ namespace CSX64
 
 	public: // -- register access -- //
 
-		u64 &RFLAGS() { return _RFLAGS; }
-		u32 &EFLAGS() { return *(u32*)&_RFLAGS; }
-		u16 &FLAGS() { return *(u16*)&_RFLAGS; }
+		inline constexpr u64 &RFLAGS() noexcept { return _RFLAGS; }
+		inline constexpr u32 &EFLAGS() noexcept { return *(u32*)&_RFLAGS; }
+		inline constexpr u16 &FLAGS() noexcept { return *(u16*)&_RFLAGS; }
 
-		u64 &RIP() { return _RIP; }
-		ReferenceRouter<u32, u64> EIP() { return {_RIP}; }
-		ReferenceRouter<u16, u64> IP() { return {_RIP}; }
+		inline constexpr u64 &RIP() noexcept { return _RIP; }
+		inline constexpr ReferenceRouter<u32, u64> EIP() noexcept { return {_RIP}; }
+		inline constexpr ReferenceRouter<u16, u64> IP() noexcept { return {_RIP}; }
 
-		u64 &RAX() { return CPURegisters[0].x64(); }
-		u64 &RBX() { return CPURegisters[1].x64(); }
-		u64 &RCX() { return CPURegisters[2].x64(); }
-		u64 &RDX() { return CPURegisters[3].x64(); }
-		u64 &RSI() { return CPURegisters[4].x64(); }
-		u64 &RDI() { return CPURegisters[5].x64(); }
-		u64 &RBP() { return CPURegisters[6].x64(); }
-		u64 &RSP() { return CPURegisters[7].x64(); }
-		u64 &R8() { return CPURegisters[8].x64(); }
-		u64 &R9() { return CPURegisters[9].x64(); }
-		u64 &R10() { return CPURegisters[10].x64(); }
-		u64 &R11() { return CPURegisters[11].x64(); }
-		u64 &R12() { return CPURegisters[12].x64(); }
-		u64 &R13() { return CPURegisters[13].x64(); }
-		u64 &R14() { return CPURegisters[14].x64(); }
-		u64 &R15() { return CPURegisters[15].x64(); }
+		inline constexpr u64 &RAX() noexcept { return CPURegisters[0].x64(); }
+		inline constexpr u64 &RBX() noexcept { return CPURegisters[1].x64(); }
+		inline constexpr u64 &RCX() noexcept { return CPURegisters[2].x64(); }
+		inline constexpr u64 &RDX() noexcept { return CPURegisters[3].x64(); }
+		inline constexpr u64 &RSI() noexcept { return CPURegisters[4].x64(); }
+		inline constexpr u64 &RDI() noexcept { return CPURegisters[5].x64(); }
+		inline constexpr u64 &RBP() noexcept { return CPURegisters[6].x64(); }
+		inline constexpr u64 &RSP() noexcept { return CPURegisters[7].x64(); }
+		inline constexpr u64 &R8() noexcept { return CPURegisters[8].x64(); }
+		inline constexpr u64 &R9() noexcept { return CPURegisters[9].x64(); }
+		inline constexpr u64 &R10() noexcept { return CPURegisters[10].x64(); }
+		inline constexpr u64 &R11() noexcept { return CPURegisters[11].x64(); }
+		inline constexpr u64 &R12() noexcept { return CPURegisters[12].x64(); }
+		inline constexpr u64 &R13() noexcept { return CPURegisters[13].x64(); }
+		inline constexpr u64 &R14() noexcept { return CPURegisters[14].x64(); }
+		inline constexpr u64 &R15() noexcept { return CPURegisters[15].x64(); }
 
-		auto EAX() { return CPURegisters[0].x32(); }
-		auto EBX() { return CPURegisters[1].x32(); }
-		auto ECX() { return CPURegisters[2].x32(); }
-		auto EDX() { return CPURegisters[3].x32(); }
-		auto ESI() { return CPURegisters[4].x32(); }
-		auto EDI() { return CPURegisters[5].x32(); }
-		auto EBP() { return CPURegisters[6].x32(); }
-		auto ESP() { return CPURegisters[7].x32(); }
-		auto R8D() { return CPURegisters[8].x32(); }
-		auto R9D() { return CPURegisters[9].x32(); }
-		auto R10D() { return CPURegisters[10].x32(); }
-		auto R11D() { return CPURegisters[11].x32(); }
-		auto R12D() { return CPURegisters[12].x32(); }
-		auto R13D() { return CPURegisters[13].x32(); }
-		auto R14D() { return CPURegisters[14].x32(); }
-		auto R15D() { return CPURegisters[15].x32(); }
+		inline constexpr auto EAX() noexcept { return CPURegisters[0].x32(); }
+		inline constexpr auto EBX() noexcept { return CPURegisters[1].x32(); }
+		inline constexpr auto ECX() noexcept { return CPURegisters[2].x32(); }
+		inline constexpr auto EDX() noexcept { return CPURegisters[3].x32(); }
+		inline constexpr auto ESI() noexcept { return CPURegisters[4].x32(); }
+		inline constexpr auto EDI() noexcept { return CPURegisters[5].x32(); }
+		inline constexpr auto EBP() noexcept { return CPURegisters[6].x32(); }
+		inline constexpr auto ESP() noexcept { return CPURegisters[7].x32(); }
+		inline constexpr auto R8D() noexcept { return CPURegisters[8].x32(); }
+		inline constexpr auto R9D() noexcept { return CPURegisters[9].x32(); }
+		inline constexpr auto R10D() noexcept { return CPURegisters[10].x32(); }
+		inline constexpr auto R11D() noexcept { return CPURegisters[11].x32(); }
+		inline constexpr auto R12D() noexcept { return CPURegisters[12].x32(); }
+		inline constexpr auto R13D() noexcept { return CPURegisters[13].x32(); }
+		inline constexpr auto R14D() noexcept { return CPURegisters[14].x32(); }
+		inline constexpr auto R15D() noexcept { return CPURegisters[15].x32(); }
 
-		u16 &AX() { return CPURegisters[0].x16(); }
-		u16 &BX() { return CPURegisters[1].x16(); }
-		u16 &CX() { return CPURegisters[2].x16(); }
-		u16 &DX() { return CPURegisters[3].x16(); }
-		u16 &SI() { return CPURegisters[4].x16(); }
-		u16 &DI() { return CPURegisters[5].x16(); }
-		u16 &BP() { return CPURegisters[6].x16(); }
-		u16 &SP() { return CPURegisters[7].x16(); }
-		u16 &R8W() { return CPURegisters[8].x16(); }
-		u16 &R9W() { return CPURegisters[9].x16(); }
-		u16 &R10W() { return CPURegisters[10].x16(); }
-		u16 &R11W() { return CPURegisters[11].x16(); }
-		u16 &R12W() { return CPURegisters[12].x16(); }
-		u16 &R13W() { return CPURegisters[13].x16(); }
-		u16 &R14W() { return CPURegisters[14].x16(); }
-		u16 &R15W() { return CPURegisters[15].x16(); }
+		inline constexpr u16 &AX() noexcept { return CPURegisters[0].x16(); }
+		inline constexpr u16 &BX() noexcept { return CPURegisters[1].x16(); }
+		inline constexpr u16 &CX() noexcept { return CPURegisters[2].x16(); }
+		inline constexpr u16 &DX() noexcept { return CPURegisters[3].x16(); }
+		inline constexpr u16 &SI() noexcept { return CPURegisters[4].x16(); }
+		inline constexpr u16 &DI() noexcept { return CPURegisters[5].x16(); }
+		inline constexpr u16 &BP() noexcept { return CPURegisters[6].x16(); }
+		inline constexpr u16 &SP() noexcept { return CPURegisters[7].x16(); }
+		inline constexpr u16 &R8W() noexcept { return CPURegisters[8].x16(); }
+		inline constexpr u16 &R9W() noexcept { return CPURegisters[9].x16(); }
+		inline constexpr u16 &R10W() noexcept { return CPURegisters[10].x16(); }
+		inline constexpr u16 &R11W() noexcept { return CPURegisters[11].x16(); }
+		inline constexpr u16 &R12W() noexcept { return CPURegisters[12].x16(); }
+		inline constexpr u16 &R13W() noexcept { return CPURegisters[13].x16(); }
+		inline constexpr u16 &R14W() noexcept { return CPURegisters[14].x16(); }
+		inline constexpr u16 &R15W() noexcept { return CPURegisters[15].x16(); }
 
-		u8 &AL() { return CPURegisters[0].x8(); }
-		u8 &BL() { return CPURegisters[1].x8(); }
-		u8 &CL() { return CPURegisters[2].x8(); }
-		u8 &DL() { return CPURegisters[3].x8(); }
-		u8 &SIL() { return CPURegisters[4].x8(); }
-		u8 &DIL() { return CPURegisters[5].x8(); }
-		u8 &BPL() { return CPURegisters[6].x8(); }
-		u8 &SPL() { return CPURegisters[7].x8(); }
-		u8 &R8B() { return CPURegisters[8].x8(); }
-		u8 &R9B() { return CPURegisters[9].x8(); }
-		u8 &R10B() { return CPURegisters[10].x8(); }
-		u8 &R11B() { return CPURegisters[11].x8(); }
-		u8 &R12B() { return CPURegisters[12].x8(); }
-		u8 &R13B() { return CPURegisters[13].x8(); }
-		u8 &R14B() { return CPURegisters[14].x8(); }
-		u8 &R15B() { return CPURegisters[15].x8(); }
+		inline constexpr u8 &AL() noexcept { return CPURegisters[0].x8(); }
+		inline constexpr u8 &BL() noexcept { return CPURegisters[1].x8(); }
+		inline constexpr u8 &CL() noexcept { return CPURegisters[2].x8(); }
+		inline constexpr u8 &DL() noexcept { return CPURegisters[3].x8(); }
+		inline constexpr u8 &SIL() noexcept { return CPURegisters[4].x8(); }
+		inline constexpr u8 &DIL() noexcept { return CPURegisters[5].x8(); }
+		inline constexpr u8 &BPL() noexcept { return CPURegisters[6].x8(); }
+		inline constexpr u8 &SPL() noexcept { return CPURegisters[7].x8(); }
+		inline constexpr u8 &R8B() noexcept { return CPURegisters[8].x8(); }
+		inline constexpr u8 &R9B() noexcept { return CPURegisters[9].x8(); }
+		inline constexpr u8 &R10B() noexcept { return CPURegisters[10].x8(); }
+		inline constexpr u8 &R11B() noexcept { return CPURegisters[11].x8(); }
+		inline constexpr u8 &R12B() noexcept { return CPURegisters[12].x8(); }
+		inline constexpr u8 &R13B() noexcept { return CPURegisters[13].x8(); }
+		inline constexpr u8 &R14B() noexcept { return CPURegisters[14].x8(); }
+		inline constexpr u8 &R15B() noexcept { return CPURegisters[15].x8(); }
 
-		u8 &AH() { return CPURegisters[0].x8h(); }
-		u8 &BH() { return CPURegisters[1].x8h(); }
-		u8 &CH() { return CPURegisters[2].x8h(); }
-		u8 &DH() { return CPURegisters[3].x8h(); }
+		inline constexpr u8 &AH() noexcept { return CPURegisters[0].x8h(); }
+		inline constexpr u8 &BH() noexcept { return CPURegisters[1].x8h(); }
+		inline constexpr u8 &CH() noexcept { return CPURegisters[2].x8h(); }
+		inline constexpr u8 &DH() noexcept { return CPURegisters[3].x8h(); }
 
 		// source: https://en.wikipedia.org/wiki/FLAGS_register
 		// source: http://www.eecg.toronto.edu/~amza/www.mindsec.com/files/x86regs.html
 
-		FlagWrapper<u64, 0> CF() { return {_RFLAGS}; }
-		FlagWrapper<u64, 2> PF() { return {_RFLAGS}; }
-		FlagWrapper<u64, 4> AF() { return {_RFLAGS}; }
-		FlagWrapper<u64, 6> ZF() { return {_RFLAGS}; }
-		FlagWrapper<u64, 7> SF() { return {_RFLAGS}; }
-		FlagWrapper<u64, 8> TF() { return {_RFLAGS}; }
-		FlagWrapper<u64, 9> IF() { return {_RFLAGS}; }
-		FlagWrapper<u64, 10> DF() { return {_RFLAGS}; }
-		FlagWrapper<u64, 11> OF() { return {_RFLAGS}; }
-		BitfieldWrapper<u64, 12, 2> IOPL() { return {_RFLAGS}; }
-		FlagWrapper<u64, 14> NT() { return {_RFLAGS}; }
+		inline constexpr FlagWrapper<u64, 0> CF() noexcept { return {_RFLAGS}; }
+		inline constexpr FlagWrapper<u64, 2> PF() noexcept { return {_RFLAGS}; }
+		inline constexpr FlagWrapper<u64, 4> AF() noexcept { return {_RFLAGS}; }
+		inline constexpr FlagWrapper<u64, 6> ZF() noexcept { return {_RFLAGS}; }
+		inline constexpr FlagWrapper<u64, 7> SF() noexcept { return {_RFLAGS}; }
+		inline constexpr FlagWrapper<u64, 8> TF() noexcept { return {_RFLAGS}; }
+		inline constexpr FlagWrapper<u64, 9> IF() noexcept { return {_RFLAGS}; }
+		inline constexpr FlagWrapper<u64, 10> DF() noexcept { return {_RFLAGS}; }
+		inline constexpr FlagWrapper<u64, 11> OF() noexcept { return {_RFLAGS}; }
+		inline constexpr BitfieldWrapper<u64, 12, 2> IOPL() noexcept { return {_RFLAGS}; }
+		inline constexpr FlagWrapper<u64, 14> NT() noexcept { return {_RFLAGS}; }
 
-		FlagWrapper<u64, 16> RF() { return {_RFLAGS}; }
-		FlagWrapper<u64, 17> VM() { return {_RFLAGS}; }
-		FlagWrapper<u64, 18> AC() { return {_RFLAGS}; }
-		FlagWrapper<u64, 19> VIF() { return {_RFLAGS}; }
-		FlagWrapper<u64, 20> VIP() { return {_RFLAGS}; }
-		FlagWrapper<u64, 21> ID() { return {_RFLAGS}; }
+		inline constexpr FlagWrapper<u64, 16> RF() noexcept { return {_RFLAGS}; }
+		inline constexpr FlagWrapper<u64, 17> VM() noexcept { return {_RFLAGS}; }
+		inline constexpr FlagWrapper<u64, 18> AC() noexcept { return {_RFLAGS}; }
+		inline constexpr FlagWrapper<u64, 19> VIF() noexcept { return {_RFLAGS}; }
+		inline constexpr FlagWrapper<u64, 20> VIP() noexcept { return {_RFLAGS}; }
+		inline constexpr FlagWrapper<u64, 21> ID() noexcept { return {_RFLAGS}; }
 
 		// File System Flag - denotes if the client is allowed to perform potentially-dangerous file system syscalls (open, delete, mkdir, etc.)
-		FlagWrapper<u64, 32> FSF() { return {_RFLAGS}; }
+		inline constexpr FlagWrapper<u64, 32> FSF() noexcept { return {_RFLAGS}; }
 		// One-Tick-REP Flag - denotes if REP instructions are performed in a single tick (more efficient, but could result in expensive ticks)
-		FlagWrapper<u64, 33> OTRF() { return {_RFLAGS}; }
+		inline constexpr FlagWrapper<u64, 33> OTRF() noexcept { return {_RFLAGS}; }
 
-		bool cc_b() { return CF(); }
-		bool cc_be() { return CF() || ZF(); }
-		bool cc_a() { return !CF() && !ZF(); }
-		bool cc_ae() { return !CF(); }
+		inline constexpr bool cc_b() noexcept { return CF(); }
+		inline constexpr bool cc_be() noexcept { return CF() || ZF(); }
+		inline constexpr bool cc_a() noexcept { return !CF() && !ZF(); }
+		inline constexpr bool cc_ae() noexcept { return !CF(); }
 
-		bool cc_l() { return SF() != OF(); }
-		bool cc_le() { return ZF() || SF() != OF(); }
-		bool cc_g() { return !ZF() && SF() == OF(); }
-		bool cc_ge() { return SF() == OF(); }
+		inline constexpr bool cc_l() noexcept { return SF() != OF(); }
+		inline constexpr bool cc_le() noexcept { return ZF() || SF() != OF(); }
+		inline constexpr bool cc_g() noexcept { return !ZF() && SF() == OF(); }
+		inline constexpr bool cc_ge() noexcept { return SF() == OF(); }
 
 		// source : http://www.website.masmforum.com/tutorials/fptute/fpuchap1.htm
 
-		FlagWrapper<u16, 0> FPU_IM() { return {FPU_control}; }
-		FlagWrapper<u16, 1> FPU_DM() { return {FPU_control}; }
-		FlagWrapper<u16, 2> FPU_ZM() { return {FPU_control}; }
-		FlagWrapper<u16, 3> FPU_OM() { return {FPU_control}; }
-		FlagWrapper<u16, 4> FPU_UM() { return {FPU_control}; }
-		FlagWrapper<u16, 5> FPU_PM() { return {FPU_control}; }
-		FlagWrapper<u16, 7> FPU_IEM() { return {FPU_control}; }
-		BitfieldWrapper<u16, 8, 2> FPU_PC() { return {FPU_control}; }
-		BitfieldWrapper<u16, 10, 2> FPU_RC() { return {FPU_control}; }
-		FlagWrapper<u16, 12> FPU_IC() { return {FPU_control}; }
+		inline constexpr FlagWrapper<u16, 0> FPU_IM() noexcept { return {FPU_control}; }
+		inline constexpr FlagWrapper<u16, 1> FPU_DM() noexcept { return {FPU_control}; }
+		inline constexpr FlagWrapper<u16, 2> FPU_ZM() noexcept { return {FPU_control}; }
+		inline constexpr FlagWrapper<u16, 3> FPU_OM() noexcept { return {FPU_control}; }
+		inline constexpr FlagWrapper<u16, 4> FPU_UM() noexcept { return {FPU_control}; }
+		inline constexpr FlagWrapper<u16, 5> FPU_PM() noexcept { return {FPU_control}; }
+		inline constexpr FlagWrapper<u16, 7> FPU_IEM() noexcept { return {FPU_control}; }
+		inline constexpr BitfieldWrapper<u16, 8, 2> FPU_PC() noexcept { return {FPU_control}; }
+		inline constexpr BitfieldWrapper<u16, 10, 2> FPU_RC() noexcept { return {FPU_control}; }
+		inline constexpr FlagWrapper<u16, 12> FPU_IC() noexcept { return {FPU_control}; }
 
-		FlagWrapper<u16, 0> FPU_I() { return {FPU_status}; }
-		FlagWrapper<u16, 1> FPU_D() { return {FPU_status}; }
-		FlagWrapper<u16, 2> FPU_Z() { return {FPU_status}; }
-		FlagWrapper<u16, 3> FPU_O() { return {FPU_status}; }
-		FlagWrapper<u16, 4> FPU_U() { return {FPU_status}; }
-		FlagWrapper<u16, 5> FPU_P() { return {FPU_status}; }
-		FlagWrapper<u16, 6> FPU_SF() { return {FPU_status}; }
-		FlagWrapper<u16, 7> FPU_IR() { return {FPU_status}; }
-		FlagWrapper<u16, 8> FPU_C0() { return {FPU_status}; }
-		FlagWrapper<u16, 9> FPU_C1() { return {FPU_status}; }
-		FlagWrapper<u16, 10> FPU_C2() { return {FPU_status}; }
-		BitfieldWrapper<u16, 11, 3> FPU_TOP() { return {FPU_control}; }
-		FlagWrapper<u16, 14> FPU_C3() { return {FPU_status}; }
-		FlagWrapper<u16, 15> FPU_B() { return {FPU_status}; }
+		inline constexpr FlagWrapper<u16, 0> FPU_I() noexcept { return {FPU_status}; }
+		inline constexpr FlagWrapper<u16, 1> FPU_D() noexcept { return {FPU_status}; }
+		inline constexpr FlagWrapper<u16, 2> FPU_Z() noexcept { return {FPU_status}; }
+		inline constexpr FlagWrapper<u16, 3> FPU_O() noexcept { return {FPU_status}; }
+		inline constexpr FlagWrapper<u16, 4> FPU_U() noexcept { return {FPU_status}; }
+		inline constexpr FlagWrapper<u16, 5> FPU_P() noexcept { return {FPU_status}; }
+		inline constexpr FlagWrapper<u16, 6> FPU_SF() noexcept { return {FPU_status}; }
+		inline constexpr FlagWrapper<u16, 7> FPU_IR() noexcept { return {FPU_status}; }
+		inline constexpr FlagWrapper<u16, 8> FPU_C0() noexcept { return {FPU_status}; }
+		inline constexpr FlagWrapper<u16, 9> FPU_C1() noexcept { return {FPU_status}; }
+		inline constexpr FlagWrapper<u16, 10> FPU_C2() noexcept { return {FPU_status}; }
+		inline constexpr BitfieldWrapper<u16, 11, 3> FPU_TOP() noexcept { return {FPU_control}; }
+		inline constexpr FlagWrapper<u16, 14> FPU_C3() noexcept { return {FPU_status}; }
+		inline constexpr FlagWrapper<u16, 15> FPU_B() noexcept { return {FPU_status}; }
 
-		ST_Wrapper ST(u64 num) { return {*this, (u32)((FPU_TOP() + num) & 7)}; }
+		inline constexpr ST_Wrapper ST(u64 num) { return {*this, (u32)((FPU_TOP() + num) & 7)}; }
 
-		ZMMRegister &ZMM(int num) { return ZMMRegisters[num]; }
+		inline constexpr ZMMRegister &ZMM(u64 num) { return ZMMRegisters[num]; }
 
 	private: // -- exe tables -- //
 

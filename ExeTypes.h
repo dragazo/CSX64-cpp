@@ -71,8 +71,9 @@ namespace CSX64
 		inline constexpr ReferenceRouter operator+=(T val) noexcept { *this = *this + val; return *this; }
 		inline constexpr ReferenceRouter operator-=(T val) noexcept { *this = *this - val; return *this; }
 		inline constexpr ReferenceRouter operator*=(T val) noexcept { *this = *this * val; return *this; }
-		inline constexpr ReferenceRouter operator/=(T val) noexcept { *this = *this / val; return *this; }
-		inline constexpr ReferenceRouter operator%=(T val) noexcept { *this = *this % val; return *this; }
+
+		inline constexpr ReferenceRouter operator/=(T val) { *this = *this / val; return *this; }
+		inline constexpr ReferenceRouter operator%=(T val) { *this = *this % val; return *this; }
 
 		inline constexpr ReferenceRouter operator&=(T val) noexcept { *this = *this & val; return *this; }
 		inline constexpr ReferenceRouter operator|=(T val) noexcept { *this = *this | val; return *this; }
@@ -104,8 +105,9 @@ namespace CSX64
 		inline constexpr BitfieldWrapper operator+=(T val) noexcept { *this = *this + val; return *this; }
 		inline constexpr BitfieldWrapper operator-=(T val) noexcept { *this = *this - val; return *this; }
 		inline constexpr BitfieldWrapper operator*=(T val) noexcept { *this = *this * val; return *this; }
-		inline constexpr BitfieldWrapper operator/=(T val) noexcept { *this = *this / val; return *this; }
-		inline constexpr BitfieldWrapper operator%=(T val) noexcept { *this = *this % val; return *this; }
+
+		inline constexpr BitfieldWrapper operator/=(T val) { *this = *this / val; return *this; }
+		inline constexpr BitfieldWrapper operator%=(T val) { *this = *this % val; return *this; }
 
 		inline constexpr BitfieldWrapper operator&=(T val) noexcept { *this = *this & val; return *this; }
 		inline constexpr BitfieldWrapper operator|=(T val) noexcept { *this = *this | val; return *this; }
