@@ -1827,7 +1827,7 @@ bool AssembleArgs::TryProcessMOVxX(OPCode op, bool sign)
 bool AssembleArgs::__TryGetStringOpSize(u64 &sizecode)
 {
 	// must have 2 args
-	if (args.size() != 2) return false;
+	if (args.size() != 2) { res = {AssembleError::ArgCount, "line " + tostr(line) + ": Expected 2 operands"}; return false; }
 
 	// args must both be memory
 	u64 a, b, sz_1, sz_2;
@@ -1846,18 +1846,29 @@ bool AssembleArgs::__TryGetStringOpSize(u64 &sizecode)
 
 	return true;
 }
+
 bool AssembleArgs::TryProcessMOVS_string(OPCode op, bool rep)
 {
 	u64 sizecode;
 	if (!__TryGetStringOpSize(sizecode)) return false;
 	
 	if (!TryAppendByte((u8)op)) return false;
-	if (!TryAppendByte((u8)((rep ? 4 : 0) | sizecode))) return false;
+	if (!TryAppendByte((u8)(((rep ? 1 : 0) << 2) | sizecode))) return false;
+
+	return true;
+}
+bool AssembleArgs::TryProcessCMPS_string(OPCode op, bool repe, bool repne)
+{
+	u64 sizecode;
+	if (!__TryGetStringOpSize(sizecode)) return false;
+
+	if (!TryAppendByte((u8)op)) return false;
+	if (!TryAppendByte((u8)(((repne ? 4 : repe ? 3 : 2) << 2) | sizecode))) return false;
 
 	return true;
 }
 
-bool AssembleArgs::TryProcessREP()
+bool AssembleArgs::__TryProcessREP_init(std::string &actual)
 {
 	if (args.size() == 0) { res = {AssembleError::ArgCount, "line " + tostr(line) + ": REP expected an instruction to augment"}; return false; }
 
@@ -1866,21 +1877,59 @@ bool AssembleArgs::TryProcessREP()
 	for (len = 0; len < args[0].size() && !std::isspace(args[0][len]); ++len);
 
 	// extract that as the "actual" instruction to modify - convert to uppercase
-	std::string actual = ToUpper(args[0].substr(0, len));
+	actual = ToUpper(args[0].substr(0, len));
 
 	// if we got the whole arg, remove first arg entirely
 	if (len == args[0].size()) args.erase(args.begin());
 	// otherwise, remove what we took and chop off leading white space
 	else args[0] = TrimStart(args[0].substr(len));
+
+	return true;
+}
+bool AssembleArgs::TryProcessREP()
+{
+	// initialize
+	std::string actual;
+	if (!__TryProcessREP_init(actual)) return false;
 	
 	// route to proper handlers
 	if (actual == "MOVS") return TryProcessMOVS_string(OPCode::string, true);
-	else if (actual == "MOVSB") return TryProcessNoArgOp(OPCode::string, true, 4 | 0);
-	else if (actual == "MOVSW") return TryProcessNoArgOp(OPCode::string, true, 4 | 1);
-	else if (actual == "MOVSD") return TryProcessNoArgOp(OPCode::string, true, 4 | 2);
-	else if (actual == "MOVSQ") return TryProcessNoArgOp(OPCode::string, true, 4 | 3);
+	else if (actual == "MOVSB") return TryProcessNoArgOp(OPCode::string, true, (1 << 2) | 0);
+	else if (actual == "MOVSW") return TryProcessNoArgOp(OPCode::string, true, (1 << 2) | 1);
+	else if (actual == "MOVSD") return TryProcessNoArgOp(OPCode::string, true, (1 << 2) | 2);
+	else if (actual == "MOVSQ") return TryProcessNoArgOp(OPCode::string, true, (1 << 2) | 3);
 	// otherwise this is illegal usage of REP
 	else { res = {AssembleError::UsageError, "line " + tostr(line) + ": REP cannot be used with the specified instruction"}; return false; }
+}
+bool AssembleArgs::TryProcessREPE()
+{
+	// initialize
+	std::string actual;
+	if (!__TryProcessREP_init(actual)) return false;
+
+	// route to proper handlers
+	if (actual == "CMPS") return TryProcessCMPS_string(OPCode::string, true, false);
+	else if (actual == "CMPSB") return TryProcessNoArgOp(OPCode::string, true, (3 << 2) | 0);
+	else if (actual == "CMPSW") return TryProcessNoArgOp(OPCode::string, true, (3 << 2) | 1);
+	else if (actual == "CMPSD") return TryProcessNoArgOp(OPCode::string, true, (3 << 2) | 2);
+	else if (actual == "CMPSQ") return TryProcessNoArgOp(OPCode::string, true, (3 << 2) | 3);
+	// otherwise this is illegal usage of REP
+	else { res = {AssembleError::UsageError, "line " + tostr(line) + ": REPE cannot be used with the specified instruction"}; return false; }
+}
+bool AssembleArgs::TryProcessREPNE()
+{
+	// initialize
+	std::string actual;
+	if (!__TryProcessREP_init(actual)) return false;
+
+	// route to proper handlers
+	if (actual == "CMPS") return TryProcessCMPS_string(OPCode::string, false, true);
+	else if (actual == "CMPSB") return TryProcessNoArgOp(OPCode::string, true, (4 << 2) | 0);
+	else if (actual == "CMPSW") return TryProcessNoArgOp(OPCode::string, true, (4 << 2) | 1);
+	else if (actual == "CMPSD") return TryProcessNoArgOp(OPCode::string, true, (4 << 2) | 2);
+	else if (actual == "CMPSQ") return TryProcessNoArgOp(OPCode::string, true, (4 << 2) | 3);
+	// otherwise this is illegal usage of REP
+	else { res = {AssembleError::UsageError, "line " + tostr(line) + ": REPNE cannot be used with the specified instruction"}; return false; }
 }
 
 bool AssembleArgs::TryProcessFPUBinaryOp(OPCode op, bool integral, bool pop)

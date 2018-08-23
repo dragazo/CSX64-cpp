@@ -286,15 +286,15 @@ namespace CSX64
 			ostr << "RSI: " << std::setw(16) << RSI() << "     SF: " << SF() << "     ST1: " << ST(1) << '\n';
 			ostr << "RDI: " << std::setw(16) << RDI() << "     OF: " << OF() << "     ST2: " << ST(2) << '\n';
 			ostr << "RBP: " << std::setw(16) << RBP() << "               ST3: " << ST(3) << '\n';
-			ostr << "RSP: " << std::setw(16) << RSP() << "     b:  " << CF() << "     ST4: " << ST(4) << '\n';
-			ostr << "R8:  " << std::setw(16) << R8() << "     be: " << CF() << "     ST5: " << ST(5) << '\n';
-			ostr << "R9:  " << std::setw(16) << R9() << "     a:  " << CF() << "     ST6: " << ST(6) << '\n';
-			ostr << "R10: " << std::setw(16) << R10() << "     ae: " << CF() << "     ST7: " << ST(7) << '\n';
+			ostr << "RSP: " << std::setw(16) << RSP() << "     b:  " << cc_b() << "     ST4: " << ST(4) << '\n';
+			ostr << "R8:  " << std::setw(16) << R8() << "     be: " << cc_be() << "     ST5: " << ST(5) << '\n';
+			ostr << "R9:  " << std::setw(16) << R9() << "     a:  " << cc_a() << "     ST6: " << ST(6) << '\n';
+			ostr << "R10: " << std::setw(16) << R10() << "     ae: " << cc_ae() << "     ST7: " << ST(7) << '\n';
 			ostr << "R11: " << std::setw(16) << R11() << '\n';
-			ostr << "R12: " << std::setw(16) << R12() << "     l:  " << CF() << "     C0: " << FPU_C0() << '\n';
-			ostr << "R13: " << std::setw(16) << R13() << "     le: " << CF() << "     C1: " << FPU_C1() << '\n';
-			ostr << "R14: " << std::setw(16) << R14() << "     g:  " << CF() << "     C2: " << FPU_C2() << '\n';
-			ostr << "R15: " << std::setw(16) << R15() << "     ge: " << CF() << "     C3: " << FPU_C3() << '\n';
+			ostr << "R12: " << std::setw(16) << R12() << "     l:  " << cc_l() << "     C0: " << FPU_C0() << '\n';
+			ostr << "R13: " << std::setw(16) << R13() << "     le: " << cc_le() << "     C1: " << FPU_C1() << '\n';
+			ostr << "R14: " << std::setw(16) << R14() << "     g:  " << cc_g() << "     C2: " << FPU_C2() << '\n';
+			ostr << "R15: " << std::setw(16) << R15() << "     ge: " << cc_ge() << "     C3: " << FPU_C3() << '\n';
 
 			ostr.flags(flags);
 			return ostr;
@@ -2501,37 +2501,43 @@ namespace CSX64
 		// helper for MOVS - performs the actual move
 		inline bool __ProcessSTRING_MOVS(u64 sizecode)
 		{
+			u64 size = Size(sizecode);
 			u64 temp;
 
-			switch (sizecode)
-			{
-			case 0:
-				if (!GetMemRaw<u8>(RSI(), temp) || !SetMemRaw<u8>(RDI(), temp)) return false;
-				if (DF()) { --RSI(); --RDI(); }
-				else { ++RSI(); ++RDI(); }
-				return true;
-			case 1:
-				if (!GetMemRaw<u16>(RSI(), temp) || !SetMemRaw<u16>(RDI(), temp)) return false;
-				if (DF()) { RSI() -= 2; RDI() -= 2; }
-				else { RSI() += 2; RDI() += 2; }
-				return true;
-			case 2: if (!GetMemRaw<u32>(RSI(), temp) || !SetMemRaw<u32>(RDI(), temp)) return false;
-				if (DF()) { RSI() -= 4; RDI() -= 4; }
-				else { RSI() += 4; RDI() += 4; }
-				return true;
-			case 3: if (!GetMemRaw<u64>(RSI(), temp) || !SetMemRaw<u64>(RDI(), temp)) return false;
-				if (DF()) { RSI() -= 8; RDI() -= 8; }
-				else { RSI() += 8; RDI() += 8; }
-				return true;
+			if (!GetMemRaw(RSI(), size, temp) || !SetMemRaw(RDI(), size, temp)) return false;
 
-			// just to be on the safe side
-			default: throw std::domain_error("provided sizecode was out of range");
-			}
+			if (DF()) { RSI() -= size; RDI() -= size; }
+			else { RSI() += size; RDI() += size; }
+
+			return true;
+		}
+		inline bool __ProcessSTRING_CMPS(u64 sizecode)
+		{
+			u64 size = Size(sizecode);
+			u64 a, b;
+
+			if (!GetMemRaw(RSI(), size, a) || !GetMemRaw(RDI(), size, b)) return false;
+
+			if (DF()) { RSI() -= size; RDI() -= size; }
+			else { RSI() += size; RDI() += size; }
+
+			u64 res = a - b;
+
+			// update flags
+			UpdateFlagsZSP(res, sizecode);
+			CF() = a < b; // if a < b, a borrow was taken from the highest bit
+			AF() = (a & 0xf) < (b & 0xf); // AF is just like CF but only the low nibble
+			OF() = Negative(a ^ b, sizecode) && Negative(a ^ res, sizecode); // overflow if sign(a)!=sign(b) and sign(a)!=sign(res)
+
+			return true;
 		}
 		/*
 		[6: mode][2: size]
-			mode = 0:     MOVS
-			mode = 1: REP MOVS
+			mode = 0:       MOVS
+			mode = 1: REP   MOVS
+			mode = 2:       CMPS
+			mode = 3: REPE  CMPS
+			mode = 4: REPNE CMPS
 			else UND
 		*/
 		bool ProcessSTRING()
@@ -2541,7 +2547,7 @@ namespace CSX64
 			u64 sizecode = s & 3;
 			
 			// switch through mode
-			switch ((s >> 2) & 7)
+			switch (s >> 2)
 			{
 			case 0: // MOVS
 				if (!__ProcessSTRING_MOVS(sizecode)) return false;
@@ -2552,8 +2558,11 @@ namespace CSX64
 				// if we can do the whole thing in a single tick
 				if (OTRF())
 				{
-					for (; RCX(); --RCX())
+					while (RCX())
+					{
 						if (!__ProcessSTRING_MOVS(sizecode)) return false;
+						--RCX();
+					}
 				}
 				// otherwise perform a single iteration (if count is nonzero)
 				else if (RCX())
@@ -2561,8 +2570,53 @@ namespace CSX64
 					if (!__ProcessSTRING_MOVS(sizecode)) return false;
 					--RCX();
 
-					// reset RIP to repeat instruction
-					RIP() -= 2;
+					RIP() -= 2; // reset RIP to repeat instruction
+				}
+				break;
+
+			case 2: // CMPS
+				if (!__ProcessSTRING_CMPS(sizecode)) return false;
+				break;
+
+			case 3: // REPE CMPS
+
+				// if we can do the whole thing in a single tick
+				if (OTRF())
+				{
+					while (RCX())
+					{
+						if (!__ProcessSTRING_CMPS(sizecode)) return false;
+						--RCX();
+						if (!ZF()) break;
+					}
+				}
+				// otherwise perform a single iteration (if count is nonzero)
+				else if (RCX())
+				{
+					if (!__ProcessSTRING_CMPS(sizecode)) return false;
+					--RCX();
+					if (ZF()) RIP() -= 2; // if condition met, reset RIP to repeat instruction
+				}
+				break;
+
+			case 4: // REPNE CMPS
+
+				// if we can do the whole thing in a single tick
+				if (OTRF())
+				{
+					while (RCX())
+					{
+						if (!__ProcessSTRING_CMPS(sizecode)) return false;
+						--RCX();
+						if (ZF()) break;
+					}
+				}
+				// otherwise perform a single iteration (if count is nonzero)
+				else if (RCX())
+				{
+					if (!__ProcessSTRING_CMPS(sizecode)) return false;
+					--RCX();
+					if (!ZF()) RIP() -= 2; // if condition met, reset RIP to repeat instruction
 				}
 				break;
 

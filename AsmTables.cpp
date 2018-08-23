@@ -249,7 +249,11 @@ namespace CSX64
 
 	const std::unordered_map<std::string, asm_router> asm_routing_table
 	{
+		// ---------------- //
+
 		// -- directives -- //
+
+		// ---------------- //
 
 		{"GLOBAL", asm_router_GLOBAL},
 	{"EXTERN", asm_router_EXTERN},
@@ -285,7 +289,11 @@ namespace CSX64
 	{"SEGMENT", asm_router_SEGMENT},
 	{"SECTION", asm_router_SEGMENT},
 
+	// --------- //
+
 	// -- x86 -- //
+
+	// --------- //
 
 	{"NOP", asm_router_NOP},
 
@@ -503,10 +511,27 @@ namespace CSX64
 	// MOVSD (string) requires disambiguation
 	{"MOVSQ", asm_router_MOVSQ},
 
-	// REP pseudo-instruction - will extract the actual instruction internally
+	{"CMPS", asm_router_CMPS},
+
+	{"CMPSB", asm_router_CMPSB},
+	{"CMPSW", asm_router_CMPSW},
+	{"CMPSD", asm_router_CMPSD},
+	{"CMPSQ", asm_router_CMPSQ},
+
+	// REP pseudo-instructions - will extract the actual instruction internally
 	{"REP", asm_router_REP},
 
+	{"REPE", asm_router_REPE},
+	{"REPZ", asm_router_REPE},
+
+	{"REPNE", asm_router_REPNE},
+	{"REPNZ", asm_router_REPNE},
+
+	// --------- //
+
 	// -- x87 -- //
+
+	// --------- //
 
 	{"FNOP", asm_router_FNOP},
 
@@ -624,6 +649,12 @@ namespace CSX64
 	{"FDECSTP", asm_router_FDECSTP},
 
 	{"FFREE", asm_router_FFREE},
+
+	// ------------- //
+
+	// -- vec ops -- //
+
+	// ------------- //
 
 	{"MOVQ", asm_router_MOVQ},
 	{"MOVD", asm_router_MOVD},
@@ -757,13 +788,21 @@ namespace CSX64
 	{"PAVGW", asm_router_PAVGW},
 	{"PAVGB", asm_router_PAVGB},
 
+	// ---------------- //
+
 	// -- CSX64 misc -- //
+
+	// ---------------- //
 
 	{"DEBUG_CPU", asm_router_DEBUG_CPU},
 	{"DEBUG_VPU", asm_router_DEBUG_VPU},
 	{"DEBUG_FULL", asm_router_DEBUG_FULL},
 
+	// -------------------- //
+
 	// -- disambiguators -- //
+
+	// -------------------- //
 
 	{"MOVS", asm_router_MOVS_disambig},
 

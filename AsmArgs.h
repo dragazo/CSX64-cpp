@@ -147,9 +147,14 @@ namespace CSX64
 
 		// gets the sizecode specified by a binary string operation (e.g. MOVS (string))
 		bool __TryGetStringOpSize(u64 &sizecode);
-		bool TryProcessMOVS_string(OPCode op, bool rep);
 
+		bool TryProcessMOVS_string(OPCode op, bool rep);
+		bool TryProcessCMPS_string(OPCode op, bool repe, bool repne);
+
+		bool __TryProcessREP_init(std::string &actual);
 		bool TryProcessREP();
+		bool TryProcessREPE();
+		bool TryProcessREPNE();
 
 		// -- x87 op formats -- //
 
