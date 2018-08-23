@@ -2521,7 +2521,7 @@ namespace CSX64
 			if (DF()) { RSI() -= size; RDI() -= size; }
 			else { RSI() += size; RDI() += size; }
 
-			u64 res = a - b;
+			u64 res = Truncate(a - b, sizecode);
 
 			// update flags
 			UpdateFlagsZSP(res, sizecode);
