@@ -1900,6 +1900,23 @@ bool AssembleArgs::TryProcessSTOS_string(OPCode op, bool rep)
 
 	return true;
 }
+bool AssembleArgs::TryProcessSCAS_string(OPCode op, bool repe, bool repne)
+{
+	if (args.size() != 1) { res = {AssembleError::ArgCount, "line " + tostr(line) + ": Expected 1 operand"}; return false; }
+
+	// takes one memory operand of a standard size
+	u64 a, b, sizecode;
+	Expr ptr_base;
+	bool explicit_size;
+	if (!TryParseAddress(args[0], a, b, ptr_base, sizecode, explicit_size)) return false;
+	if (!explicit_size) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Could not deduce operand size"}; return false; }
+	if (sizecode > 3) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Specified operand size is not supported"}; return false; }
+
+	if (!TryAppendByte((u8)op)) return false;
+	if (!TryAppendByte((u8)(((repne ? 11 : repe ? 10 : 9) << 2) | sizecode))) return false;
+
+	return true;
+}
 
 bool AssembleArgs::__TryProcessREP_init(std::string &actual)
 {
@@ -1959,6 +1976,13 @@ bool AssembleArgs::TryProcessREPE()
 	else if (actual == "CMPSW") return TryProcessNoArgOp(OPCode::string, true, (3 << 2) | 1);
 	else if (actual == "CMPSD") return TryProcessNoArgOp(OPCode::string, true, (3 << 2) | 2);
 	else if (actual == "CMPSQ") return TryProcessNoArgOp(OPCode::string, true, (3 << 2) | 3);
+
+	else if (actual == "SCAS") return TryProcessSCAS_string(OPCode::string, true, false);
+	else if (actual == "SCASB") return TryProcessNoArgOp(OPCode::string, true, (10 << 2) | 0);
+	else if (actual == "SCASW") return TryProcessNoArgOp(OPCode::string, true, (10 << 2) | 1);
+	else if (actual == "SCASD") return TryProcessNoArgOp(OPCode::string, true, (10 << 2) | 2);
+	else if (actual == "SCASQ") return TryProcessNoArgOp(OPCode::string, true, (10 << 2) | 3);
+
 	// otherwise this is illegal usage of REP
 	else { res = {AssembleError::UsageError, "line " + tostr(line) + ": REPE cannot be used with the specified instruction"}; return false; }
 }
@@ -1974,6 +1998,13 @@ bool AssembleArgs::TryProcessREPNE()
 	else if (actual == "CMPSW") return TryProcessNoArgOp(OPCode::string, true, (4 << 2) | 1);
 	else if (actual == "CMPSD") return TryProcessNoArgOp(OPCode::string, true, (4 << 2) | 2);
 	else if (actual == "CMPSQ") return TryProcessNoArgOp(OPCode::string, true, (4 << 2) | 3);
+
+	else if (actual == "SCAS") return TryProcessSCAS_string(OPCode::string, false, true);
+	else if (actual == "SCASB") return TryProcessNoArgOp(OPCode::string, true, (11 << 2) | 0);
+	else if (actual == "SCASW") return TryProcessNoArgOp(OPCode::string, true, (11 << 2) | 1);
+	else if (actual == "SCASD") return TryProcessNoArgOp(OPCode::string, true, (11 << 2) | 2);
+	else if (actual == "SCASQ") return TryProcessNoArgOp(OPCode::string, true, (11 << 2) | 3);
+
 	// otherwise this is illegal usage of REP
 	else { res = {AssembleError::UsageError, "line " + tostr(line) + ": REPNE cannot be used with the specified instruction"}; return false; }
 }

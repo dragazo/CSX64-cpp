@@ -273,6 +273,12 @@ namespace CSX64
 	inline bool asm_router_STOSD(AssembleArgs &args) { return args.TryProcessNoArgOp(OPCode::string, true, (7 << 2) | 2); }
 	inline bool asm_router_STOSQ(AssembleArgs &args) { return args.TryProcessNoArgOp(OPCode::string, true, (7 << 2) | 3); }
 
+	inline bool asm_router_SCAS(AssembleArgs &args) { return args.TryProcessSCAS_string(OPCode::string, false, false); }
+	inline bool asm_router_SCASB(AssembleArgs &args) { return args.TryProcessNoArgOp(OPCode::string, true, (9 << 2) | 0); }
+	inline bool asm_router_SCASW(AssembleArgs &args) { return args.TryProcessNoArgOp(OPCode::string, true, (9 << 2) | 1); }
+	inline bool asm_router_SCASD(AssembleArgs &args) { return args.TryProcessNoArgOp(OPCode::string, true, (9 << 2) | 2); }
+	inline bool asm_router_SCASQ(AssembleArgs &args) { return args.TryProcessNoArgOp(OPCode::string, true, (9 << 2) | 3); }
+
 	inline bool asm_router_REP(AssembleArgs &args) { return args.TryProcessREP(); }
 	inline bool asm_router_REPE(AssembleArgs &args) { return args.TryProcessREPE(); }
 	inline bool asm_router_REPNE(AssembleArgs &args) { return args.TryProcessREPNE(); }

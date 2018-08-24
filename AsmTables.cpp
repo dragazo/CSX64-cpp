@@ -528,6 +528,12 @@ namespace CSX64
 	{"STOSD", asm_router_STOSD},
 	{"STOSQ", asm_router_STOSQ},
 
+	{"SCAS", asm_router_SCAS},
+	{"SCASB", asm_router_SCASB},
+	{"SCASW", asm_router_SCASW},
+	{"SCASD", asm_router_SCASD},
+	{"SCASQ", asm_router_SCASQ},
+
 	// REP pseudo-instructions - will extract the actual instruction internally
 	{"REP", asm_router_REP},
 
