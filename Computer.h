@@ -2571,7 +2571,7 @@ namespace CSX64
 		*/
 		bool ProcessSTRING()
 		{
-			u64 s, temp;
+			u64 s;
 			if (!GetMemAdv<u8>(s)) return false;
 			u64 sizecode = s & 3;
 			

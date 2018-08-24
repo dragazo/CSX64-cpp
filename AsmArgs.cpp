@@ -1824,7 +1824,7 @@ bool AssembleArgs::TryProcessMOVxX(OPCode op, bool sign)
 	return true;
 }
 
-bool AssembleArgs::__TryGetStringOpSize(u64 &sizecode)
+bool AssembleArgs::__TryGetBinaryStringOpSize(u64 &sizecode)
 {
 	// must have 2 args
 	if (args.size() != 2) { res = {AssembleError::ArgCount, "line " + tostr(line) + ": Expected 2 operands"}; return false; }
@@ -1850,7 +1850,7 @@ bool AssembleArgs::__TryGetStringOpSize(u64 &sizecode)
 bool AssembleArgs::TryProcessMOVS_string(OPCode op, bool rep)
 {
 	u64 sizecode;
-	if (!__TryGetStringOpSize(sizecode)) return false;
+	if (!__TryGetBinaryStringOpSize(sizecode)) return false;
 	
 	if (!TryAppendByte((u8)op)) return false;
 	if (!TryAppendByte((u8)(((rep ? 1 : 0) << 2) | sizecode))) return false;
@@ -1860,7 +1860,7 @@ bool AssembleArgs::TryProcessMOVS_string(OPCode op, bool rep)
 bool AssembleArgs::TryProcessCMPS_string(OPCode op, bool repe, bool repne)
 {
 	u64 sizecode;
-	if (!__TryGetStringOpSize(sizecode)) return false;
+	if (!__TryGetBinaryStringOpSize(sizecode)) return false;
 
 	if (!TryAppendByte((u8)op)) return false;
 	if (!TryAppendByte((u8)(((repne ? 4 : repe ? 3 : 2) << 2) | sizecode))) return false;
@@ -1869,8 +1869,14 @@ bool AssembleArgs::TryProcessCMPS_string(OPCode op, bool repe, bool repne)
 }
 bool AssembleArgs::TryProcessLODS_string(OPCode op, bool rep)
 {
-	u64 sizecode;
-	if (!__TryGetStringOpSize(sizecode)) return false;
+	if (args.size() != 1) { res = {AssembleError::ArgCount, "line " + tostr(line) + ": Expected 1 operand"}; return false; }
+
+	// takes one cpu register that is a partition of RAX (may not be AH)
+	u64 reg, sizecode;
+	bool high;
+	if (!TryParseCPURegister(args[0], reg, sizecode, high)) return false;
+	if (reg != 0) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Operand must be a partition of RAX"}; return false; }
+	if (high) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Operand may not be AH"}; return false; }
 
 	if (!TryAppendByte((u8)op)) return false;
 	if (!TryAppendByte((u8)(((rep ? 6 : 5) << 2) | sizecode))) return false;
@@ -1879,8 +1885,15 @@ bool AssembleArgs::TryProcessLODS_string(OPCode op, bool rep)
 }
 bool AssembleArgs::TryProcessSTOS_string(OPCode op, bool rep)
 {
-	u64 sizecode;
-	if (!__TryGetStringOpSize(sizecode)) return false;
+	if (args.size() != 1) { res = {AssembleError::ArgCount, "line " + tostr(line) + ": Expected 1 operand"}; return false; }
+
+	// takes one memory operand of a standard size
+	u64 a, b, sizecode;
+	Expr ptr_base;
+	bool explicit_size;
+	if (!TryParseAddress(args[0], a, b, ptr_base, sizecode, explicit_size)) return false;
+	if (!explicit_size) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Could not deduce operand size"}; return false; }
+	if (sizecode > 3) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Specified operand size is not supported"}; return false; }
 
 	if (!TryAppendByte((u8)op)) return false;
 	if (!TryAppendByte((u8)(((rep ? 8 : 7) << 2) | sizecode))) return false;
