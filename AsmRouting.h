@@ -250,18 +250,28 @@ namespace CSX64
 	inline bool asm_router_AAS(AssembleArgs &args) { return args.TryProcessNoArgOp(OPCode::AAX, true, 1); }
 
 	// MOVS (string) requires disambiguation
-
 	inline bool asm_router_MOVSB(AssembleArgs &args) { return args.TryProcessNoArgOp(OPCode::string, true, 0); }
 	inline bool asm_router_MOVSW(AssembleArgs &args) { return args.TryProcessNoArgOp(OPCode::string, true, 1); }
 	// MOVSD (string) requires disambiguation
 	inline bool asm_router_MOVSQ(AssembleArgs &args) { return args.TryProcessNoArgOp(OPCode::string, true, 3); }
 
 	inline bool asm_router_CMPS(AssembleArgs &args) { return args.TryProcessCMPS_string(OPCode::string, false, false); }
-
 	inline bool asm_router_CMPSB(AssembleArgs &args) { return args.TryProcessNoArgOp(OPCode::string, true, (2 << 2) | 0); }
 	inline bool asm_router_CMPSW(AssembleArgs &args) { return args.TryProcessNoArgOp(OPCode::string, true, (2 << 2) | 1); }
 	inline bool asm_router_CMPSD(AssembleArgs &args) { return args.TryProcessNoArgOp(OPCode::string, true, (2 << 2) | 2); }
 	inline bool asm_router_CMPSQ(AssembleArgs &args) { return args.TryProcessNoArgOp(OPCode::string, true, (2 << 2) | 3); }
+
+	inline bool asm_router_LODS(AssembleArgs &args) { return args.TryProcessLODS_string(OPCode::string, false); }
+	inline bool asm_router_LODSB(AssembleArgs &args) { return args.TryProcessNoArgOp(OPCode::string, true, (5 << 2) | 0); }
+	inline bool asm_router_LODSW(AssembleArgs &args) { return args.TryProcessNoArgOp(OPCode::string, true, (5 << 2) | 1); }
+	inline bool asm_router_LODSD(AssembleArgs &args) { return args.TryProcessNoArgOp(OPCode::string, true, (5 << 2) | 2); }
+	inline bool asm_router_LODSQ(AssembleArgs &args) { return args.TryProcessNoArgOp(OPCode::string, true, (5 << 2) | 3); }
+
+	inline bool asm_router_STOS(AssembleArgs &args) { return args.TryProcessSTOS_string(OPCode::string, false); }
+	inline bool asm_router_STOSB(AssembleArgs &args) { return args.TryProcessNoArgOp(OPCode::string, true, (7 << 2) | 0); }
+	inline bool asm_router_STOSW(AssembleArgs &args) { return args.TryProcessNoArgOp(OPCode::string, true, (7 << 2) | 1); }
+	inline bool asm_router_STOSD(AssembleArgs &args) { return args.TryProcessNoArgOp(OPCode::string, true, (7 << 2) | 2); }
+	inline bool asm_router_STOSQ(AssembleArgs &args) { return args.TryProcessNoArgOp(OPCode::string, true, (7 << 2) | 3); }
 
 	inline bool asm_router_REP(AssembleArgs &args) { return args.TryProcessREP(); }
 	inline bool asm_router_REPE(AssembleArgs &args) { return args.TryProcessREPE(); }

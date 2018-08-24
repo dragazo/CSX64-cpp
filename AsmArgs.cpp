@@ -1867,6 +1867,26 @@ bool AssembleArgs::TryProcessCMPS_string(OPCode op, bool repe, bool repne)
 
 	return true;
 }
+bool AssembleArgs::TryProcessLODS_string(OPCode op, bool rep)
+{
+	u64 sizecode;
+	if (!__TryGetStringOpSize(sizecode)) return false;
+
+	if (!TryAppendByte((u8)op)) return false;
+	if (!TryAppendByte((u8)(((rep ? 6 : 5) << 2) | sizecode))) return false;
+
+	return true;
+}
+bool AssembleArgs::TryProcessSTOS_string(OPCode op, bool rep)
+{
+	u64 sizecode;
+	if (!__TryGetStringOpSize(sizecode)) return false;
+
+	if (!TryAppendByte((u8)op)) return false;
+	if (!TryAppendByte((u8)(((rep ? 8 : 7) << 2) | sizecode))) return false;
+
+	return true;
+}
 
 bool AssembleArgs::__TryProcessREP_init(std::string &actual)
 {
@@ -1898,6 +1918,19 @@ bool AssembleArgs::TryProcessREP()
 	else if (actual == "MOVSW") return TryProcessNoArgOp(OPCode::string, true, (1 << 2) | 1);
 	else if (actual == "MOVSD") return TryProcessNoArgOp(OPCode::string, true, (1 << 2) | 2);
 	else if (actual == "MOVSQ") return TryProcessNoArgOp(OPCode::string, true, (1 << 2) | 3);
+
+	else if (actual == "LODS") return TryProcessLODS_string(OPCode::string, true);
+	else if (actual == "LODSB") return TryProcessNoArgOp(OPCode::string, true, (6 << 2) | 0);
+	else if (actual == "LODSW") return TryProcessNoArgOp(OPCode::string, true, (6 << 2) | 1);
+	else if (actual == "LODSD") return TryProcessNoArgOp(OPCode::string, true, (6 << 2) | 2);
+	else if (actual == "LODSQ") return TryProcessNoArgOp(OPCode::string, true, (6 << 2) | 3);
+
+	else if (actual == "STOS") return TryProcessSTOS_string(OPCode::string, true);
+	else if (actual == "STOSB") return TryProcessNoArgOp(OPCode::string, true, (8 << 2) | 0);
+	else if (actual == "STOSW") return TryProcessNoArgOp(OPCode::string, true, (8 << 2) | 1);
+	else if (actual == "STOSD") return TryProcessNoArgOp(OPCode::string, true, (8 << 2) | 2);
+	else if (actual == "STOSQ") return TryProcessNoArgOp(OPCode::string, true, (8 << 2) | 3);
+
 	// otherwise this is illegal usage of REP
 	else { res = {AssembleError::UsageError, "line " + tostr(line) + ": REP cannot be used with the specified instruction"}; return false; }
 }

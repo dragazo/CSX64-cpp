@@ -150,6 +150,8 @@ namespace CSX64
 
 		bool TryProcessMOVS_string(OPCode op, bool rep);
 		bool TryProcessCMPS_string(OPCode op, bool repe, bool repne);
+		bool TryProcessLODS_string(OPCode op, bool rep);
+		bool TryProcessSTOS_string(OPCode op, bool rep);
 
 		bool __TryProcessREP_init(std::string &actual);
 		bool TryProcessREP();

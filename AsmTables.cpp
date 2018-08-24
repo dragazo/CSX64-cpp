@@ -505,18 +505,28 @@ namespace CSX64
 	{"AAS", asm_router_AAS},
 
 	// MOVS (string) requires disambiguation
-
 	{"MOVSB", asm_router_MOVSB},
 	{"MOVSW", asm_router_MOVSW},
 	// MOVSD (string) requires disambiguation
 	{"MOVSQ", asm_router_MOVSQ},
 
 	{"CMPS", asm_router_CMPS},
-
 	{"CMPSB", asm_router_CMPSB},
 	{"CMPSW", asm_router_CMPSW},
 	{"CMPSD", asm_router_CMPSD},
 	{"CMPSQ", asm_router_CMPSQ},
+
+	{"LODS", asm_router_LODS},
+	{"LODSB", asm_router_LODSB},
+	{"LODSW", asm_router_LODSW},
+	{"LODSD", asm_router_LODSD},
+	{"LODSQ", asm_router_LODSQ},
+
+	{"STOS", asm_router_STOS},
+	{"STOSB", asm_router_STOSB},
+	{"STOSW", asm_router_STOSW},
+	{"STOSD", asm_router_STOSD},
+	{"STOSQ", asm_router_STOSQ},
 
 	// REP pseudo-instructions - will extract the actual instruction internally
 	{"REP", asm_router_REP},
