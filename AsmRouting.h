@@ -258,7 +258,7 @@ namespace CSX64
 	inline bool asm_router_CMPS(AssembleArgs &args) { return args.TryProcessCMPS_string(OPCode::string, false, false); }
 	inline bool asm_router_CMPSB(AssembleArgs &args) { return args.TryProcessNoArgOp(OPCode::string, true, (2 << 2) | 0); }
 	inline bool asm_router_CMPSW(AssembleArgs &args) { return args.TryProcessNoArgOp(OPCode::string, true, (2 << 2) | 1); }
-	inline bool asm_router_CMPSD(AssembleArgs &args) { return args.TryProcessNoArgOp(OPCode::string, true, (2 << 2) | 2); }
+	// CMPSD (string) requires disambiguation
 	inline bool asm_router_CMPSQ(AssembleArgs &args) { return args.TryProcessNoArgOp(OPCode::string, true, (2 << 2) | 3); }
 
 	inline bool asm_router_LODS(AssembleArgs &args) { return args.TryProcessLODS_string(OPCode::string, false); }
@@ -540,6 +540,148 @@ namespace CSX64
 	inline bool asm_router_PAVGW(AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_AVG, 1, true, true, false); }
 	inline bool asm_router_PAVGB(AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_AVG, 0, true, true, false); }
 
+	inline bool asm_router_CMPPD(AssembleArgs &args) { return args.TryProcessVPU_FCMP(OPCode::VPU_FCMP, 3, true, true, false); }
+	inline bool asm_router_CMPPS(AssembleArgs &args) { return args.TryProcessVPU_FCMP(OPCode::VPU_FCMP, 2, true, true, false); }
+
+	// CMPSD (vec) requires disambiguation
+	inline bool asm_router_CMPSS(AssembleArgs &args) { return args.TryProcessVPU_FCMP(OPCode::VPU_FCMP, 2, false, false, true); }
+
+	// packed double comparisons
+	inline bool asm_router_CMPEQPD(AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 3, true, true, false, true, 0); }
+	inline bool asm_router_CMPLTPD(AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 3, true, true, false, true, 1); }
+	inline bool asm_router_CMPLEPD(AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 3, true, true, false, true, 2); }
+	inline bool asm_router_CMPUNORDPD(AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 3, true, true, false, true, 3); }
+	inline bool asm_router_CMPNEQPD(AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 3, true, true, false, true, 4); }
+	inline bool asm_router_CMPNLTPD(AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 3, true, true, false, true, 5); }
+	inline bool asm_router_CMPNLEPD(AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 3, true, true, false, true, 6); }
+	inline bool asm_router_CMPORDPD(AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 3, true, true, false, true, 7); }
+	inline bool asm_router_CMPEQ_UQPD(AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 3, true, true, false, true, 8); }
+	inline bool asm_router_CMPNGEPD(AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 3, true, true, false, true, 9); }
+	inline bool asm_router_CMPNGTPD(AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 3, true, true, false, true, 10); }
+	inline bool asm_router_CMPFALSEPD(AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 3, true, true, false, true, 11); }
+	inline bool asm_router_CMPNEQ_OQPD(AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 3, true, true, false, true, 12); }
+	inline bool asm_router_CMPGEPD(AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 3, true, true, false, true, 13); }
+	inline bool asm_router_CMPGTPD(AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 3, true, true, false, true, 14); }
+	inline bool asm_router_CMPTRUEPD(AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 3, true, true, false, true, 15); }
+	inline bool asm_router_CMPEQ_OSPD(AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 3, true, true, false, true, 16); }
+	inline bool asm_router_CMPLT_OQPD(AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 3, true, true, false, true, 17); }
+	inline bool asm_router_CMPLE_OQPD(AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 3, true, true, false, true, 18); }
+	inline bool asm_router_CMPUNORD_SPD(AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 3, true, true, false, true, 19); }
+	inline bool asm_router_CMPNEQ_USPD(AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 3, true, true, false, true, 20); }
+	inline bool asm_router_CMPNLT_UQPD(AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 3, true, true, false, true, 21); }
+	inline bool asm_router_CMPNLE_UQPD(AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 3, true, true, false, true, 22); }
+	inline bool asm_router_CMPORD_SPD(AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 3, true, true, false, true, 23); }
+	inline bool asm_router_CMPEQ_USPD(AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 3, true, true, false, true, 24); }
+	inline bool asm_router_CMPNGE_UQPD(AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 3, true, true, false, true, 25); }
+	inline bool asm_router_CMPNGT_UQPD(AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 3, true, true, false, true, 26); }
+	inline bool asm_router_CMPFALSE_OSPD(AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 3, true, true, false, true, 27); }
+	inline bool asm_router_CMPNEQ_OSPD(AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 3, true, true, false, true, 28); }
+	inline bool asm_router_CMPGE_OQPD(AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 3, true, true, false, true, 29); }
+	inline bool asm_router_CMPGT_OQPD(AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 3, true, true, false, true, 30); }
+	inline bool asm_router_CMPTRUE_USPD(AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 3, true, true, false, true, 31); }
+	
+	// packed single comparisons
+	inline bool asm_router_CMPEQPS(AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 2, true, true, false, true, 0); }
+	inline bool asm_router_CMPLTPS(AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 2, true, true, false, true, 1); }
+	inline bool asm_router_CMPLEPS(AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 2, true, true, false, true, 2); }
+	inline bool asm_router_CMPUNORDPS(AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 2, true, true, false, true, 3); }
+	inline bool asm_router_CMPNEQPS(AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 2, true, true, false, true, 4); }
+	inline bool asm_router_CMPNLTPS(AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 2, true, true, false, true, 5); }
+	inline bool asm_router_CMPNLEPS(AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 2, true, true, false, true, 6); }
+	inline bool asm_router_CMPORDPS(AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 2, true, true, false, true, 7); }
+	inline bool asm_router_CMPEQ_UQPS(AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 2, true, true, false, true, 8); }
+	inline bool asm_router_CMPNGEPS(AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 2, true, true, false, true, 9); }
+	inline bool asm_router_CMPNGTPS(AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 2, true, true, false, true, 10); }
+	inline bool asm_router_CMPFALSEPS(AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 2, true, true, false, true, 11); }
+	inline bool asm_router_CMPNEQ_OQPS(AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 2, true, true, false, true, 12); }
+	inline bool asm_router_CMPGEPS(AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 2, true, true, false, true, 13); }
+	inline bool asm_router_CMPGTPS(AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 2, true, true, false, true, 14); }
+	inline bool asm_router_CMPTRUEPS(AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 2, true, true, false, true, 15); }
+	inline bool asm_router_CMPEQ_OSPS(AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 2, true, true, false, true, 16); }
+	inline bool asm_router_CMPLT_OQPS(AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 2, true, true, false, true, 17); }
+	inline bool asm_router_CMPLE_OQPS(AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 2, true, true, false, true, 18); }
+	inline bool asm_router_CMPUNORD_SPS(AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 2, true, true, false, true, 19); }
+	inline bool asm_router_CMPNEQ_USPS(AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 2, true, true, false, true, 20); }
+	inline bool asm_router_CMPNLT_UQPS(AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 2, true, true, false, true, 21); }
+	inline bool asm_router_CMPNLE_UQPS(AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 2, true, true, false, true, 22); }
+	inline bool asm_router_CMPORD_SPS(AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 2, true, true, false, true, 23); }
+	inline bool asm_router_CMPEQ_USPS(AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 2, true, true, false, true, 24); }
+	inline bool asm_router_CMPNGE_UQPS(AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 2, true, true, false, true, 25); }
+	inline bool asm_router_CMPNGT_UQPS(AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 2, true, true, false, true, 26); }
+	inline bool asm_router_CMPFALSE_OSPS(AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 2, true, true, false, true, 27); }
+	inline bool asm_router_CMPNEQ_OSPS(AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 2, true, true, false, true, 28); }
+	inline bool asm_router_CMPGE_OQPS(AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 2, true, true, false, true, 29); }
+	inline bool asm_router_CMPGT_OQPS(AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 2, true, true, false, true, 30); }
+	inline bool asm_router_CMPTRUE_USPS(AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 2, true, true, false, true, 31); }
+
+	// scalar double comparisons
+	inline bool asm_router_CMPEQSD(AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 3, false, false, true, true, 0); }
+	inline bool asm_router_CMPLTSD(AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 3, false, false, true, true, 1); }
+	inline bool asm_router_CMPLESD(AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 3, false, false, true, true, 2); }
+	inline bool asm_router_CMPUNORDSD(AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 3, false, false, true, true, 3); }
+	inline bool asm_router_CMPNEQSD(AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 3, false, false, true, true, 4); }
+	inline bool asm_router_CMPNLTSD(AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 3, false, false, true, true, 5); }
+	inline bool asm_router_CMPNLESD(AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 3, false, false, true, true, 6); }
+	inline bool asm_router_CMPORDSD(AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 3, false, false, true, true, 7); }
+	inline bool asm_router_CMPEQ_UQSD(AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 3, false, false, true, true, 8); }
+	inline bool asm_router_CMPNGESD(AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 3, false, false, true, true, 9); }
+	inline bool asm_router_CMPNGTSD(AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 3, false, false, true, true, 10); }
+	inline bool asm_router_CMPFALSESD(AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 3, false, false, true, true, 11); }
+	inline bool asm_router_CMPNEQ_OQSD(AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 3, false, false, true, true, 12); }
+	inline bool asm_router_CMPGESD(AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 3, false, false, true, true, 13); }
+	inline bool asm_router_CMPGTSD(AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 3, false, false, true, true, 14); }
+	inline bool asm_router_CMPTRUESD(AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 3, false, false, true, true, 15); }
+	inline bool asm_router_CMPEQ_OSSD(AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 3, false, false, true, true, 16); }
+	inline bool asm_router_CMPLT_OQSD(AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 3, false, false, true, true, 17); }
+	inline bool asm_router_CMPLE_OQSD(AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 3, false, false, true, true, 18); }
+	inline bool asm_router_CMPUNORD_SSD(AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 3, false, false, true, true, 19); }
+	inline bool asm_router_CMPNEQ_USSD(AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 3, false, false, true, true, 20); }
+	inline bool asm_router_CMPNLT_UQSD(AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 3, false, false, true, true, 21); }
+	inline bool asm_router_CMPNLE_UQSD(AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 3, false, false, true, true, 22); }
+	inline bool asm_router_CMPORD_SSD(AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 3, false, false, true, true, 23); }
+	inline bool asm_router_CMPEQ_USSD(AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 3, false, false, true, true, 24); }
+	inline bool asm_router_CMPNGE_UQSD(AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 3, false, false, true, true, 25); }
+	inline bool asm_router_CMPNGT_UQSD(AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 3, false, false, true, true, 26); }
+	inline bool asm_router_CMPFALSE_OSSD(AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 3, false, false, true, true, 27); }
+	inline bool asm_router_CMPNEQ_OSSD(AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 3, false, false, true, true, 28); }
+	inline bool asm_router_CMPGE_OQSD(AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 3, false, false, true, true, 29); }
+	inline bool asm_router_CMPGT_OQSD(AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 3, false, false, true, true, 30); }
+	inline bool asm_router_CMPTRUE_USSD(AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 3, false, false, true, true, 31); }
+
+	// scalar single comparisons
+	inline bool asm_router_CMPEQSS(AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 2, false, false, true, true, 0); }
+	inline bool asm_router_CMPLTSS(AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 2, false, false, true, true, 1); }
+	inline bool asm_router_CMPLESS(AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 2, false, false, true, true, 2); }
+	inline bool asm_router_CMPUNORDSS(AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 2, false, false, true, true, 3); }
+	inline bool asm_router_CMPNEQSS(AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 2, false, false, true, true, 4); }
+	inline bool asm_router_CMPNLTSS(AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 2, false, false, true, true, 5); }
+	inline bool asm_router_CMPNLESS(AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 2, false, false, true, true, 6); }
+	inline bool asm_router_CMPORDSS(AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 2, false, false, true, true, 7); }
+	inline bool asm_router_CMPEQ_UQSS(AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 2, false, false, true, true, 8); }
+	inline bool asm_router_CMPNGESS(AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 2, false, false, true, true, 9); }
+	inline bool asm_router_CMPNGTSS(AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 2, false, false, true, true, 10); }
+	inline bool asm_router_CMPFALSESS(AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 2, false, false, true, true, 11); }
+	inline bool asm_router_CMPNEQ_OQSS(AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 2, false, false, true, true, 12); }
+	inline bool asm_router_CMPGESS(AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 2, false, false, true, true, 13); }
+	inline bool asm_router_CMPGTSS(AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 2, false, false, true, true, 14); }
+	inline bool asm_router_CMPTRUESS(AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 2, false, false, true, true, 15); }
+	inline bool asm_router_CMPEQ_OSSS(AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 2, false, false, true, true, 16); }
+	inline bool asm_router_CMPLT_OQSS(AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 2, false, false, true, true, 17); }
+	inline bool asm_router_CMPLE_OQSS(AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 2, false, false, true, true, 18); }
+	inline bool asm_router_CMPUNORD_SSS(AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 2, false, false, true, true, 19); }
+	inline bool asm_router_CMPNEQ_USSS(AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 2, false, false, true, true, 20); }
+	inline bool asm_router_CMPNLT_UQSS(AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 2, false, false, true, true, 21); }
+	inline bool asm_router_CMPNLE_UQSS(AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 2, false, false, true, true, 22); }
+	inline bool asm_router_CMPORD_SSS(AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 2, false, false, true, true, 23); }
+	inline bool asm_router_CMPEQ_USSS(AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 2, false, false, true, true, 24); }
+	inline bool asm_router_CMPNGE_UQSS(AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 2, false, false, true, true, 25); }
+	inline bool asm_router_CMPNGT_UQSS(AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 2, false, false, true, true, 26); }
+	inline bool asm_router_CMPFALSE_OSSS(AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 2, false, false, true, true, 27); }
+	inline bool asm_router_CMPNEQ_OSSS(AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 2, false, false, true, true, 28); }
+	inline bool asm_router_CMPGE_OQSS(AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 2, false, false, true, true, 29); }
+	inline bool asm_router_CMPGT_OQSS(AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 2, false, false, true, true, 30); }
+	inline bool asm_router_CMPTRUE_USSS(AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 2, false, false, true, true, 31); }
+
 	// ---------------- //
 
 	// -- CSX64 misc -- //
@@ -577,9 +719,24 @@ namespace CSX64
 		{
 			return args.TryProcessNoArgOp(OPCode::string, true, 2);
 		}
+		// otherwise is MOVSD (vec)
 		else
 		{
 			return args.TryProcessVPUMove(OPCode::VPU_MOV, 3, false, false, true);
+		}
+	}
+
+	inline bool asm_router_CMPSD_disambig(AssembleArgs &args)
+	{
+		// CMPSD (string) takes no operands
+		if (args.args.size() == 0)
+		{
+			return args.TryProcessNoArgOp(OPCode::string, true, (2 << 2) | 2);
+		}
+		// otherwise is CMPSD (vec)
+		else
+		{
+			return args.TryProcessVPU_FCMP(OPCode::VPU_FCMP, 3, false, false, true);
 		}
 	}
 }

@@ -9,6 +9,8 @@ namespace CSX64
 
 	bool(Computer::* const Computer::opcode_handlers[256])() = 
 	{
+		// -- x86 instructions -- //
+
 		&Computer::ProcessNOP,
 
 		&Computer::ProcessHLT,
@@ -83,7 +85,7 @@ namespace CSX64
 
 		&Computer::ProcessSTRING,
 
-		// x87 instructions
+		// -- x87 instructions -- //
 
 		&Computer::ProcessNOP,
 
@@ -131,7 +133,7 @@ namespace CSX64
 		&Computer::ProcessFINCDECSTP,
 		&Computer::ProcessFFREE,
 
-		// vpu instructions
+		// -- vpu instructions -- //
 
 		&Computer::ProcessVPUMove,
 
@@ -166,9 +168,10 @@ namespace CSX64
 		&Computer::TryProcessVEC_FADDSUB,
 		&Computer::TryProcessVEC_AVG,
 
-			// -- unused opcodes -- //
+		&Computer::TryProcessVEC_FCMP,
 
-		&Computer::ProcessUNKNOWN,
+		// -- unused opcodes -- //
+
 		&Computer::ProcessUNKNOWN,
 		&Computer::ProcessUNKNOWN,
 		&Computer::ProcessUNKNOWN,
@@ -312,5 +315,41 @@ namespace CSX64
 		&Computer::ProcessUNKNOWN,
 
 		&Computer::ProcessDEBUG
+	};
+
+	const Computer::VPUBinaryDelegate Computer::__TryProcessVEC_FCMP_lookup[32] =
+	{
+		&Computer::__TryProcessVEC_FCMP_EQ_OQ,
+		&Computer::__TryProcessVEC_FCMP_LT_OS,
+		&Computer::__TryProcessVEC_FCMP_LE_OS,
+		&Computer::__TryProcessVEC_FCMP_UNORD_Q,
+		&Computer::__TryProcessVEC_FCMP_NEQ_UQ,
+		&Computer::__TryProcessVEC_FCMP_NLT_US,
+		&Computer::__TryProcessVEC_FCMP_NLE_US,
+		&Computer::__TryProcessVEC_FCMP_ORD_Q,
+		&Computer::__TryProcessVEC_FCMP_EQ_UQ,
+		&Computer::__TryProcessVEC_FCMP_NGE_US,
+		&Computer::__TryProcessVEC_FCMP_NGT_US,
+		&Computer::__TryProcessVEC_FCMP_FALSE_OQ,
+		&Computer::__TryProcessVEC_FCMP_NEQ_OQ,
+		&Computer::__TryProcessVEC_FCMP_GE_OS,
+		&Computer::__TryProcessVEC_FCMP_GT_OS,
+		&Computer::__TryProcessVEC_FCMP_TRUE_UQ,
+		&Computer::__TryProcessVEC_FCMP_EQ_OS,
+		&Computer::__TryProcessVEC_FCMP_LT_OQ,
+		&Computer::__TryProcessVEC_FCMP_LE_OQ,
+		&Computer::__TryProcessVEC_FCMP_UNORD_S,
+		&Computer::__TryProcessVEC_FCMP_NEQ_US,
+		&Computer::__TryProcessVEC_FCMP_NLT_UQ,
+		&Computer::__TryProcessVEC_FCMP_NLE_UQ,
+		&Computer::__TryProcessVEC_FCMP_ORD_S,
+		&Computer::__TryProcessVEC_FCMP_EQ_US,
+		&Computer::__TryProcessVEC_FCMP_NGE_UQ,
+		&Computer::__TryProcessVEC_FCMP_NGT_UQ,
+		&Computer::__TryProcessVEC_FCMP_FALSE_OS,
+		&Computer::__TryProcessVEC_FCMP_NEQ_OS,
+		&Computer::__TryProcessVEC_FCMP_GE_OQ,
+		&Computer::__TryProcessVEC_FCMP_GT_OQ,
+		&Computer::__TryProcessVEC_FCMP_TRUE_US,
 	};
 }

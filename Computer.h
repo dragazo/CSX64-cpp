@@ -13,6 +13,7 @@
 #include <cmath>
 #include <limits>
 #include <type_traits>
+#include <ctime>
 
 #include "CoreTypes.h"
 #include "ExeTypes.h"
@@ -165,9 +166,12 @@ namespace CSX64
 	public: // -- ctor/dtor -- //
 
 		// Validates the machine for operation, but does not prepare it for execute (see Initialize)
-		inline Computer() : mem(nullptr), mem_size(0), running(false), error(ErrorCode::None), max_mem_size((u64)8 * 1024 * 1024 * 1024) {}
+		inline Computer() :
+			mem(nullptr), mem_size(0),
+			running(false), error(ErrorCode::None), max_mem_size((u64)8 * 1024 * 1024 * 1024),
+			Rand((unsigned int)std::time(nullptr)) {}
 		virtual ~Computer() { aligned_free(mem); }
-
+		
 		Computer(const Computer&) = delete;
 		Computer(Computer&&) = delete;
 
@@ -735,6 +739,12 @@ namespace CSX64
 
 		// holds handlers for all 8-bit opcodes
 		static bool(Computer::* const opcode_handlers[])();
+
+		// type used for simd computation handlers
+		typedef bool (Computer::* VPUBinaryDelegate)(u64 elem_sizecode, u64 &res, u64 a, u64 b, int index);
+
+		// holds cpu delegates for simd fp comparisons
+		static const VPUBinaryDelegate __TryProcessVEC_FCMP_lookup[];
 
 	private: // -- operators -- //
 
@@ -2886,7 +2896,7 @@ namespace CSX64
 
 			return true;
 		}
-		bool PopFPU() { long double _; return  PopFPU(_); }
+		bool PopFPU() { long double _; return PopFPU(_); }
 
 		/*
 		[8: mode]   [address]
@@ -3586,8 +3596,6 @@ namespace CSX64
 
 		// -- vpu stuff -- //
 
-		typedef bool (Computer::* VPUBinaryDelegate)(u64 elem_sizecode, u64 &res, u64 a, u64 b, int index);
-
 		/*
 		[5: reg][1: aligned][2: reg_size]   [1: has_mask][1: zmask][1: scalar][1:][2: elem_size][2: mode]   ([count: mask])
 		mode = 0: [3:][5: src]   reg <- src
@@ -3774,10 +3782,10 @@ namespace CSX64
 			return true;
 		}
 
-		bool TryProcessVEC_FADD() { return  ProcessVPUBinary(12, &Computer::__TryPerformVEC_FADD); }
-		bool TryProcessVEC_FSUB() { return  ProcessVPUBinary(12, &Computer::__TryPerformVEC_FSUB); }
-		bool TryProcessVEC_FMUL() { return  ProcessVPUBinary(12, &Computer::__TryPerformVEC_FMUL); }
-		bool TryProcessVEC_FDIV() { return  ProcessVPUBinary(12, &Computer::__TryPerformVEC_FDIV); }
+		bool TryProcessVEC_FADD() { return ProcessVPUBinary(12, &Computer::__TryPerformVEC_FADD); }
+		bool TryProcessVEC_FSUB() { return ProcessVPUBinary(12, &Computer::__TryPerformVEC_FSUB); }
+		bool TryProcessVEC_FMUL() { return ProcessVPUBinary(12, &Computer::__TryPerformVEC_FMUL); }
+		bool TryProcessVEC_FDIV() { return ProcessVPUBinary(12, &Computer::__TryPerformVEC_FDIV); }
 
 		bool __TryPerformVEC_AND(u64 elem_sizecode, u64 &res, u64 a, u64 b, int index)
 		{
@@ -3800,10 +3808,10 @@ namespace CSX64
 			return true;
 		}
 
-		bool TryProcessVEC_AND() { return  ProcessVPUBinary(15, &Computer::__TryPerformVEC_AND); }
-		bool TryProcessVEC_OR() { return  ProcessVPUBinary(15, &Computer::__TryPerformVEC_OR); }
-		bool TryProcessVEC_XOR() { return  ProcessVPUBinary(15, &Computer::__TryPerformVEC_XOR); }
-		bool TryProcessVEC_ANDN() { return  ProcessVPUBinary(15, &Computer::__TryPerformVEC_ANDN); }
+		bool TryProcessVEC_AND() { return ProcessVPUBinary(15, &Computer::__TryPerformVEC_AND); }
+		bool TryProcessVEC_OR() { return ProcessVPUBinary(15, &Computer::__TryPerformVEC_OR); }
+		bool TryProcessVEC_XOR() { return ProcessVPUBinary(15, &Computer::__TryPerformVEC_XOR); }
+		bool TryProcessVEC_ANDN() { return ProcessVPUBinary(15, &Computer::__TryPerformVEC_ANDN); }
 
 		bool __TryPerformVEC_ADD(u64 elem_sizecode, u64 &res, u64 a, u64 b, int index)
 		{
@@ -3840,9 +3848,9 @@ namespace CSX64
 			return true;
 		}
 
-		bool TryProcessVEC_ADD() { return  ProcessVPUBinary(15, &Computer::__TryPerformVEC_ADD); }
-		bool TryProcessVEC_ADDS() { return  ProcessVPUBinary(15, &Computer::__TryPerformVEC_ADDS); }
-		bool TryProcessVEC_ADDUS() { return  ProcessVPUBinary(15, &Computer::__TryPerformVEC_ADDUS); }
+		bool TryProcessVEC_ADD() { return ProcessVPUBinary(15, &Computer::__TryPerformVEC_ADD); }
+		bool TryProcessVEC_ADDS() { return ProcessVPUBinary(15, &Computer::__TryPerformVEC_ADDS); }
+		bool TryProcessVEC_ADDUS() { return ProcessVPUBinary(15, &Computer::__TryPerformVEC_ADDUS); }
 
 		bool __TryPerformVEC_SUB(u64 elem_sizecode, u64 &res, u64 a, u64 b, int index)
 		{
@@ -3861,9 +3869,9 @@ namespace CSX64
 			return true;
 		}
 
-		bool TryProcessVEC_SUB() { return  ProcessVPUBinary(15, &Computer::__TryPerformVEC_SUB); }
-		bool TryProcessVEC_SUBS() { return  ProcessVPUBinary(15, &Computer::__TryPerformVEC_SUBS); }
-		bool TryProcessVEC_SUBUS() { return  ProcessVPUBinary(15, &Computer::__TryPerformVEC_SUBUS); }
+		bool TryProcessVEC_SUB() { return ProcessVPUBinary(15, &Computer::__TryPerformVEC_SUB); }
+		bool TryProcessVEC_SUBS() { return ProcessVPUBinary(15, &Computer::__TryPerformVEC_SUBS); }
+		bool TryProcessVEC_SUBUS() { return ProcessVPUBinary(15, &Computer::__TryPerformVEC_SUBUS); }
 
 		bool __TryPerformVEC_MULL(u64 elem_sizecode, u64 &res, u64 a, u64 b, int index)
 		{
@@ -3871,7 +3879,7 @@ namespace CSX64
 			return true;
 		}
 
-		bool TryProcessVEC_MULL() { return  ProcessVPUBinary(15, &Computer::__TryPerformVEC_MULL); }
+		bool TryProcessVEC_MULL() { return ProcessVPUBinary(15, &Computer::__TryPerformVEC_MULL); }
 
 		bool __TryProcessVEC_FMIN(u64 elem_sizecode, u64 &res, u64 a, u64 b, int index)
 		{
@@ -3890,8 +3898,8 @@ namespace CSX64
 			return true;
 		}
 
-		bool TryProcessVEC_FMIN() { return  ProcessVPUBinary(12, &Computer::__TryProcessVEC_FMIN); }
-		bool TryProcessVEC_FMAX() { return  ProcessVPUBinary(12, &Computer::__TryProcessVEC_FMAX); }
+		bool TryProcessVEC_FMIN() { return ProcessVPUBinary(12, &Computer::__TryProcessVEC_FMIN); }
+		bool TryProcessVEC_FMAX() { return ProcessVPUBinary(12, &Computer::__TryProcessVEC_FMAX); }
 
 		bool __TryProcessVEC_UMIN(u64 elem_sizecode, u64 &res, u64 a, u64 b, int index)
 		{
@@ -3916,10 +3924,10 @@ namespace CSX64
 			return true;
 		}
 
-		bool TryProcessVEC_UMIN() { return  ProcessVPUBinary(15, &Computer::__TryProcessVEC_UMIN); }
-		bool TryProcessVEC_SMIN() { return  ProcessVPUBinary(15, &Computer::__TryProcessVEC_SMIN); }
-		bool TryProcessVEC_UMAX() { return  ProcessVPUBinary(15, &Computer::__TryProcessVEC_UMAX); }
-		bool TryProcessVEC_SMAX() { return  ProcessVPUBinary(15, &Computer::__TryProcessVEC_SMAX); }
+		bool TryProcessVEC_UMIN() { return ProcessVPUBinary(15, &Computer::__TryProcessVEC_UMIN); }
+		bool TryProcessVEC_SMIN() { return ProcessVPUBinary(15, &Computer::__TryProcessVEC_SMIN); }
+		bool TryProcessVEC_UMAX() { return ProcessVPUBinary(15, &Computer::__TryProcessVEC_UMAX); }
+		bool TryProcessVEC_SMAX() { return ProcessVPUBinary(15, &Computer::__TryProcessVEC_SMAX); }
 
 		bool __TryPerformVEC_FADDSUB(u64 elem_sizecode, u64 &res, u64 a, u64 b, int index)
 		{
@@ -3931,7 +3939,7 @@ namespace CSX64
 			return true;
 		}
 
-		bool TryProcessVEC_FADDSUB() { return  ProcessVPUBinary(12, &Computer::__TryPerformVEC_FADDSUB); }
+		bool TryProcessVEC_FADDSUB() { return ProcessVPUBinary(12, &Computer::__TryPerformVEC_FADDSUB); }
 
 		bool __TryPerformVEC_AVG(u64 elem_sizecode, u64 &res, u64 a, u64 b, int index)
 		{
@@ -3940,6 +3948,93 @@ namespace CSX64
 		}
 
 		bool TryProcessVEC_AVG() { return ProcessVPUBinary(3, &Computer::__TryPerformVEC_AVG); }
+
+		// constants used to represent the result of a "true" simd floatint-point comparison
+		static constexpr u64 __fp64_simd_cmp_true = 0xffffffffffffffff;
+		static constexpr u64 __fp32_simd_cmp_true = 0xffffffff;
+
+		// macro to build functions for handling simd floating-point comparisons
+		#define __TryProcessVEC_FCMP_formatter(pred_name, great, less, equal, unord, signal) \
+		bool __TryProcessVEC_FCMP_ ## pred_name(u64 elem_sizecode, u64 &res, u64 a, u64 b, int index) \
+		{ \
+			if (elem_sizecode == 3) \
+			{ \
+				double fa = AsDouble(a), fb = AsDouble(b); \
+				bool cmp; \
+				if (std::isnan(fa) || std::isnan(fb)) \
+				{ \
+					cmp = unord; \
+					if (signal) { Terminate(ErrorCode::ArithmeticError); return false; } \
+				} \
+				else if (fa >  fb) cmp = great; \
+				else if (fa <  fb) cmp = less; \
+				else if (fa == fb) cmp = equal; \
+				else cmp = false; /* if something weird happens, catch as false */ \
+				res = cmp ? __fp64_simd_cmp_true : 0; \
+			} \
+			else \
+			{ \
+				float fa = AsFloat((u32)a), fb = AsFloat((u32)b); \
+				bool cmp; \
+				if (std::isnan(fa) || std::isnan(fb)) \
+				{ \
+					cmp = unord; \
+					if (signal) { Terminate(ErrorCode::ArithmeticError); return false; } \
+				} \
+				else if (fa >  fb) cmp = great; \
+				else if (fa <  fb) cmp = less; \
+				else if (fa == fb) cmp = equal; \
+				else cmp = false; /* if something weird happens, catch as false */ \
+				res = cmp ? __fp32_simd_cmp_true : 0; \
+			} \
+			return true; \
+		}
+		
+		__TryProcessVEC_FCMP_formatter(EQ_OQ, false, false, true, false, false)
+			__TryProcessVEC_FCMP_formatter(LT_OS, false, true, false, false, true)
+			__TryProcessVEC_FCMP_formatter(LE_OS, false, true, true, false, true)
+			__TryProcessVEC_FCMP_formatter(UNORD_Q, false, false, false, true, false)
+			__TryProcessVEC_FCMP_formatter(NEQ_UQ, true, true, false, true, false)
+			__TryProcessVEC_FCMP_formatter(NLT_US, true, false, true, true, true)
+			__TryProcessVEC_FCMP_formatter(NLE_US, true, false, false, true, true)
+			__TryProcessVEC_FCMP_formatter(ORD_Q, true, true, true, false, false)
+			__TryProcessVEC_FCMP_formatter(EQ_UQ, false, false, true, true, false)
+			__TryProcessVEC_FCMP_formatter(NGE_US, false, true, false, true, true)
+			__TryProcessVEC_FCMP_formatter(NGT_US, false, true, true, true, true)
+			__TryProcessVEC_FCMP_formatter(FALSE_OQ, false, false, false, false, false)
+			__TryProcessVEC_FCMP_formatter(NEQ_OQ, true, true, false, false, false)
+			__TryProcessVEC_FCMP_formatter(GE_OS, true, false, true, false, true)
+			__TryProcessVEC_FCMP_formatter(GT_OS, true, false, false, false, true)
+			__TryProcessVEC_FCMP_formatter(TRUE_UQ, true, true, true, true, false)
+			__TryProcessVEC_FCMP_formatter(EQ_OS, false, false, true, false, true)
+			__TryProcessVEC_FCMP_formatter(LT_OQ, false, true, false, false, false)
+			__TryProcessVEC_FCMP_formatter(LE_OQ, false, true, true, false, false)
+			__TryProcessVEC_FCMP_formatter(UNORD_S, false, false, false, true, true)
+			__TryProcessVEC_FCMP_formatter(NEQ_US, true, true, false, true, true)
+			__TryProcessVEC_FCMP_formatter(NLT_UQ, true, false, true, true, false)
+			__TryProcessVEC_FCMP_formatter(NLE_UQ, true, false, false, true, false)
+			__TryProcessVEC_FCMP_formatter(ORD_S, true, true, true, false, true)
+			__TryProcessVEC_FCMP_formatter(EQ_US, false, false, true, true, true)
+			__TryProcessVEC_FCMP_formatter(NGE_UQ, false, true, false, true, false)
+			__TryProcessVEC_FCMP_formatter(NGT_UQ, false, true, true, true, false)
+			__TryProcessVEC_FCMP_formatter(FALSE_OS, false, false, false, false, true)
+			__TryProcessVEC_FCMP_formatter(NEQ_OS, true, true, false, false, true)
+			__TryProcessVEC_FCMP_formatter(GE_OQ, true, false, true, false, false)
+			__TryProcessVEC_FCMP_formatter(GT_OQ, true, false, false, false, false)
+			__TryProcessVEC_FCMP_formatter(TRUE_US, true, true, true, true, true)
+
+		bool TryProcessVEC_FCMP()
+		{
+			// read condition byte
+			u64 cond;
+			if (!GetMemAdv<u8>(cond)) return false;
+
+			// ensure condition is in range
+			if (cond >= 32) { Terminate(ErrorCode::UndefinedBehavior); return false; }
+
+			// perform the comparison
+			return ProcessVPUBinary(12, __TryProcessVEC_FCMP_lookup[cond]);
+		}
 
 		// -- misc instructions -- //
 

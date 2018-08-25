@@ -177,7 +177,9 @@ namespace CSX64
 		bool VPUMaskPresent(Expr *mask, u64 elem_count);
 
 		bool TryProcessVPUMove(OPCode op, u64 elem_sizecode, bool maskable, bool aligned, bool scalar);
-		bool TryProcessVPUBinary(OPCode op, u64 elem_sizecode, bool maskable, bool aligned, bool scalar);
+		bool TryProcessVPUBinary(OPCode op, u64 elem_sizecode, bool maskable, bool aligned, bool scalar, bool has_ext_op = false, u8 ext_op = 0);
+
+		bool TryProcessVPU_FCMP(OPCode op, u64 elem_sizecode, bool maskable, bool aligned, bool scalar);
 	};
 }
 
