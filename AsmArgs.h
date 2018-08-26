@@ -159,6 +159,8 @@ namespace CSX64
 		bool TryProcessREPE();
 		bool TryProcessREPNE();
 
+		bool TryProcessBSx(OPCode op, bool forward);
+
 		// -- x87 op formats -- //
 
 		bool TryProcessFPUBinaryOp(OPCode op, bool integral, bool pop);

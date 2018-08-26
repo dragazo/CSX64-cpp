@@ -2779,6 +2779,49 @@ namespace CSX64
 			return true;
 		}
 
+		/*
+		[1: forward][1: mem][2: size][4: dest]
+			mem = 0: [4:][4: src]
+			mem = 1: [address]
+		*/
+		bool ProcessBSx()
+		{
+			u64 s, src, res;
+			if (!GetMemAdv<u8>(s)) return false;
+			u64 sizecode = (s >> 4) & 3;
+
+			// if src is mem
+			if (s & 64)
+			{
+				if (!GetAddressAdv(src) || !GetMemRaw(src, Size(sizecode), src)) return false;
+			}
+			// otherwise src is reg
+			else
+			{
+				if (!GetMemAdv<u8>(src)) return false;
+				src = CPURegisters[src & 15][sizecode];
+			}
+
+			// if src is zero
+			if (src == 0)
+			{
+				ZF() = true;
+				res = Rand64(Rand); // result is undefined in this case
+			}
+			// otherwise perform the search
+			else
+			{
+				ZF() = false;
+				res = Sizecode(s & 128 ? IsolateLowBit(src) : IsolateHighBit(src));
+			}
+
+			// update dest and flags
+			CPURegisters[s & 15][sizecode] = res;
+			EFLAGS() ^= Rand() & (decltype(CF())::mask | decltype(OF())::mask | decltype(SF())::mask | decltype(AF())::mask | decltype(PF())::mask);
+
+			return true;
+		}
+
 		// -- floating point stuff -- //
 
 		/// <summary>

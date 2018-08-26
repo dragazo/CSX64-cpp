@@ -277,10 +277,20 @@ namespace CSX64
 
 	// -- CSX64 encoding utilities -- //
 
+	// isolates the highest set bit. if val is zero, returns zero.
+	inline constexpr u64 IsolateHighBit(u64 val)
+	{
+		// while there are multiple set bits, clear the low one
+		while (val & (val - 1)) val = val & (val - 1);
+		return val;
+	}
+	// isolates the lowest set bit. if val is zero, returns zero.
+	inline constexpr u64 IsolateLowBit(u64 val) { return val & (~val + 1); }
+
 	/// <summary>
 	/// Returns true if this value is a power of two. (zero returns false)
 	/// </summary>
-	constexpr bool IsPowerOf2(u64 val) { return val != 0 && (val & (val - 1)) == 0; }
+	inline constexpr bool IsPowerOf2(u64 val) { return val != 0 && (val & (val - 1)) == 0; }
 
 	/// <summary>
 	/// Extracts 2 distinct powers of 2 from the specified value. Returns true if the value is made up of exactly two non-zero powers of 2.
@@ -294,56 +304,56 @@ namespace CSX64
 	/// Gets the bitmask for the sign bit of an integer with the specified sizecode
 	/// </summary>
 	/// <param name="sizecode">the sizecode specifying the width of integer to examine</param>
-	constexpr u64 SignMask(u64 sizecode) { return (u64)1 << ((8 << sizecode) - 1); }
+	inline constexpr u64 SignMask(u64 sizecode) { return (u64)1 << ((8 << sizecode) - 1); }
 	/// <summary>
 	/// Gets the bitmask that includes the entire valid domain of an integer with the specified width
 	/// </summary>
 	/// <param name="sizecode">the sizecode specifying the width of integer to examine</param>
-	constexpr u64 TruncMask(u64 sizecode) { u64 res = SignMask(sizecode); return res | (res - 1); }
+	inline constexpr u64 TruncMask(u64 sizecode) { u64 res = SignMask(sizecode); return res | (res - 1); }
 
 	/// <summary>
 	/// Returns if the value with specified size code is positive
 	/// </summary>
 	/// <param name="val">the value to process</param>
 	/// <param name="sizecode">the current size code of the value</param>
-	constexpr bool Positive(u64 val, u64 sizecode) { return (val & SignMask(sizecode)) == 0; }
+	inline constexpr bool Positive(u64 val, u64 sizecode) { return (val & SignMask(sizecode)) == 0; }
 	/// <summary>
 	/// Returns if the value with specified size code is negative
 	/// </summary>
 	/// <param name="val">the value to process</param>
 	/// <param name="sizecode">the current size code of the value</param>
-	constexpr bool Negative(u64 val, u64 sizecode) { return (val & SignMask(sizecode)) != 0; }
+	inline constexpr bool Negative(u64 val, u64 sizecode) { return (val & SignMask(sizecode)) != 0; }
 
 	/// <summary>
 	/// Sign extends a value to 64-bits
 	/// </summary>
 	/// <param name="val">the value to sign extend</param>
 	/// <param name="sizecode">the current size code</param>
-	constexpr u64 SignExtend(u64 val, u64 sizecode) { return Positive(val, sizecode) ? val : val | ~TruncMask(sizecode); }
+	inline constexpr u64 SignExtend(u64 val, u64 sizecode) { return Positive(val, sizecode) ? val : val | ~TruncMask(sizecode); }
 	/// <summary>
 	/// Truncates the value to the specified size code (can also be used to zero extend a value)
 	/// </summary>
 	/// <param name="val">the value to truncate</param>
 	/// <param name="sizecode">the size code to truncate to</param>
-	constexpr u64 Truncate(u64 val, u64 sizecode) { return val & TruncMask(sizecode); }
+	inline constexpr u64 Truncate(u64 val, u64 sizecode) { return val & TruncMask(sizecode); }
 
 	/// <summary>
 	/// Parses a 2-bit size code into an actual size (in bytes) 0:1  1:2  2:4  3:8
 	/// </summary>
 	/// <param name="sizecode">the code to parse</param>
-	constexpr u64 Size(u64 sizecode) { return (u64)1 << sizecode; }
+	inline constexpr u64 Size(u64 sizecode) { return (u64)1 << sizecode; }
 	/// <summary>
 	/// Parses a 2-bit size code into an actual size (in bits) 0:8  1:16  2:32  3:64
 	/// </summary>
 	/// <param name="sizecode">the code to parse</param>
-	constexpr u64 SizeBits(u64 sizecode) { return (u64)8 << sizecode; }
+	inline constexpr u64 SizeBits(u64 sizecode) { return (u64)8 << sizecode; }
 
 	/// <summary>
 	/// Gets the sizecode of the specified size. Throws <see cref="ArgumentException"/> if the size is not a power of 2
 	/// </summary>
 	/// <param name="size">the size</param>
 	/// <exception cref="ArgumentException"></exception>
-	constexpr u64 Sizecode(u64 size)
+	inline constexpr u64 Sizecode(u64 size)
 	{
 		if (!IsPowerOf2(size)) throw std::invalid_argument("argument was not a power of 2");
 
@@ -359,7 +369,7 @@ namespace CSX64
 	/// returns an elementary word size in bytes sufficient to hold the specified number of bits
 	/// </summary>
 	/// <param name="bits">the number of bits in the representation</param>
-	constexpr u64 BitsToBytes(u64 bits)
+	inline constexpr u64 BitsToBytes(u64 bits)
 	{
 		if (bits <= 8) return 1;
 		else if (bits <= 16) return 2;
@@ -372,23 +382,23 @@ namespace CSX64
 	/// Interprets a double as its raw bits
 	/// </summary>
 	/// <param name="val">value to interpret</param>
-	constexpr u64 DoubleAsUInt64(double val) { return *(u64*)&val; }
+	inline constexpr u64 DoubleAsUInt64(double val) { return *(u64*)&val; }
 	/// <summary>
 	/// Interprets raw bits as a double
 	/// </summary>
 	/// <param name="val">value to interpret</param>
-	constexpr double AsDouble(u64 val) { return *(double*)&val; }
+	inline constexpr double AsDouble(u64 val) { return *(double*)&val; }
 
 	/// <summary>
 	/// Interprets a float as its raw bits (placed in low 32 bits)
 	/// </summary>
 	/// <param name="val">the float to interpret</param>
-	constexpr u64 FloatAsUInt64(float val) { return *(std::uint32_t*)&val; }
+	inline constexpr u64 FloatAsUInt64(float val) { return *(std::uint32_t*)&val; }
 	/// <summary>
 	/// Interprets raw bits as a float (low 32 bits)
 	/// </summary>
 	/// <param name="val">the bits to interpret</param>
-	constexpr float AsFloat(u32 val) { return *(float*)&val; }
+	inline constexpr float AsFloat(u32 val) { return *(float*)&val; }
 
 	void ExtractDouble(double val, double &exp, double &sig);
 	double AssembleDouble(double exp, double sig);
@@ -397,7 +407,7 @@ namespace CSX64
 	/// Returns true if the floating-point value is denormalized (including +-0)
 	/// </summary>
 	/// <param name="val">the value to test</param>
-	constexpr bool IsDenorm(double val) { return (DoubleAsUInt64(val) & 0x7ff0000000000000ul) == 0; }
+	inline constexpr bool IsDenorm(double val) { return (DoubleAsUInt64(val) & 0x7ff0000000000000ul) == 0; }
 }
 
 #endif

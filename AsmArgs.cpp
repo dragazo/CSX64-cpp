@@ -2009,6 +2009,49 @@ bool AssembleArgs::TryProcessREPNE()
 	else { res = {AssembleError::UsageError, "line " + tostr(line) + ": REPNE cannot be used with the specified instruction"}; return false; }
 }
 
+bool AssembleArgs::TryProcessBSx(OPCode op, bool forward)
+{
+	if (args.size() != 2) { res = {AssembleError::ArgCount, "line " + tostr(line) + ": Expected 2 operands"}; return false; }
+
+	// write the op code
+	if (!TryAppendByte((u8)op)) return false;
+
+	// first arg must be reg
+	u64 dest, dest_sz;
+	bool high;
+	if (!TryParseCPURegister(args[0], dest, dest_sz, high)) return false;
+	// 8-bit mode is not allowed
+	if (dest_sz == 0) { res = {AssembleError::UsageError, "line " + tostr(line) + ": 8-bit mode is not supported"}; return false; }
+
+	// reg, reg
+	u64 src, src_sz;
+	if (TryParseCPURegister(args[1], src, src_sz, high))
+	{
+		// make sure sizes match
+		if (dest_sz != src_sz) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Operand size mismatch"}; return false; }
+
+		if (!TryAppendByte((u8)((forward ? 128 : 0) | (dest_sz << 4) | dest))) return false;
+		if (!TryAppendByte((u8)src)) return false;
+	}
+	// reg, mem
+	else if (args[1].back() == ']')
+	{
+		u64 a, b;
+		Expr ptr_base;
+		bool src_explicit;
+		if (!TryParseAddress(args[1], a, b, ptr_base, src_sz, src_explicit)) return false;
+
+		// make sure sizes match
+		if (src_explicit && dest_sz != src_sz) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Operand size mismatch"}; return false; }
+
+		if (!TryAppendByte((u8)((forward ? 128 : 0) | 64 | (dest_sz << 4) | dest))) return false;
+		if (!TryAppendAddress(a, b, std::move(ptr_base))) return false;
+	}
+	else { res = {AssembleError::UsageError, "line " + tostr(line) + ": Second operand must be a cpu register or memory value"}; return false; }
+
+	return true;
+}
+
 bool AssembleArgs::TryProcessFPUBinaryOp(OPCode op, bool integral, bool pop)
 {
 	// write op code

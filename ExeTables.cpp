@@ -85,6 +85,8 @@ namespace CSX64
 
 		&Computer::ProcessSTRING,
 
+		&Computer::ProcessBSx,
+
 		// -- x87 instructions -- //
 
 		&Computer::ProcessNOP,
@@ -172,7 +174,6 @@ namespace CSX64
 
 		// -- unused opcodes -- //
 
-		&Computer::ProcessUNKNOWN,
 		&Computer::ProcessUNKNOWN,
 		&Computer::ProcessUNKNOWN,
 		&Computer::ProcessUNKNOWN,

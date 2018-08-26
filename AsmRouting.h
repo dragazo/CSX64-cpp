@@ -283,6 +283,9 @@ namespace CSX64
 	inline bool asm_router_REPE(AssembleArgs &args) { return args.TryProcessREPE(); }
 	inline bool asm_router_REPNE(AssembleArgs &args) { return args.TryProcessREPNE(); }
 
+	inline bool asm_router_BSF(AssembleArgs &args) { return args.TryProcessBSx(OPCode::BSx, true); }
+	inline bool asm_router_BSR(AssembleArgs &args) { return args.TryProcessBSx(OPCode::BSx, false); }
+
 	// --------- //
 
 	// -- x87 -- //
