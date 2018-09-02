@@ -289,6 +289,18 @@ namespace CSX64
 	{"SEGMENT", asm_router_SEGMENT},
 	{"SECTION", asm_router_SEGMENT},
 
+	// -------------- //
+
+	// -- unmapped -- //
+
+	// -------------- //
+
+	{"LFENCE", asm_router_LFENCE},
+	{"SFENCE", asm_router_SFENCE},
+	{"MFENCE", asm_router_MFENCE},
+
+	{"PAUSE", asm_router_PAUSE},
+
 	// --------- //
 
 	// -- x86 -- //
@@ -545,6 +557,8 @@ namespace CSX64
 
 	{"BSF", asm_router_BSF},
 	{"BSR", asm_router_BSR},
+
+	{"UD", asm_router_UD},
 
 	// --------- //
 

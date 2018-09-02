@@ -134,6 +134,7 @@ namespace CSX64
 		bool TryProcessBinaryOp_R_RM(OPCode op, bool has_ext_op = false, u8 ext_op = 0, u64 sizemask = 15, int _force_b_imm_sizecode = -1);
 
 		bool TryProcessNoArgOp(OPCode op, bool has_ext_op = false, u8 ext_op = 0);
+		bool TryProcessNoArgOp_no_write(); // this is the same as NoArgOp, but doesn't write an opcode
 
 		bool TryProcessXCHG(OPCode op);
 		bool TryProcessLEA(OPCode op);

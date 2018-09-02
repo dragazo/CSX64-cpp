@@ -49,6 +49,18 @@ namespace CSX64
 
 	inline bool asm_router_SEGMENT(AssembleArgs &args) { return args.TryProcessSegment(); } // SECTION
 
+	// -------------- //
+
+	// -- unmapped -- //
+
+	// -------------- //
+
+	inline bool asm_router_LFENCE(AssembleArgs &args) { return args.TryProcessNoArgOp_no_write(); }
+	inline bool asm_router_SFENCE(AssembleArgs &args) { return args.TryProcessNoArgOp_no_write(); }
+	inline bool asm_router_MFENCE(AssembleArgs &args) { return args.TryProcessNoArgOp_no_write(); }
+
+	inline bool asm_router_PAUSE(AssembleArgs &args) { return args.TryProcessNoArgOp_no_write(); }
+
 	// --------- //
 
 	// -- x86 -- //
@@ -285,6 +297,8 @@ namespace CSX64
 
 	inline bool asm_router_BSF(AssembleArgs &args) { return args.TryProcessBSx(OPCode::BSx, true); }
 	inline bool asm_router_BSR(AssembleArgs &args) { return args.TryProcessBSx(OPCode::BSx, false); }
+
+	inline bool asm_router_UD(AssembleArgs &args) { return args.TryProcessNoArgOp(OPCode::UD); }
 
 	// --------- //
 

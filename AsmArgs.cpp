@@ -1562,6 +1562,12 @@ bool AssembleArgs::TryProcessNoArgOp(OPCode op, bool has_ext_op, u8 ext_op)
 
 	return true;
 }
+bool AssembleArgs::TryProcessNoArgOp_no_write()
+{
+	// only check to make sure there were no operands
+	if (args.size() != 0) { res = {AssembleError::ArgCount, "line " + tostr(line) + ": Expected no operands"}; return false; }
+	return true;
+}
 
 bool AssembleArgs::TryProcessXCHG(OPCode op)
 {

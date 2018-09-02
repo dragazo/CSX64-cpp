@@ -2822,6 +2822,14 @@ namespace CSX64
 			return true;
 		}
 
+		// identical to ProcessUNKNOWN() - added for clarity for UD instruction
+		bool ProcessUD()
+		{
+			// ud explicitly triggers an unknown opcode error
+			Terminate(ErrorCode::UnknownOp);
+			return false;
+		}
+
 		// -- floating point stuff -- //
 
 		/// <summary>
