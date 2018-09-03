@@ -740,8 +740,9 @@ namespace CSX64
 		// holds handlers for all 8-bit opcodes
 		static bool(Computer::* const opcode_handlers[])();
 
-		// type used for simd computation handlers
+		// types used for simd computation handlers
 		typedef bool (Computer::* VPUBinaryDelegate)(u64 elem_sizecode, u64 &res, u64 a, u64 b, int index);
+		typedef bool (Computer::* VPUUnaryDelegate)(u64 elem_sizecode, u64 &res, u64 a, int index);
 
 		// holds cpu delegates for simd fp comparisons
 		static const VPUBinaryDelegate __TryProcessVEC_FCMP_lookup[];
@@ -770,7 +771,7 @@ namespace CSX64
 			// get a (reg or mem)
 			if ((s & 1) == 0)
 			{
-				if (!GetMemAdv(1, a)) return false;
+				if (!GetMemAdv<u8>(a)) return false;
 				if ((a & 128) != 0)
 				{
 					if ((a & 0x0c) != 0 || sizecode != 0) { Terminate(ErrorCode::UndefinedBehavior); return false; }
@@ -1069,7 +1070,7 @@ namespace CSX64
 			// if b is register
 			if ((s1 & 1) == 0)
 			{
-				if (!GetMemAdv(1, b)) return false;
+				if (!GetMemAdv<u8>(b)) return false;
 
 				// if b is high
 				if ((b & 128) != 0)
@@ -1346,7 +1347,7 @@ namespace CSX64
 			// if b is reg
 			if ((a & 1) == 0)
 			{
-				if (!GetMemAdv(1, b)) return false;
+				if (!GetMemAdv<u8>(b)) return false;
 
 				// if b is high
 				if ((b & 128) != 0)
@@ -3137,7 +3138,7 @@ namespace CSX64
 		bool ProcessFXCH()
 		{
 			u64 i;
-			if (!GetMemAdv(1, i)) return false;
+			if (!GetMemAdv<u8>(i)) return false;
 
 			// make sure they're both in use
 			if (ST(0).Empty() || ST(i).Empty()) { Terminate(ErrorCode::FPUAccessViolation); return false; }
@@ -3504,7 +3505,7 @@ namespace CSX64
 		bool ProcessFCOM()
 		{
 			u64 s, m;
-			if (!GetMemAdv(1, s)) return false;
+			if (!GetMemAdv<u8>(s)) return false;
 
 			long double a, b;
 
@@ -3712,7 +3713,7 @@ namespace CSX64
 			switch (s2 & 3)
 			{
 			case 0:
-				if (!GetMemAdv(1, _src)) return false;
+				if (!GetMemAdv<u8>(_src)) return false;
 				if (reg_sizecode != 2 && (_src & 0x10) != 0) { Terminate(ErrorCode::UndefinedBehavior); return false; }
 				src = (int)_src & 0x1f;
 
@@ -3772,11 +3773,11 @@ namespace CSX64
 
 			// get the register to work with
 			if (dest_sizecode == 3) { Terminate(ErrorCode::UndefinedBehavior); return false; }
-			if (dest_sizecode != 2 && (s1 & 0x80) != 0) { Terminate(ErrorCode::UndefinedBehavior); return false; }
+			if (dest_sizecode != 2 && s1 & 0x80) { Terminate(ErrorCode::UndefinedBehavior); return false; }
 			int dest = (int)(s1 >> 3);
 
 			// get number of elements to process (accounting for scalar flag)
-			int elem_count = (s2 & 0x20) != 0 ? 1 : (int)(Size(dest_sizecode + 4) >> elem_sizecode);
+			int elem_count = s2 & 0x20 ? 1 : (int)(Size(dest_sizecode + 4) >> elem_sizecode);
 
 			// get the mask (default of all 1's)
 			u64 mask = ~(u64)0;
@@ -3785,15 +3786,15 @@ namespace CSX64
 			bool zmask = (s2 & 0x40) != 0;
 
 			// get src1
-			if (!GetMemAdv(1, _src1)) return false;
+			if (!GetMemAdv<u8>(_src1)) return false;
 			if (dest_sizecode != 2 && (_src1 & 0x10) != 0) { Terminate(ErrorCode::UndefinedBehavior); return false; }
 			int src1 = (int)(_src1 & 0x1f);
 
 			// if src2 is a register
 			if ((s2 & 1) == 0)
 			{
-				if (!GetMemAdv(1, _src2)) return false;
-				if (dest_sizecode != 2 && (_src2 & 0x10) != 0) { Terminate(ErrorCode::UndefinedBehavior); return false; }
+				if (!GetMemAdv<u8>(_src2)) return false;
+				if (dest_sizecode != 2 && _src2 & 0x10) { Terminate(ErrorCode::UndefinedBehavior); return false; }
 				int src2 = (int)(_src2 & 0x1f);
 
 				for (int i = 0; i < elem_count; ++i, mask >>= 1)
@@ -3819,6 +3820,73 @@ namespace CSX64
 
 						// hand over to the delegate for processing
 						if (!(this->*func)(elem_sizecode, res, ZMMRegisters[src1].uint((int)elem_sizecode, i), res, i)) return false;
+						ZMMRegisters[dest].uint((int)elem_sizecode, i) = res;
+					}
+					else if (zmask) ZMMRegisters[dest].uint((int)elem_sizecode, i) = 0;
+			}
+
+			return true;
+		}
+		/*
+		[5: dest][1: aligned][2: dest_size]   [1: has_mask][1: zmask][1: scalar][1:][2: elem_size][1:][1: mem]   ([count: mask])
+		mem = 0: [3:][5: src]   dest <- f(src)
+		mem = 1: [address]      dest <- f(M[address])
+		*/
+		bool ProcessVPUUnary(u64 elem_size_mask, VPUUnaryDelegate func)
+		{
+			// read settings bytes
+			u64 s1, s2, _src, res, m;
+			if (!GetMemAdv<u8>(s1) || !GetMemAdv<u8>(s2)) return false;
+			u64 dest_sizecode = s1 & 3;
+			u64 elem_sizecode = (s2 >> 2) & 3;
+
+			// make sure this element size is allowed
+			if ((Size(elem_sizecode) & elem_size_mask) == 0) { Terminate(ErrorCode::UndefinedBehavior); return false; }
+
+			// get the register to work with
+			if (dest_sizecode == 3) { Terminate(ErrorCode::UndefinedBehavior); return false; }
+			if (dest_sizecode != 2 && s1 & 0x80) { Terminate(ErrorCode::UndefinedBehavior); return false; }
+			int dest = (int)(s1 >> 3);
+
+			// get number of elements to process (accounting for scalar flag)
+			int elem_count = s2 & 0x20 ? 1 : (int)(Size(dest_sizecode + 4) >> elem_sizecode);
+			
+			// get the mask (default of all 1's)
+			u64 mask = ~(u64)0;
+			if (s2 & 0x80 && !GetMemAdv(BitsToBytes((u64)elem_count), mask)) return false;
+			// get the zmask flag
+			bool zmask = s2 & 0x40;
+
+			// if src is a register
+			if ((s2 & 1) == 0)
+			{
+				if (!GetMemAdv<u8>(_src)) return false;
+				if (dest_sizecode != 2 && _src & 0x10) { Terminate(ErrorCode::UndefinedBehavior); return false; }
+				int src = (int)(_src & 0x1f);
+
+				for (int i = 0; i < elem_count; ++i, mask >>= 1)
+					if (mask & 1)
+					{
+						// hand over to the delegate for processing
+						if (!(this->*func)(elem_sizecode, res, ZMMRegisters[src].uint((int)elem_sizecode, i), i)) return false;
+						ZMMRegisters[dest].uint((int)elem_sizecode, i) = res;
+					}
+					else if (zmask) ZMMRegisters[dest].uint((int)elem_sizecode, i) = 0;
+			}
+			// otherwise src is memory
+			else
+			{
+				if (!GetAddressAdv(m)) return false;
+				// if we're in vector mode and aligned flag is set, make sure address is aligned
+				if (elem_count > 1 && (s1 & 4) != 0 && m % Size(dest_sizecode + 4) != 0) { Terminate(ErrorCode::AlignmentViolation); return false; }
+
+				for (int i = 0; i < elem_count; ++i, mask >>= 1, m += Size(elem_sizecode))
+					if (mask & 1)
+					{
+						if (!GetMemRaw(m, Size(elem_sizecode), res)) return false;
+
+						// hand over to the delegate for processing
+						if (!(this->*func)(elem_sizecode, res, res, i)) return false;
 						ZMMRegisters[dest].uint((int)elem_sizecode, i) = res;
 					}
 					else if (zmask) ZMMRegisters[dest].uint((int)elem_sizecode, i) = 0;
@@ -4117,6 +4185,43 @@ namespace CSX64
 			// perform the comparison
 			return ProcessVPUBinary(12, __TryProcessVEC_FCMP_lookup[cond]);
 		}
+
+		// these trigger ArithmeticError on negative sqrt - spec doesn't specify explicitly what to do
+		bool __TryProcessVEC_FSQRT(u64 elem_sizecode, u64 &res, u64 a, int index)
+		{
+			if (elem_sizecode == 3)
+			{
+				double f = AsDouble(a);
+				if (f < 0) { Terminate(ErrorCode::ArithmeticError); return false; }
+				res = DoubleAsUInt64(std::sqrt(f));
+			}
+			else
+			{
+				float f = AsFloat((u32)a);
+				if (f < 0) { Terminate(ErrorCode::ArithmeticError); return false; }
+				res = FloatAsUInt64(std::sqrt(f));
+			}
+			return true;
+		}
+		bool __TryProcessVEC_FRSQRT(u64 elem_sizecode, u64 &res, u64 a, int index)
+		{
+			if (elem_sizecode == 3)
+			{
+				double f = AsDouble(a);
+				if (f < 0) { Terminate(ErrorCode::ArithmeticError); return false; }
+				res = DoubleAsUInt64(1.0 / std::sqrt(f));
+			}
+			else
+			{
+				float f = AsFloat((u32)a);
+				if (f < 0) { Terminate(ErrorCode::ArithmeticError); return false; }
+				res = FloatAsUInt64(1.0f / std::sqrt(f));
+			}
+			return true;
+		}
+
+		bool TryProcessVEC_FSQRT() { return ProcessVPUUnary(12, &Computer::__TryProcessVEC_FSQRT); }
+		bool TryProcessVEC_FRSQRT() { return ProcessVPUUnary(12, &Computer::__TryProcessVEC_FRSQRT); }
 
 		// -- misc instructions -- //
 

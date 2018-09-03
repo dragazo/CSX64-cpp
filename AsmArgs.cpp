@@ -2365,15 +2365,15 @@ bool AssembleArgs::TryExtractVPUMask(std::string &arg, std::unique_ptr<Expr> &ma
 	mask = nullptr; // no mask is denoted by null
 	zmask = false; // by default, mask is not a zmask
 
-				   // if it ends in z or Z, it's a zmask
-	if (arg[arg.size() - 1] == 'z' || arg[arg.size() - 1] == 'Z')
+	// if it ends in z or Z, it's a zmask
+	if (arg.back() == 'z' || arg.back() == 'Z')
 	{
 		// remove the z
 		arg.pop_back();
 		arg = TrimEnd(std::move(arg));
 
 		// ensure validity - must be preceded by }
-		if (arg.size() == 0 || arg[arg.size() - 1] != '}') { res = {AssembleError::FormatError, "line " + tostr(line) + ": Zmask declarator encountered without a corresponding mask"}; return false; }
+		if (arg.size() == 0 || arg.back() != '}') { res = {AssembleError::FormatError, "line " + tostr(line) + ": Zmask declarator encountered without a corresponding mask"}; return false; }
 
 		// mark as being a zmask
 		zmask = true;
@@ -2613,6 +2613,62 @@ bool AssembleArgs::TryProcessVPUBinary(OPCode op, u64 elem_sizecode, bool maskab
 			// vreg, mem/imm, *
 			else { res = {AssembleError::UsageError, "line " + tostr(line) + ": Expected vpu register as second operand"}; return false; }
 		}
+	}
+	// mem/imm, *
+	else { res = {AssembleError::UsageError, "line " + tostr(line) + ": Expected a vpu register as first operand"}; return false; }
+
+	return true;
+}
+bool AssembleArgs::TryProcessVPUUnary(OPCode op, u64 elem_sizecode, bool maskable, bool aligned, bool scalar, bool has_ext_op, u8 ext_op)
+{
+	if (args.size() != 2) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Expected 2 operands"}; return false; }
+
+	// write the op code
+	if (!TryAppendByte((u8)op)) return false;
+	if (has_ext_op) { if (!TryAppendByte(ext_op)) return false; }
+
+	// extract the mask
+	std::unique_ptr<Expr> mask;
+	bool zmask;
+	if (!TryExtractVPUMask(args[0], mask, zmask)) return false;
+	// if it had an explicit mask and we were told not to allow that, it's an error
+	if (mask != nullptr && !maskable) { res = {AssembleError::FormatError, "line " + tostr(line) + ": Instruction does not support masking"}; return false; }
+
+	// vreg, *
+	u64 dest, dest_sizecode;
+	if (TryParseVPURegister(args[0], dest, dest_sizecode))
+	{
+		u64 elem_count = scalar ? 1 : Size(dest_sizecode) >> elem_sizecode;
+		bool mask_present = VPUMaskPresent(mask.get(), elem_count);
+
+		// vreg, vreg
+		u64 src, src_sizecode;
+		if (TryParseVPURegister(args[1], src, src_sizecode))
+		{
+			if (dest_sizecode != src_sizecode) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Operand size mismatch"}; return false; }
+
+			if (!TryAppendVal(1, (dest << 3) | (aligned ? 4 : 0ul) | (dest_sizecode - 4))) return false;
+			if (!TryAppendVal(1, (mask_present ? 128 : 0ul) | (zmask ? 64 : 0ul) | (scalar ? 32 : 0ul) | (elem_sizecode << 2) | 0)) return false;
+			if (mask_present && !TryAppendExpr(BitsToBytes(elem_count), std::move(*mask))) return false;
+			if (!TryAppendVal(1, src)) return false;
+		}
+		// vreg, mem
+		else if (args[1].back() == ']')
+		{
+			u64 a, b;
+			Expr ptr_base;
+			bool src_explicit;
+			if (!TryParseAddress(args[1], a, b, ptr_base, src_sizecode, src_explicit)) return false;
+
+			if (src_explicit && src_sizecode != (scalar ? elem_sizecode : dest_sizecode)) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Operand size mismatch"}; return false; }
+
+			if (!TryAppendVal(1, (dest << 3) | (aligned ? 4 : 0ul) | (dest_sizecode - 4))) return false;
+			if (!TryAppendVal(1, (mask_present ? 128 : 0ul) | (zmask ? 64 : 0ul) | (scalar ? 32 : 0ul) | (elem_sizecode << 2) | 1)) return false;
+			if (mask_present && !TryAppendExpr(BitsToBytes(elem_count), std::move(*mask))) return false;
+			if (!TryAppendAddress(a, b, std::move(ptr_base))) return false;
+		}
+		// vreg, imm
+		else { res = {AssembleError::UsageError, "line " + tostr(line) + ": Expected vpu register or memory value as second operand"}; return false; }
 	}
 	// mem/imm, *
 	else { res = {AssembleError::UsageError, "line " + tostr(line) + ": Expected a vpu register as first operand"}; return false; }

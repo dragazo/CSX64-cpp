@@ -175,10 +175,11 @@ namespace CSX64
 
 		&Computer::TryProcessVEC_FCMP,
 
+		&Computer::TryProcessVEC_FSQRT,
+		&Computer::TryProcessVEC_FRSQRT,
+
 		// -- unused opcodes -- //
 
-		&Computer::ProcessUNKNOWN,
-		&Computer::ProcessUNKNOWN,
 		&Computer::ProcessUNKNOWN,
 		&Computer::ProcessUNKNOWN,
 		&Computer::ProcessUNKNOWN,
