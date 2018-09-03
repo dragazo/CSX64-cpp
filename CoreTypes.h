@@ -45,7 +45,7 @@ namespace CSX64
 
 		string,
 
-		BSx,
+		BSx, TZCNT,
 
 		UD,
 

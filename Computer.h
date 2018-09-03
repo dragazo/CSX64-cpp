@@ -2784,11 +2784,10 @@ namespace CSX64
 			mem = 0: [4:][4: src]
 			mem = 1: [address]
 		*/
-		bool ProcessBSx()
+		inline bool __Process_BSx_common(u64 &s, u64 &src, u64 &sizecode)
 		{
-			u64 s, src, res;
 			if (!GetMemAdv<u8>(s)) return false;
-			u64 sizecode = (s >> 4) & 3;
+			sizecode = (s >> 4) & 3;
 
 			// if src is mem
 			if (s & 64)
@@ -2801,6 +2800,13 @@ namespace CSX64
 				if (!GetMemAdv<u8>(src)) return false;
 				src = CPURegisters[src & 15][sizecode];
 			}
+
+			return true;
+		}
+		bool ProcessBSx()
+		{
+			u64 s, src, sizecode, res;
+			if (!__Process_BSx_common(s, src, sizecode)) return false;
 
 			// if src is zero
 			if (src == 0)
@@ -2818,6 +2824,31 @@ namespace CSX64
 			// update dest and flags
 			CPURegisters[s & 15][sizecode] = res;
 			EFLAGS() ^= Rand() & (decltype(CF())::mask | decltype(OF())::mask | decltype(SF())::mask | decltype(AF())::mask | decltype(PF())::mask);
+
+			return true;
+		}
+		bool ProcessTZCNT()
+		{
+			u64 s, src, sizecode, res;
+			if (!__Process_BSx_common(s, src, sizecode)) return false;
+
+			// if src is zero
+			if (src == 0)
+			{
+				CF() = true;
+				res = SizeBits(sizecode); // result is operand size (in bits) in this case
+			}
+			// otherwise perform the search
+			else
+			{
+				CF() = false;
+				res = Sizecode(IsolateLowBit(src));
+			}
+
+			// update dest and flags
+			CPURegisters[s & 15][sizecode] = res;
+			ZF() = res == 0;
+			EFLAGS() ^= Rand() & (decltype(OF())::mask | decltype(SF())::mask | decltype(AF())::mask | decltype(PF())::mask);
 
 			return true;
 		}

@@ -298,6 +298,8 @@ namespace CSX64
 	inline bool asm_router_BSF(AssembleArgs &args) { return args.TryProcessBSx(OPCode::BSx, true); }
 	inline bool asm_router_BSR(AssembleArgs &args) { return args.TryProcessBSx(OPCode::BSx, false); }
 
+	inline bool asm_router_TZCNT(AssembleArgs &args) { return args.TryProcessBSx(OPCode::TZCNT, true); } // forward flag doesn't matter
+
 	inline bool asm_router_UD(AssembleArgs &args) { return args.TryProcessNoArgOp(OPCode::UD); }
 
 	// --------- //

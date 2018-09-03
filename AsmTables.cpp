@@ -558,6 +558,8 @@ namespace CSX64
 	{"BSF", asm_router_BSF},
 	{"BSR", asm_router_BSR},
 
+	{"TZCNT", asm_router_TZCNT},
+
 	{"UD", asm_router_UD},
 
 	// --------- //
