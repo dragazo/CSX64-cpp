@@ -183,6 +183,9 @@ namespace CSX64
 		bool TryProcessVPUBinary(OPCode op, u64 elem_sizecode, bool maskable, bool aligned, bool scalar, bool has_ext_op = false, u8 ext_op = 0);
 		bool TryProcessVPUUnary(OPCode op, u64 elem_sizecode, bool maskable, bool aligned, bool scalar, bool has_ext_op = false, u8 ext_op = 0);
 
+		// same as TryProcessVPUBinary() except that it forces the 2 arg pathway
+		bool TryProcessVPUBinary_2arg(OPCode op, u64 elem_sizecode, bool maskable, bool aligned, bool scalar, bool has_ext_op = false, u8 ext_op = 0);
+
 		bool TryProcessVPU_FCMP(OPCode op, u64 elem_sizecode, bool maskable, bool aligned, bool scalar);
 	};
 }

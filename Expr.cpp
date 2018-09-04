@@ -4,6 +4,7 @@
 
 namespace CSX64
 {
+	// this maps ops to a string representation - not used for parsing
 	const std::unordered_map<Expr::OPs, std::string> Expr::Op_to_Str
 	{
 		{Expr::OPs::Mul, "*"},
@@ -202,15 +203,40 @@ namespace CSX64
 			if (ret == false) return false;
 
 			if (LF || RF) { res = DoubleAsUInt64((LF ? AsDouble(L) : (i64)L) / (RF ? AsDouble(R) : (i64)R)); floating = true; }
-			else res = (u64)((i64)L / (i64)R);
+			else
+			{
+				// catch division by zero in integral case (floating-point is ok (inf))
+				if (R == 0) { err = "divide by zero"; return false; }
+
+				res = (u64)((i64)L / (i64)R);
+			}
+
 			break;
 		case OPs::Mod:
 			if (!Left->__Evaluate__(symbols, L, LF, err, visited)) ret = false;
 			if (!Right->__Evaluate__(symbols, R, RF, err, visited)) ret = false;
 			if (ret == false) return false;
 
-			if (LF || RF) { res = DoubleAsUInt64(std::fmod(LF ? AsDouble(L) : (i64)L, RF ? AsDouble(R) : (i64)R)); floating = true; }
-			else res = (u64)((i64)L % (i64)R);
+			// catch division by zero in both float/int cases (floaing zero is integral zero)
+			if (R == 0) { err = "divide by zero"; return false; }
+
+			if (LF || RF)
+			{
+				double _num = LF ? AsDouble(L) : (i64)L, _denom = RF ? AsDouble(R) : (i64)R;
+
+				// catch division by zero in floating case
+				if (_denom == 0) { err = "divide by zero"; return false; }
+				
+				res = DoubleAsUInt64(std::fmod(_num, _denom));
+				floating = true;
+			}
+			else
+			{
+				// catch division by zero in integral case
+				if (R == 0) { err = "divide by zero"; return false; }
+
+				res = (u64)((i64)L % (i64)R);
+			}
 			break;
 		case OPs::Add:
 			if (!Left->__Evaluate__(symbols, L, LF, err, visited)) ret = false;

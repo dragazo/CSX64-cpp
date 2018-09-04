@@ -2676,6 +2676,14 @@ bool AssembleArgs::TryProcessVPUUnary(OPCode op, u64 elem_sizecode, bool maskabl
 	return true;
 }
 
+bool AssembleArgs::TryProcessVPUBinary_2arg(OPCode op, u64 elem_sizecode, bool maskable, bool aligned, bool scalar, bool has_ext_op, u8 ext_op)
+{
+	// ensure we select the 2 arg pathway
+	if (args.size() != 2) { res = {AssembleError::ArgCount, "line " + tostr(line) + ": Expected 2 operands"}; return false; }
+	// then refer to VPUBinary
+	return TryProcessVPUBinary(op, elem_sizecode, maskable, aligned, scalar, has_ext_op, ext_op);
+}
+
 bool AssembleArgs::TryProcessVPU_FCMP(OPCode op, u64 elem_sizecode, bool maskable, bool aligned, bool scalar)
 {
 	// has the 2-3 args + 1 for the comparison predicate

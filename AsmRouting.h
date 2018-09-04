@@ -701,6 +701,9 @@ namespace CSX64
 	inline bool asm_router_CMPGT_OQSS(AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 2, false, false, true, true, 30); }
 	inline bool asm_router_CMPTRUE_USSS(AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 2, false, false, true, true, 31); }
 
+	inline bool asm_router_COMISD(AssembleArgs &args) { return args.TryProcessVPUBinary_2arg(OPCode::VPU_FCOMI, 3, false, false, true); }
+	inline bool asm_router_COMISS(AssembleArgs &args) { return args.TryProcessVPUBinary_2arg(OPCode::VPU_FCOMI, 2, false, false, true); }
+
 	inline bool asm_router_SQRTPD(AssembleArgs &args) { return args.TryProcessVPUUnary(OPCode::VPU_FSQRT, 3, true, true, false); }
 	inline bool asm_router_SQRTPS(AssembleArgs &args) { return args.TryProcessVPUUnary(OPCode::VPU_FSQRT, 2, true, true, false); }
 

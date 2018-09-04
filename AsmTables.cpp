@@ -965,6 +965,9 @@ namespace CSX64
 	{"CMPGT_OQSS", asm_router_CMPGT_OQSS},
 	{"CMPTRUE_USSS", asm_router_CMPTRUE_USSS},
 
+	{"COMISD", asm_router_COMISD},
+	{"COMISS", asm_router_COMISS},
+
 	{"SQRTPD", asm_router_SQRTPD},
 	{"SQRTPS", asm_router_SQRTPS},
 
