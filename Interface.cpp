@@ -44,6 +44,7 @@ namespace CSX64
 		// set up vpu registers
 		for (int i = 0; i < 32; ++i)
 			for (int j = 0; j < 8; ++j) ZMMRegisters[i].uint64(j) = Rand64(Rand);
+		_MXCSR = 0x1f80;
 
 		// set execution state
 		RIP() = 0;

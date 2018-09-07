@@ -980,6 +980,9 @@ namespace CSX64
 	{"RSQRTSD", asm_router_RSQRTSD},
 	{"RSQRTSS", asm_router_RSQRTSS},
 
+	{"STMXCSR", asm_router_STMXCSR},
+	{"LDMXCSR", asm_router_LDMXCSR},
+
 	// ---------------- //
 
 	// -- CSX64 misc -- //

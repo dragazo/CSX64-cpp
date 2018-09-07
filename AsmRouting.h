@@ -716,6 +716,9 @@ namespace CSX64
 	inline bool asm_router_RSQRTSD(AssembleArgs &args) { return args.TryProcessVPUUnary(OPCode::VPU_FRSQRT, 3, false, false, true); }
 	inline bool asm_router_RSQRTSS(AssembleArgs &args) { return args.TryProcessVPUUnary(OPCode::VPU_FRSQRT, 2, false, false, true); }
 
+	inline bool asm_router_STMXCSR(AssembleArgs &args) { return args.TryProcessFSTLD_WORD(OPCode::FSTLD_WORD, 4, 2); }
+	inline bool asm_router_LDMXCSR(AssembleArgs &args) { return args.TryProcessFSTLD_WORD(OPCode::FSTLD_WORD, 5, 2); }
+
 	// ---------------- //
 
 	// -- CSX64 misc -- //
