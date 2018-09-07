@@ -90,11 +90,11 @@ namespace CSX64
 
 		static constexpr T __mask = (T)1 << (len - 1);
 		static constexpr T low_mask = __mask | (__mask - 1);
-		static constexpr T high_mask = low_mask << pos;
+		static constexpr T mask = low_mask << pos;
 
 		inline constexpr operator T() const noexcept { return (data >> pos) & low_mask; }
-		inline constexpr BitfieldWrapper operator=(T val) noexcept { data = (data & ~high_mask) | ((val & low_mask) << pos); return *this; }
-		inline constexpr BitfieldWrapper operator=(BitfieldWrapper wrapper) noexcept { data = (data & ~high_mask) | (wrapper.data & high_mask); return *this; }
+		inline constexpr BitfieldWrapper operator=(T val) noexcept { data = (data & ~mask) | ((val & low_mask) << pos); return *this; }
+		inline constexpr BitfieldWrapper operator=(BitfieldWrapper wrapper) noexcept { data = (data & ~mask) | (wrapper.data & mask); return *this; }
 
 		inline constexpr BitfieldWrapper operator++() noexcept { *this = *this + 1; return *this; }
 		inline constexpr BitfieldWrapper operator--() noexcept { *this = *this - 1; return *this; }

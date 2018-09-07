@@ -121,6 +121,7 @@
       <ConformanceMode>true</ConformanceMode>
       <DisableLanguageExtensions>true</DisableLanguageExtensions>
       <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
+      <PreprocessToFile>false</PreprocessToFile>
     </ClCompile>
     <Link>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
@@ -139,6 +140,7 @@
       <ConformanceMode>true</ConformanceMode>
       <DisableLanguageExtensions>true</DisableLanguageExtensions>
       <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
+      <PreprocessToFile>false</PreprocessToFile>
     </ClCompile>
     <Link>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>

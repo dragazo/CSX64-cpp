@@ -19,6 +19,26 @@
 #include "ExeTypes.h"
 #include "Utility.h"
 
+// macros for generating flag union expressions for use with a Computer object
+// __VA_ARGS__ was expanding non-standardly, which is why the below macro recursion doesn't use it
+#define MASK_UNION_0() (0)
+#define MASK_UNION_1(f) (decltype(((::CSX64::Computer*)nullptr)->f())::mask)
+#define MASK_UNION_2(a,b)                              (MASK_UNION_1(a) | MASK_UNION_1(b))
+#define MASK_UNION_3(a,b,c)                            (MASK_UNION_1(a) | MASK_UNION_2(b,c))
+#define MASK_UNION_4(a,b,c,d)                          (MASK_UNION_1(a) | MASK_UNION_3(b,c,d))
+#define MASK_UNION_5(a,b,c,d,e)                        (MASK_UNION_1(a) | MASK_UNION_4(b,c,d,e))
+#define MASK_UNION_6(a,b,c,d,e,f)                      (MASK_UNION_1(a) | MASK_UNION_5(b,c,d,e,f))
+#define MASK_UNION_7(a,b,c,d,e,f,g)                    (MASK_UNION_1(a) | MASK_UNION_6(b,c,d,e,f,g))
+#define MASK_UNION_8(a,b,c,d,e,f,g,h)                  (MASK_UNION_1(a) | MASK_UNION_7(b,c,d,e,f,g,h))
+#define MASK_UNION_9(a,b,c,d,e,f,g,h,i)                (MASK_UNION_1(a) | MASK_UNION_8(b,c,d,e,f,g,h,i))
+#define MASK_UNION_10(a,b,c,d,e,f,g,h,i,j)             (MASK_UNION_1(a) | MASK_UNION_9(b,c,d,e,f,g,h,i,j))
+#define MASK_UNION_11(a,b,c,d,e,f,g,h,i,j,k)           (MASK_UNION_1(a) | MASK_UNION_10(b,c,d,e,f,g,h,i,j,k))
+#define MASK_UNION_12(a,b,c,d,e,f,g,h,i,j,k,l)         (MASK_UNION_1(a) | MASK_UNION_11(b,c,d,e,f,g,h,i,j,k,l))
+#define MASK_UNION_13(a,b,c,d,e,f,g,h,i,j,k,l,m)       (MASK_UNION_1(a) | MASK_UNION_12(b,c,d,e,f,g,h,i,j,k,l,m))
+#define MASK_UNION_14(a,b,c,d,e,f,g,h,i,j,k,l,m,n)     (MASK_UNION_1(a) | MASK_UNION_13(b,c,d,e,f,g,h,i,j,k,l,m,n))
+#define MASK_UNION_15(a,b,c,d,e,f,g,h,i,j,k,l,m,n,o)   (MASK_UNION_1(a) | MASK_UNION_14(b,c,d,e,f,g,h,i,j,k,l,m,n,o))
+#define MASK_UNION_16(a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p) (MASK_UNION_1(a) | MASK_UNION_15(b,c,d,e,f,g,h,i,j,k,l,m,n,o,p))
+
 namespace CSX64
 {
 	class Computer
@@ -1660,8 +1680,8 @@ namespace CSX64
 				CF() = OF() = RDX() != 0;
 				break;
 			}
-
-			EFLAGS() ^= Rand() & (decltype(SF())::mask | decltype(ZF())::mask | decltype(AF())::mask | decltype(PF())::mask);
+			
+			EFLAGS() ^= Rand() & MASK_UNION_4(SF, ZF, AF, PF);
 
 			return true;
 		}
@@ -1734,7 +1754,7 @@ namespace CSX64
 				break;
 			}
 
-			EFLAGS() ^= Rand() & (decltype(SF())::mask | decltype(ZF())::mask | decltype(AF())::mask | decltype(PF())::mask);
+			EFLAGS() ^= Rand() & MASK_UNION_4(SF, ZF, AF, PF);
 
 			return true;
 		}
@@ -1771,7 +1791,7 @@ namespace CSX64
 				break;
 			}
 
-			EFLAGS() ^= Rand() & (decltype(SF())::mask | decltype(ZF())::mask | decltype(AF())::mask | decltype(PF())::mask);
+			EFLAGS() ^= Rand() & MASK_UNION_4(SF, ZF, AF, PF);
 
 			return StoreBinaryOpFormat(s1, s2, m, (u64)res);
 		}
@@ -1808,7 +1828,7 @@ namespace CSX64
 				break;
 			}
 
-			EFLAGS() ^= Rand() & (decltype(SF())::mask | decltype(ZF())::mask | decltype(AF())::mask | decltype(PF())::mask);
+			EFLAGS() ^= Rand() & MASK_UNION_4(SF, ZF, AF, PF);
 
 			return StoreTernaryOPFormat(s, (u64)res);
 		}
@@ -1850,7 +1870,7 @@ namespace CSX64
 				break;
 			}
 
-			EFLAGS() ^= Rand() & (decltype(CF())::mask | decltype(OF())::mask | decltype(SF())::mask | decltype(ZF())::mask | decltype(AF())::mask | decltype(PF())::mask);
+			EFLAGS() ^= Rand() & MASK_UNION_6(CF, OF, SF, ZF, AF, PF);
 
 			return true;
 		}
@@ -1895,7 +1915,7 @@ namespace CSX64
 				break;
 			}
 
-			EFLAGS() ^= Rand() & (decltype(CF())::mask | decltype(OF())::mask | decltype(SF())::mask | decltype(ZF())::mask | decltype(AF())::mask | decltype(PF())::mask);
+			EFLAGS() ^= Rand() & MASK_UNION_6(CF, OF, SF, ZF, AF, PF);
 
 			return true;
 		}
@@ -2243,7 +2263,7 @@ namespace CSX64
 
 			EFLAGS() = 2; // clear all the (public) flags (flag 1 must always be set)
 			ZF() = res == 0; // ZF is set on zero
-			EFLAGS() ^= Rand() & (decltype(AF())::mask | decltype(SF())::mask | decltype(PF())::mask); // AF, SF, PF undefined
+			EFLAGS() ^= Rand() & MASK_UNION_3(AF, SF, PF); // AF, SF, PF undefined
 
 			return StoreBinaryOpFormat(s1, s2, m, res);
 		}
@@ -2259,7 +2279,7 @@ namespace CSX64
 			SF() = Negative(res, sizecode);
 			CF() = a != 0;
 			OF() = false;
-			EFLAGS() ^= Rand() & (decltype(AF())::mask | decltype(PF())::mask);
+			EFLAGS() ^= Rand() & MASK_UNION_2(AF, PF);
 
 			return StoreUnaryOpFormat(s, m, res);
 		}
@@ -2274,7 +2294,7 @@ namespace CSX64
 			SF() = Negative(res, sizecode);
 			CF() = a == 0;
 			ZF() = OF() = false;
-			EFLAGS() ^= Rand() & (decltype(AF())::mask | decltype(PF())::mask);
+			EFLAGS() ^= Rand() & MASK_UNION_2(AF, PF);
 
 			return StoreUnaryOpFormat(s, m, res);
 		}
@@ -2290,7 +2310,7 @@ namespace CSX64
 			SF() = Negative(res, sizecode);
 			CF() = a == 0;
 			OF() = false;
-			EFLAGS() ^= Rand() & (decltype(AF())::mask | decltype(PF())::mask);
+			EFLAGS() ^= Rand() & MASK_UNION_2(AF, PF);
 
 			return StoreUnaryOpFormat(s, m, res);
 		}
@@ -2309,7 +2329,7 @@ namespace CSX64
 			SF() = Negative(res, sizecode);
 			OF() = false;
 			CF() = false;
-			EFLAGS() ^= Rand() & (decltype(AF())::mask | decltype(PF())::mask);
+			EFLAGS() ^= Rand() & MASK_UNION_2(AF, PF);
 
 			return StoreRR_RMFormat(s1, res);
 		}
@@ -2333,7 +2353,7 @@ namespace CSX64
 			u64 mask = (u64)1 << (b % SizeBits(sizecode)); // performed modulo-n
 
 			CF() = (a & mask) != 0;
-			EFLAGS() ^= Rand() & (decltype(OF())::mask | decltype(SF())::mask | decltype(AF())::mask | decltype(PF())::mask);
+			EFLAGS() ^= Rand() & MASK_UNION_4(OF, SF, AF, PF);
 
 			switch (ext)
 			{
@@ -2524,7 +2544,7 @@ namespace CSX64
 			}
 			AL() &= 0xf;
 
-			EFLAGS() ^= Rand() & (decltype(OF())::mask | decltype(SF())::mask | decltype(ZF())::mask | decltype(PF())::mask);
+			EFLAGS() ^= Rand() & MASK_UNION_4(OF, SF, ZF, PF);
 
 			return true;
 		}
@@ -2844,7 +2864,7 @@ namespace CSX64
 
 			// update dest and flags
 			CPURegisters[s & 15][sizecode] = res;
-			EFLAGS() ^= Rand() & (decltype(CF())::mask | decltype(OF())::mask | decltype(SF())::mask | decltype(AF())::mask | decltype(PF())::mask);
+			EFLAGS() ^= Rand() & MASK_UNION_5(CF, OF, SF, AF, PF);
 
 			return true;
 		}
@@ -2869,7 +2889,7 @@ namespace CSX64
 			// update dest and flags
 			CPURegisters[s & 15][sizecode] = res;
 			ZF() = res == 0;
-			EFLAGS() ^= Rand() & (decltype(OF())::mask | decltype(SF())::mask | decltype(AF())::mask | decltype(PF())::mask);
+			EFLAGS() ^= Rand() & MASK_UNION_4(OF, SF, AF, PF);
 
 			return true;
 		}
@@ -3048,7 +3068,7 @@ namespace CSX64
 			u64 ext;
 			if (!GetMemAdv<u8>(ext)) return false;
 
-			FPU_status ^= Rand() & (decltype(FPU_C0())::mask | decltype(FPU_C1())::mask | decltype(FPU_C2())::mask | decltype(FPU_C3())::mask);
+			FPU_status ^= Rand() & MASK_UNION_4(FPU_C0, FPU_C1, FPU_C2, FPU_C3);
 
 			switch (ext)
 			{
@@ -3078,7 +3098,7 @@ namespace CSX64
 			u64 s, m;
 			if (!GetMemAdv<u8>(s)) return false;
 
-			FPU_status ^= Rand() & (decltype(FPU_C0())::mask | decltype(FPU_C1())::mask | decltype(FPU_C2())::mask | decltype(FPU_C3())::mask);
+			FPU_status ^= Rand() & MASK_UNION_4(FPU_C0, FPU_C1, FPU_C2, FPU_C3);
 
 			// switch through mode
 			switch (s & 7)
@@ -3125,7 +3145,7 @@ namespace CSX64
 			u64 s, m;
 			if (!GetMemAdv<u8>(s)) return false;
 
-			FPU_status ^= Rand() & (decltype(FPU_C0())::mask | decltype(FPU_C1())::mask | decltype(FPU_C2())::mask | decltype(FPU_C3())::mask);
+			FPU_status ^= Rand() & MASK_UNION_4(FPU_C0, FPU_C1, FPU_C2, FPU_C3);
 
 			switch (s & 15)
 			{
@@ -3174,7 +3194,7 @@ namespace CSX64
 			ST(0) = ST(i);
 			ST(i) = temp;
 
-			FPU_status ^= Rand() & (decltype(FPU_C0())::mask | decltype(FPU_C2())::mask | decltype(FPU_C3())::mask);
+			FPU_status ^= Rand() & MASK_UNION_3(FPU_C0, FPU_C2, FPU_C3);
 			FPU_C1() = false;
 
 			return true;
@@ -3220,7 +3240,7 @@ namespace CSX64
 				ST(0) = ST(s >> 4);
 			}
 
-			FPU_status ^= Rand() & (decltype(FPU_C0())::mask | decltype(FPU_C1())::mask | decltype(FPU_C2())::mask | decltype(FPU_C3())::mask);
+			FPU_status ^= Rand() & MASK_UNION_4(FPU_C0, FPU_C1, FPU_C2, FPU_C3);
 
 			return true;
 		}
@@ -3233,7 +3253,7 @@ namespace CSX64
 
 			long double res = a + b;
 
-			FPU_status ^= Rand() & (decltype(FPU_C0())::mask | decltype(FPU_C1())::mask | decltype(FPU_C2())::mask | decltype(FPU_C3())::mask);
+			FPU_status ^= Rand() & MASK_UNION_4(FPU_C0, FPU_C1, FPU_C2, FPU_C3);
 
 			return StoreFPUBinaryFormat(s, res);
 		}
@@ -3245,7 +3265,7 @@ namespace CSX64
 
 			long double res = a - b;
 
-			FPU_status ^= Rand() & (decltype(FPU_C0())::mask | decltype(FPU_C1())::mask | decltype(FPU_C2())::mask | decltype(FPU_C3())::mask);
+			FPU_status ^= Rand() & MASK_UNION_4(FPU_C0, FPU_C1, FPU_C2, FPU_C3);
 
 			return StoreFPUBinaryFormat(s, res);
 		}
@@ -3257,7 +3277,7 @@ namespace CSX64
 
 			long double res = b - a;
 
-			FPU_status ^= Rand() & (decltype(FPU_C0())::mask | decltype(FPU_C1())::mask | decltype(FPU_C2())::mask | decltype(FPU_C3())::mask);
+			FPU_status ^= Rand() & MASK_UNION_4(FPU_C0, FPU_C1, FPU_C2, FPU_C3);
 
 			return StoreFPUBinaryFormat(s, res);
 		}
@@ -3270,7 +3290,7 @@ namespace CSX64
 
 			long double res = a * b;
 
-			FPU_status ^= Rand() & (decltype(FPU_C0())::mask | decltype(FPU_C1())::mask | decltype(FPU_C2())::mask | decltype(FPU_C3())::mask);
+			FPU_status ^= Rand() & MASK_UNION_4(FPU_C0, FPU_C1, FPU_C2, FPU_C3);
 
 			return StoreFPUBinaryFormat(s, res);
 		}
@@ -3282,7 +3302,7 @@ namespace CSX64
 
 			long double res = a / b;
 
-			FPU_status ^= Rand() & (decltype(FPU_C0())::mask | decltype(FPU_C1())::mask | decltype(FPU_C2())::mask | decltype(FPU_C3())::mask);
+			FPU_status ^= Rand() & MASK_UNION_4(FPU_C0, FPU_C1, FPU_C2, FPU_C3);
 
 			return StoreFPUBinaryFormat(s, res);
 		}
@@ -3294,7 +3314,7 @@ namespace CSX64
 
 			long double res = b / a;
 
-			FPU_status ^= Rand() & (decltype(FPU_C0())::mask | decltype(FPU_C1())::mask | decltype(FPU_C2())::mask | decltype(FPU_C3())::mask);
+			FPU_status ^= Rand() & MASK_UNION_4(FPU_C0, FPU_C1, FPU_C2, FPU_C3);
 
 			return StoreFPUBinaryFormat(s, res);
 		}
@@ -3310,7 +3330,7 @@ namespace CSX64
 
 			ST(0) = std::powl(2, val) - 1;
 
-			FPU_status ^= Rand() & (decltype(FPU_C0())::mask | decltype(FPU_C1())::mask | decltype(FPU_C2())::mask | decltype(FPU_C3())::mask);
+			FPU_status ^= Rand() & MASK_UNION_4(FPU_C0, FPU_C1, FPU_C2, FPU_C3);
 
 			return true;
 		}
@@ -3320,7 +3340,7 @@ namespace CSX64
 
 			ST(0) = std::fabsl(ST(0));
 
-			FPU_status ^= Rand() & (decltype(FPU_C0())::mask | decltype(FPU_C2())::mask | decltype(FPU_C3())::mask);
+			FPU_status ^= Rand() & MASK_UNION_3(FPU_C0, FPU_C2, FPU_C3);
 			FPU_C1() = false;
 
 			return true;
@@ -3331,7 +3351,7 @@ namespace CSX64
 
 			ST(0) = -ST(0);
 
-			FPU_status ^= Rand() & (decltype(FPU_C0())::mask | decltype(FPU_C2())::mask | decltype(FPU_C3())::mask);
+			FPU_status ^= Rand() & MASK_UNION_3(FPU_C0, FPU_C2, FPU_C3);
 			FPU_C1() = false;
 
 			return true;
@@ -3393,7 +3413,7 @@ namespace CSX64
 
 			ST(0) = res;
 
-			FPU_status ^= Rand() & (decltype(FPU_C0())::mask | decltype(FPU_C2())::mask | decltype(FPU_C3())::mask);
+			FPU_status ^= Rand() & MASK_UNION_3(FPU_C0, FPU_C2, FPU_C3);
 			FPU_C1() = res > val;
 
 			return true;
@@ -3404,7 +3424,7 @@ namespace CSX64
 
 			ST(0) = std::sqrtl(ST(0));
 
-			FPU_status ^= Rand() & (decltype(FPU_C0())::mask | decltype(FPU_C1())::mask | decltype(FPU_C2())::mask | decltype(FPU_C3())::mask);
+			FPU_status ^= Rand() & MASK_UNION_4(FPU_C0, FPU_C1, FPU_C2, FPU_C3);
 
 			return true;
 		}
@@ -3418,7 +3438,7 @@ namespace CSX64
 			PopFPU(); // pop stack and place in the new st(0)
 			ST(0) = ST(1) * std::log2l(ST(0));
 
-			FPU_status ^= Rand() & (decltype(FPU_C0())::mask | decltype(FPU_C1())::mask | decltype(FPU_C2())::mask | decltype(FPU_C3())::mask);
+			FPU_status ^= Rand() & MASK_UNION_4(FPU_C0, FPU_C1, FPU_C2, FPU_C3);
 
 			return true;
 		}
@@ -3432,7 +3452,7 @@ namespace CSX64
 			PopFPU(); // pop stack and place in the new st(0)
 			ST(0) = b * std::log2(a + 1);
 
-			FPU_status ^= Rand() & (decltype(FPU_C0())::mask | decltype(FPU_C1())::mask | decltype(FPU_C2())::mask | decltype(FPU_C3())::mask);
+			FPU_status ^= Rand() & MASK_UNION_4(FPU_C0, FPU_C1, FPU_C2, FPU_C3);
 
 			return true;
 		}
@@ -3440,7 +3460,7 @@ namespace CSX64
 		{
 			if (ST(0).Empty()) { Terminate(ErrorCode::FPUAccessViolation); return false; }
 
-			FPU_status ^= Rand() & (decltype(FPU_C0())::mask | decltype(FPU_C1())::mask | decltype(FPU_C2())::mask | decltype(FPU_C3())::mask);
+			FPU_status ^= Rand() & MASK_UNION_4(FPU_C0, FPU_C1, FPU_C2, FPU_C3);
 
 			// get value and extract exponent/significand
 			double exp, sig;
@@ -3464,7 +3484,7 @@ namespace CSX64
 			// add (truncated) st1 to exponent of st0
 			ST(0) = AssembleDouble(exp + (i64)b, sig);
 
-			FPU_status ^= Rand() & (decltype(FPU_C0())::mask | decltype(FPU_C1())::mask | decltype(FPU_C2())::mask | decltype(FPU_C3())::mask);
+			FPU_status ^= Rand() & MASK_UNION_4(FPU_C0, FPU_C1, FPU_C2, FPU_C3);
 
 			return true;
 		}
@@ -3609,7 +3629,7 @@ namespace CSX64
 
 			ST(0) = std::sinl(ST(0));
 
-			FPU_status ^= Rand() & (decltype(FPU_C0())::mask | decltype(FPU_C1())::mask | decltype(FPU_C3())::mask);
+			FPU_status ^= Rand() & MASK_UNION_3(FPU_C0, FPU_C1, FPU_C3);
 			FPU_C2() = false;
 
 			return true;
@@ -3620,7 +3640,7 @@ namespace CSX64
 
 			ST(0) = std::cosl(ST(0));
 
-			FPU_status ^= Rand() & (decltype(FPU_C0())::mask | decltype(FPU_C1())::mask | decltype(FPU_C3())::mask);
+			FPU_status ^= Rand() & MASK_UNION_3(FPU_C0, FPU_C1, FPU_C3);
 			FPU_C2() = false;
 
 			return true;
@@ -3629,7 +3649,7 @@ namespace CSX64
 		{
 			if (ST(0).Empty()) { Terminate(ErrorCode::FPUAccessViolation); return false; }
 
-			FPU_status ^= Rand() & (decltype(FPU_C0())::mask | decltype(FPU_C1())::mask | decltype(FPU_C3())::mask);
+			FPU_status ^= Rand() & MASK_UNION_3(FPU_C0, FPU_C1, FPU_C3);
 			FPU_C2() = false;
 
 			// get the value
@@ -3645,7 +3665,7 @@ namespace CSX64
 
 			ST(0) = std::tanl(ST(0));
 
-			FPU_status ^= Rand() & (decltype(FPU_C0())::mask | decltype(FPU_C1())::mask | decltype(FPU_C3())::mask);
+			FPU_status ^= Rand() & MASK_UNION_3(FPU_C0, FPU_C1, FPU_C3);
 			FPU_C2() = false;
 
 			// also push 1 onto fpu stack
@@ -3661,7 +3681,7 @@ namespace CSX64
 			PopFPU(); // pop stack and place in new st(0)
 			ST(0) = std::atan2l(b, a);
 
-			FPU_status ^= Rand() & (decltype(FPU_C0())::mask | decltype(FPU_C1())::mask | decltype(FPU_C3())::mask);
+			FPU_status ^= Rand() & MASK_UNION_3(FPU_C0, FPU_C1, FPU_C3);
 			FPU_C2() = false;
 
 			return true;
@@ -3686,7 +3706,7 @@ namespace CSX64
 			default: return true; // can't happen but compiler is stupid
 			}
 
-			FPU_status ^= Rand() & (decltype(FPU_C0())::mask | decltype(FPU_C2())::mask | decltype(FPU_C3())::mask);
+			FPU_status ^= Rand() & MASK_UNION_3(FPU_C0, FPU_C2, FPU_C3);
 			FPU_C1() = false;
 
 			return true;
@@ -3699,7 +3719,7 @@ namespace CSX64
 			// mark as not in use
 			ST(i).Free();
 
-			FPU_status ^= Rand() & (decltype(FPU_C0())::mask | decltype(FPU_C1())::mask | decltype(FPU_C2())::mask | decltype(FPU_C3())::mask);
+			FPU_status ^= Rand() & MASK_UNION_4(FPU_C0, FPU_C1, FPU_C2, FPU_C3);
 
 			return true;
 		}
@@ -4409,7 +4429,7 @@ namespace CSX64
 			CF() = z;
 			
 			// clear OF, AF, and SF
-			EFLAGS() &= ~(decltype(OF())::mask | decltype(AF())::mask | decltype(SF())::mask);
+			EFLAGS() &= ~MASK_UNION_3(OF, AF, SF);
 
 			// result is src1 (see explanation above)
 			res = _a;
