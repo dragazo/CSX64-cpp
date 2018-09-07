@@ -84,6 +84,8 @@ namespace CSX64
 
 		VPU_FSQRT, VPU_FRSQRT,
 
+		VPU_CVT,
+
 		// misc instructions
 
 		DEBUG = 255

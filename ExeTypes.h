@@ -206,13 +206,13 @@ namespace CSX64
 
 		// -- sizecode access utilities -- //
 
-		inline ZMMRegister_sizecode_wrapper uint(int sizecode, int index);
+		inline ZMMRegister_sizecode_wrapper uint(u64 sizecode, u64 index);
 	};
 	struct ZMMRegister_sizecode_wrapper
 	{
 		ZMMRegister &reg;
-		i16 index;
-		i16 sizecode;
+		u16 index;
+		u16 sizecode;
 
 		inline constexpr operator u64() const
 		{
@@ -240,7 +240,7 @@ namespace CSX64
 		}
 		inline constexpr ZMMRegister_sizecode_wrapper operator=(ZMMRegister_sizecode_wrapper other) { *this = (u64)other; return *this; }
 	};
-	ZMMRegister_sizecode_wrapper ZMMRegister::uint(int sizecode, int index) { return {*this, (i16)index, (i16)sizecode}; }
+	ZMMRegister_sizecode_wrapper ZMMRegister::uint(u64 sizecode, u64 index) { return {*this, (u16)index, (u16)sizecode}; }
 
 	/// <summary>
 	/// Represents a file descriptor used by the <see cref="CSX64"/> processor
