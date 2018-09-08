@@ -187,6 +187,11 @@ namespace CSX64
 		bool TryProcessVPUBinary_2arg(OPCode op, u64 elem_sizecode, bool maskable, bool aligned, bool scalar, bool has_ext_op = false, u8 ext_op = 0);
 
 		bool TryProcessVPU_FCMP(OPCode op, u64 elem_sizecode, bool maskable, bool aligned, bool scalar);
+
+		// these internally handle all the vpu conversion encodings
+		bool TryProcessVPUCVT_scalar_f2i(OPCode op, bool trunc, bool single);
+		bool TryProcessVPUCVT_scalar_i2f(OPCode op, bool single);
+		bool TryProcessVPUCVT_scalar_f2f(OPCode op, bool extend);
 	};
 }
 

@@ -983,6 +983,17 @@ namespace CSX64
 	{"STMXCSR", asm_router_STMXCSR},
 	{"LDMXCSR", asm_router_LDMXCSR},
 
+	{"CVTSD2SI", asm_router_CVTSD2SI},
+	{"CVTSS2SI", asm_router_CVTSS2SI},
+	{"CVTTSD2SI", asm_router_CVTTSD2SI},
+	{"CVTTSS2SI", asm_router_CVTTSS2SI},
+
+	{"CVTSI2SD", asm_router_CVTSI2SD},
+	{"CVTSI2SS", asm_router_CVTSI2SS},
+
+	{"CVTSD2SS", asm_router_CVTSD2SS},
+	{"CVTSS2SD", asm_router_CVTSS2SD},
+
 	// ---------------- //
 
 	// -- CSX64 misc -- //

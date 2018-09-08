@@ -2702,4 +2702,170 @@ bool AssembleArgs::TryProcessVPU_FCMP(OPCode op, u64 elem_sizecode, bool maskabl
 	// now refer to binary vpu formatter
 	return TryProcessVPUBinary(op, elem_sizecode, maskable, aligned, scalar, true, (u8)pred);
 }
+
+bool AssembleArgs::TryProcessVPUCVT_scalar_f2i(OPCode op, bool trunc, bool single)
+{
+	if (args.size() != 2) { res = {AssembleError::ArgCount, "line " + tostr(line) + ": Expected 2 operands"}; return false; }
+
+	// write the opcode
+	if (!TryAppendByte((u8)op)) return false;
+
+	u8 mode = trunc ? 8 : 0; // decoded vpucvt mode
+	if (single) mode += 4;
+
+	// dest must be cpu register
+	u64 dest, dest_sizecode;
+	bool dest_high;
+	if (!TryParseCPURegister(args[0], dest, dest_sizecode, dest_high)) return false;
+	
+	// account for dest size
+	if (dest_sizecode == 3) mode += 2;
+	else if (dest_sizecode != 2) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Specified destination size not supported"}; return false; }
+
+	// if source is xmm register
+	u64 src, src_sizecode;
+	if (TryParseVPURegister(args[1], src, src_sizecode))
+	{
+		// only xmm registers are supported
+		if (src_sizecode != 4) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Specified source size not supported"}; return false; }
+		// this check /should/ be redundant, but better safe than sorry
+		if (src > 15) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Source register must be xmm0-15"}; return false; }
+
+		// write the data
+		if (!TryAppendByte(mode)) return false;
+		if (!TryAppendByte((u8)((dest << 4) | src))) return false;
+	}
+	// if source is memory
+	else if (args[1].back() == ']')
+	{
+		u64 a, b;
+		bool src_explicit;
+		Expr ptr_base;
+		if (!TryParseAddress(args[1], a, b, ptr_base, src_sizecode, src_explicit)) return false;
+
+		// make sure the size matches what we're expecting
+		if(src_explicit && src_sizecode != (single ? 2 : 3)) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Specified source size not supported"}; return false; }
+
+		++mode; // account for the memory mode case
+
+		// write the data
+		if (!TryAppendByte(mode)) return false;
+		if (!TryAppendByte((u8)(dest << 4))) return false;
+		if (!TryAppendAddress(a, b, std::move(ptr_base))) return false;
+	}
+	else { res = {AssembleError::UsageError, "line " + tostr(line) + ": Expected xmm register or memory value as second operand"}; return false; }
+
+	return true;
+}
+bool AssembleArgs::TryProcessVPUCVT_scalar_i2f(OPCode op, bool single)
+{
+	if (args.size() != 2) { res = {AssembleError::ArgCount, "line " + tostr(line) + ": Expected 2 operands"}; return false; }
+
+	// write the opcode
+	if (!TryAppendByte((u8)op)) return false;
+
+	u8 mode = single ? 20 : 16; // decoded vpucvt mode
+
+	// dest must be xmm register
+	u64 dest, dest_sizecode;
+	if (!TryParseVPURegister(args[0], dest, dest_sizecode)) return false;
+
+	// only xmm registers are supported
+	if (dest_sizecode != 4) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Specified destination size not supported"}; return false; }
+	// this check /should/ be redundant, but better safe than sorry
+	if (dest > 15) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Destination register must be xmm0-15"}; return false; }
+
+	// if source is reg
+	u64 src, src_sizecode;
+	bool src_high;
+	if (TryParseCPURegister(args[1], src, src_sizecode, src_high))
+	{
+		// account for size case
+		if (src_sizecode == 3) mode += 2;
+		else if (src_sizecode != 2) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Specified source size not supported"}; return false; }
+
+		// write the data
+		if (!TryAppendByte(mode)) return false;
+		if (!TryAppendByte((u8)((dest << 4) | src))) return false;
+	}
+	// if source is mem
+	else if (args[1].back() == ']')
+	{
+		u64 a, b;
+		bool src_explicit;
+		Expr ptr_base;
+		if (!TryParseAddress(args[1], a, b, ptr_base, src_sizecode, src_explicit)) return false;
+
+		// we need to know what format we're converting from
+		if (!src_explicit) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Could not deduce operand size"}; return false; }
+
+		// account for size case
+		if (src_sizecode == 3) mode += 2;
+		else if (src_sizecode != 2) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Specified source size not supported"}; return false; }
+
+		++mode; // account for memory mode case
+
+		// write the data
+		if (!TryAppendByte(mode)) return false;
+		if (!TryAppendByte((u8)(dest << 4))) return false;
+		if (!TryAppendAddress(a, b, std::move(ptr_base))) return false;
+	}
+	else { res = {AssembleError::UsageError, "line " + tostr(line) + ": Expected cpu register or memory value as second operand"}; return false; }
+
+	return true;
+}
+bool AssembleArgs::TryProcessVPUCVT_scalar_f2f(OPCode op, bool extend)
+{
+	if (args.size() != 2) { res = {AssembleError::ArgCount, "line " + tostr(line) + ": Expected 2 operands"}; return false; }
+
+	// write the opcode
+	if (!TryAppendByte((u8)op)) return false;
+
+	u8 mode = extend ? 26 : 24; // decoded vpucvt mode
+
+	// dest must be xmm register
+	u64 dest, dest_sizecode;
+	if (!TryParseVPURegister(args[0], dest, dest_sizecode)) return false;
+
+	// only xmm registers are supported
+	if (dest_sizecode != 4) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Specified destination size not supported"}; return false; }
+	// this check /should/ be redundant, but better safe than sorry
+	if (dest > 15) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Destination register must be xmm0-15"}; return false; }
+
+	// if source is xmm register
+	u64 src, src_sizecode;
+	if (TryParseVPURegister(args[1], src, src_sizecode))
+	{
+		// only xmm registers are supported
+		if (src_sizecode != 4) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Specified source size not supported"}; return false; }
+		// this check /should/ be redundant, but better safe than sorry
+		if (src > 15) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Source register must be xmm0-15"}; return false; }
+
+		// write the data
+		if (!TryAppendByte(mode)) return false;
+		if (!TryAppendByte((u8)((dest << 4) | src))) return false;
+	}
+	// if source is memory
+	else if (args[1].back() == ']')
+	{
+		u64 a, b;
+		bool src_explicit;
+		Expr ptr_base;
+		if (!TryParseAddress(args[1], a, b, ptr_base, src_sizecode, src_explicit)) return false;
+
+		// make sure the size matches what we're expecting
+		if (src_explicit && src_sizecode != (extend ? 2 : 3)) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Specified source size not supported"}; return false; }
+
+		++mode; // account for the memory mode case
+
+		// write the data
+		if (!TryAppendByte(mode)) return false;
+		if (!TryAppendByte((u8)(dest << 4))) return false;
+		if (!TryAppendAddress(a, b, std::move(ptr_base))) return false;
+	}
+	else { res = {AssembleError::UsageError, "line " + tostr(line) + ": Expected xmm register or memory value as second operand"}; return false; }
+
+	return true;
+}
+
 }
