@@ -2868,4 +2868,238 @@ bool AssembleArgs::TryProcessVPUCVT_scalar_f2f(OPCode op, bool extend)
 	return true;
 }
 
+bool AssembleArgs::__TryProcessVPUCVT_packed_formatter_reg(OPCode op, u8 mode, u64 elem_count, u64 dest, Expr *mask, bool zmask, u64 src)
+{
+	bool mask_present = VPUMaskPresent(mask, elem_count);
+
+	if (!TryAppendByte((u8)op)) return false;
+	if (!TryAppendByte(mode)) return false;
+	if (!TryAppendByte((u8)(dest << 3) | (0) | (mask_present ? 2 : 0) | (zmask ? 1 : 0))) return false;
+	if (mask_present && !TryAppendExpr(BitsToBytes(elem_count), std::move(*mask))) return false;
+	if (!TryAppendByte((u8)src)) return false;
+
+	return true;
+}
+bool AssembleArgs::__TryProcessVPUCVT_packed_formatter_mem(OPCode op, u8 mode, u64 elem_count, u64 dest, Expr *mask, bool zmask, u64 a, u64 b, Expr &&ptr_base)
+{
+	bool mask_present = VPUMaskPresent(mask, elem_count);
+
+	if (!TryAppendByte((u8)op)) return false;
+	if (!TryAppendByte(mode)) return false;
+	if (!TryAppendByte((u8)(dest << 3) | (4) | (mask_present ? 2 : 0) | (zmask ? 1 : 0))) return false;
+	if (mask_present && !TryAppendExpr(BitsToBytes(elem_count), std::move(*mask))) return false;
+	if (!TryAppendAddress(a, b, std::move(ptr_base))) return false;
+
+	return true;
+}
+
+bool AssembleArgs::TryProcessVPUCVT_packed_f2i(OPCode op, bool trunc, bool single)
+{
+	if (args.size() != 2) { res = {AssembleError::ArgCount, "line " + tostr(line) + ": Expected 2 operands"}; return false; }
+
+	u8 mode = trunc ? 34 : 28; // decoded vpucvt mode
+	if (single) mode += 3;
+
+	// extract the mask
+	std::unique_ptr<Expr> mask;
+	bool zmask;
+	if (!TryExtractVPUMask(args[0], mask, zmask)) return false;
+
+	// dest must be vpu register
+	u64 dest, dest_sizecode;
+	if (!TryParseVPURegister(args[0], dest, dest_sizecode)) return false;
+
+	// if src is a vpu register
+	u64 src, src_sizecode;
+	if (TryParseVPURegister(args[1], src, src_sizecode))
+	{
+		// validate operand sizes
+		if (dest_sizecode != (single ? src_sizecode : src_sizecode == 4 ? 4 : src_sizecode - 1)) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Specified operand size combination not supported"}; return false; }
+
+		// decode size and get number of elements
+		mode += (u8)src_sizecode - 4;
+		u64 elem_count = (single ? 4 : 2) << (src_sizecode - 4);
+
+		// write the data
+		if (!__TryProcessVPUCVT_packed_formatter_reg(op, mode, elem_count, dest, mask.get(), zmask, src)) return false;
+	}
+	// if src is mem
+	else if (args[1].back() == ']')
+	{
+		u64 a, b;
+		Expr ptr_base;
+		bool src_explicit;
+		if (!TryParseAddress(args[1], a, b, ptr_base, src_sizecode, src_explicit)) return false;
+
+		// validate operand sizes
+		if (src_explicit && dest_sizecode != (single ? src_sizecode : src_sizecode - 1)) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Specified operand size combination not supported"}; return false; }
+
+		// decode size and get number of elements
+		u64 elem_count;
+		// single is converting to same size, so we can use dest_sz instead
+		if (single)
+		{
+			mode += (u8)dest_sizecode - 4;
+			elem_count = 4 << (dest_sizecode - 4);
+		}
+		// otherwise we can't tell 2 vs 4 doubles since they both use xmm dest - we need explicit source size
+		else if (src_explicit)
+		{
+			mode += (u8)src_sizecode - 4;
+			elem_count = 2 << (src_sizecode - 4);
+		}
+		// however, if dest is ymm, we know source is zmm
+		else if (dest_sizecode == 5)
+		{
+			mode += 2;
+			elem_count = 8;
+		}
+		else { res = {AssembleError::UsageError, "line " + tostr(line) + ": Could not deduce operand size"}; return false; }
+
+		// write the data
+		if (!__TryProcessVPUCVT_packed_formatter_mem(op, mode, elem_count, dest, mask.get(), zmask, a, b, std::move(ptr_base))) return false;
+	}
+	else { res = {AssembleError::UsageError, "line " + tostr(line) + ": Expected a VPU register or memory value as second operand"}; return false; }
+
+	return true;
+}
+bool AssembleArgs::TryProcessVPUCVT_packed_i2f(OPCode op, bool single)
+{
+	if (args.size() != 2) { res = {AssembleError::ArgCount, "line " + tostr(line) + ": Expected 2 operands"}; return false; }
+
+	u8 mode = single ? 43 : 40; // decoded vpucvt mode
+
+	// extract the mask
+	std::unique_ptr<Expr> mask;
+	bool zmask;
+	if (!TryExtractVPUMask(args[0], mask, zmask)) return false;
+
+	// dest must be vpu register
+	u64 dest, dest_sizecode;
+	if (!TryParseVPURegister(args[0], dest, dest_sizecode)) return false;
+
+	// if src is a vpu register
+	u64 src, src_sizecode;
+	if (TryParseVPURegister(args[1], src, src_sizecode))
+	{
+		// validate operand sizes
+		if (src_sizecode != (single ? dest_sizecode : dest_sizecode == 4 ? 4 : dest_sizecode - 1)) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Specified operand size combination not supported"}; return false; }
+
+		// decode size and get number of elements
+		mode += (u8)dest_sizecode - 4;
+		u64 elem_count = (single ? 4 : 2) << (dest_sizecode - 4);
+
+		// write the data
+		if (!__TryProcessVPUCVT_packed_formatter_reg(op, mode, elem_count, dest, mask.get(), zmask, src)) return false;
+	}
+	// if src is mem
+	else if (args[1].back() == ']')
+	{
+		u64 a, b;
+		Expr ptr_base;
+		bool src_explicit;
+		if (!TryParseAddress(args[1], a, b, ptr_base, src_sizecode, src_explicit)) return false;
+
+		// validate operand sizes
+		if (src_explicit && src_sizecode != (single ? dest_sizecode : dest_sizecode - 1)) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Specified operand size combination not supported"}; return false; }
+
+		// decode size and get number of elements
+		mode += (u8)dest_sizecode - 4;
+		u64 elem_count = (single ? 4 : 2) << (dest_sizecode - 4);
+
+		// write the data
+		if (!__TryProcessVPUCVT_packed_formatter_mem(op, mode, elem_count, dest, mask.get(), zmask, a, b, std::move(ptr_base))) return false;
+	}
+	else { res = {AssembleError::UsageError, "line " + tostr(line) + ": Expected a VPU register or memory value as second operand"}; return false; }
+
+	return true;
+}
+bool AssembleArgs::TryProcessVPUCVT_packed_f2f(OPCode op, bool extend)
+{
+	if (args.size() != 2) { res = {AssembleError::ArgCount, "line " + tostr(line) + ": Expected 2 operands"}; return false; }
+
+	u8 mode = extend ? 49 : 46; // decoded vpucvt mode
+
+	// extract the mask
+	std::unique_ptr<Expr> mask;
+	bool zmask;
+	if (!TryExtractVPUMask(args[0], mask, zmask)) return false;
+
+	// dest must be vpu register
+	u64 dest, dest_sizecode;
+	if (!TryParseVPURegister(args[0], dest, dest_sizecode)) return false;
+
+	// if src is a vpu register
+	u64 src, src_sizecode;
+	if (TryParseVPURegister(args[1], src, src_sizecode))
+	{
+		u64 elem_count;
+		if (extend)
+		{
+			// validate operand sizes
+			if (src_sizecode != (dest_sizecode == 4 ? 4 : dest_sizecode - 1)) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Specified operand size combination not supported"}; return false; }
+
+			// decode size and get number of elements
+			mode += (u8)dest_sizecode - 4;
+			elem_count = 2 << (dest_sizecode - 4);
+		}
+		else
+		{
+			// validate operand sizes
+			if (dest_sizecode != (src_sizecode == 4 ? 4 : src_sizecode - 1)) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Specified operand size combination not supported"}; return false; }
+
+			// decode size and get number of elements
+			mode += (u8)src_sizecode - 4;
+			elem_count = 2 << (src_sizecode - 4);
+		}
+
+		// write the data
+		if (!__TryProcessVPUCVT_packed_formatter_reg(op, mode, elem_count, dest, mask.get(), zmask, src)) return false;
+	}
+	// if src is mem
+	else if (args[1].back() == ']')
+	{
+		u64 a, b;
+		Expr ptr_base;
+		bool src_explicit;
+		if (!TryParseAddress(args[1], a, b, ptr_base, src_sizecode, src_explicit)) return false;
+
+		u64 elem_count;
+		if (extend)
+		{
+			// validate operand sizes
+			if (src_explicit && src_sizecode != dest_sizecode - 1) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Specified operand size combination not supported"}; return false; }
+
+			// decode size and get number of elements
+			mode += (u8)dest_sizecode - 4;
+			elem_count = 2 << (dest_sizecode - 4);
+		}
+		else
+		{
+			// validate operand sizes
+			if (src_explicit && dest_sizecode != src_sizecode - 1) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Specified operand size combination not supported"}; return false; }
+
+			// we can't tell 2 vs 4 elements since they both use xmm dest - we need explicit source size
+			if (src_explicit)
+			{
+				mode += (u8)src_sizecode - 4;
+				elem_count = 2 << (src_sizecode - 4);
+			}
+			// however, if dest is ymm, we know source is zmm
+			else if (dest_sizecode == 5)
+			{
+				mode += 2;
+				elem_count = 8;
+			}
+			else { res = {AssembleError::UsageError, "line " + tostr(line) + ": Could not deduce operand size"}; return false; }
+		}
+
+		// write the data
+		if (!__TryProcessVPUCVT_packed_formatter_mem(op, mode, elem_count, dest, mask.get(), zmask, a, b, std::move(ptr_base))) return false;
+	}
+	else { res = {AssembleError::UsageError, "line " + tostr(line) + ": Expected a VPU register or memory value as second operand"}; return false; }
+
+	return true;
+}
+
 }

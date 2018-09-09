@@ -994,6 +994,17 @@ namespace CSX64
 	{"CVTSD2SS", asm_router_CVTSD2SS},
 	{"CVTSS2SD", asm_router_CVTSS2SD},
 
+	{"CVTPD2DQ", asm_router_CVTPD2DQ},
+	{"CVTPS2DQ", asm_router_CVTPS2DQ},
+	{"CVTTPD2DQ", asm_router_CVTTPD2DQ},
+	{"CVTTPS2DQ", asm_router_CVTTPS2DQ},
+
+	{"CVTDQ2PD", asm_router_CVTDQ2PD},
+	{"CVTDQ2PS", asm_router_CVTDQ2PS},
+
+	{"CVTPD2PS", asm_router_CVTPD2PS},
+	{"CVTPS2PD", asm_router_CVTPS2PD},
+
 	// ---------------- //
 
 	// -- CSX64 misc -- //

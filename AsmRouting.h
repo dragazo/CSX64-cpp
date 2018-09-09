@@ -730,6 +730,17 @@ namespace CSX64
 	inline bool asm_router_CVTSD2SS(AssembleArgs &args) { return args.TryProcessVPUCVT_scalar_f2f(OPCode::VPU_CVT, false); }
 	inline bool asm_router_CVTSS2SD(AssembleArgs &args) { return args.TryProcessVPUCVT_scalar_f2f(OPCode::VPU_CVT, true); }
 
+	inline bool asm_router_CVTPD2DQ(AssembleArgs &args) { return args.TryProcessVPUCVT_packed_f2i(OPCode::VPU_CVT, false, false); }
+	inline bool asm_router_CVTPS2DQ(AssembleArgs &args) { return args.TryProcessVPUCVT_packed_f2i(OPCode::VPU_CVT, false, true); }
+	inline bool asm_router_CVTTPD2DQ(AssembleArgs &args) { return args.TryProcessVPUCVT_packed_f2i(OPCode::VPU_CVT, true, false); }
+	inline bool asm_router_CVTTPS2DQ(AssembleArgs &args) { return args.TryProcessVPUCVT_packed_f2i(OPCode::VPU_CVT, true, true); }
+
+	inline bool asm_router_CVTDQ2PD(AssembleArgs &args) { return args.TryProcessVPUCVT_packed_i2f(OPCode::VPU_CVT, false); }
+	inline bool asm_router_CVTDQ2PS(AssembleArgs &args) { return args.TryProcessVPUCVT_packed_i2f(OPCode::VPU_CVT, true); }
+
+	inline bool asm_router_CVTPD2PS(AssembleArgs &args) { return args.TryProcessVPUCVT_packed_f2f(OPCode::VPU_CVT, false); }
+	inline bool asm_router_CVTPS2PD(AssembleArgs &args) { return args.TryProcessVPUCVT_packed_f2f(OPCode::VPU_CVT, true); }
+
 	// ---------------- //
 
 	// -- CSX64 misc -- //

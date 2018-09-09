@@ -189,6 +189,11 @@ namespace CSX64
 
 	public:
 
+		// -- fill utilities -- //
+
+		// fills the register with zeros
+		inline void clear() { data[0] = data[1] = data[2] = data[3] = data[4] = data[5] = data[6] = data[7] = 0; }
+
 		// -- index access utilities -- //
 
 		inline u64 &uint64(int index) { return ((u64*)data)[index]; }

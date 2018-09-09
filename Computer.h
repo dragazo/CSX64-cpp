@@ -3942,7 +3942,6 @@ namespace CSX64
 			return true;
 		}
 
-		// PACKED CVT FORMAT NOT YET COMPLETED - DO NOT USE
 		/*
 		[5: dest][1: mem][1: has_mask][1: zmask]   ([count: mask])
 		mem = 0: [3:][5: src]   dest <- f(src)
@@ -3963,7 +3962,9 @@ namespace CSX64
 
 			// because we may be changing sizes, and writing to the source register, we need to do our work in a temporary buffer
 			ZMMRegister temp_dest;
-			
+			// result should be zero-filled outside of the conversion range, so just clear the whole temporary
+			temp_dest.clear();
+
 			// if src is a register
 			if ((s & 4) == 0)
 			{
@@ -3987,7 +3988,7 @@ namespace CSX64
 			{
 				u64 m, res;
 				if (!GetAddressAdv(m)) return false;
-				// if we're in vector mode, make sure address is aligned
+				// make sure source address is aligned
 				if (m % (elem_count << from_elem_sizecode) != 0) { Terminate(ErrorCode::AlignmentViolation); return false; }
 
 				for (u64 i = 0; i < elem_count; ++i, mask >>= 1, m += Size(from_elem_sizecode))
@@ -4593,6 +4594,40 @@ namespace CSX64
 		mode = 26: CVTSS2SD xmm, xmm
 		mode = 27: CVTSS2SD xmm, m32
 
+		// ---------------------- //
+
+		mode = 28: CVTPD2DQ 2
+		mode = 29: CVTPD2DQ 4
+		mode = 30: CVTPD2DQ 8
+
+		mode = 31: CVTPS2DQ 4
+		mode = 32: CVTPS2DQ 8
+		mode = 33: CVTPS2DQ 16
+
+		mode = 34: CVTTPD2DQ 2
+		mode = 35: CVTTPD2DQ 4
+		mode = 36: CVTTPD2DQ 8
+
+		mode = 37: CVTTPS2DQ 4
+		mode = 38: CVTTPS2DQ 8
+		mode = 39: CVTTPS2DQ 16
+
+		mode = 40: CVTDQ2PD 2
+		mode = 41: CVTDQ2PD 4
+		mode = 42: CVTDQ2PD 8
+
+		mode = 43: CVTDQ2PS 4
+		mode = 44: CVTDQ2PS 8
+		mode = 45: CVTDQ2PS 16
+
+		mode = 46: CVTPD2PS 2
+		mode = 47: CVTPD2PS 4
+		mode = 48: CVTPD2PS 8
+
+		mode = 49: CVTPS2PD 2
+		mode = 50: CVTPS2PD 4
+		mode = 51: CVTPS2PD 8
+
 		else UND
 		*/
 		bool TryProcessVEC_CVT()
@@ -4639,6 +4674,40 @@ namespace CSX64
 
 			case 26: return ProcessVPUCVT_scalar_xmm_xmm(3, 2, &Computer::__single_to_double);
 			case 27: return ProcessVPUCVT_scalar_xmm_mem(3, 2, &Computer::__single_to_double);
+
+			// ------------------------------------------------------------------------ //
+
+			case 28: return ProcessVPUCVT_packed(2, 2, 3, &Computer::__double_to_i32);
+			case 29: return ProcessVPUCVT_packed(4, 2, 3, &Computer::__double_to_i32);
+			case 30: return ProcessVPUCVT_packed(8, 2, 3, &Computer::__double_to_i32);
+
+			case 31: return ProcessVPUCVT_packed(4, 2, 2, &Computer::__single_to_i32);
+			case 32: return ProcessVPUCVT_packed(8, 2, 2, &Computer::__single_to_i32);
+			case 33: return ProcessVPUCVT_packed(16, 2, 2, &Computer::__single_to_i32);
+
+			case 34: return ProcessVPUCVT_packed(2, 2, 3, &Computer::__double_to_ti32);
+			case 35: return ProcessVPUCVT_packed(4, 2, 3, &Computer::__double_to_ti32);
+			case 36: return ProcessVPUCVT_packed(8, 2, 3, &Computer::__double_to_ti32);
+
+			case 37: return ProcessVPUCVT_packed(4, 2, 2, &Computer::__single_to_ti32);
+			case 38: return ProcessVPUCVT_packed(8, 2, 2, &Computer::__single_to_ti32);
+			case 39: return ProcessVPUCVT_packed(16, 2, 2, &Computer::__single_to_ti32);
+
+			case 40: return ProcessVPUCVT_packed(2, 3, 2, &Computer::__i32_to_double);
+			case 41: return ProcessVPUCVT_packed(4, 3, 2, &Computer::__i32_to_double);
+			case 42: return ProcessVPUCVT_packed(8, 3, 2, &Computer::__i32_to_double);
+
+			case 43: return ProcessVPUCVT_packed(4, 2, 2, &Computer::__i32_to_single);
+			case 44: return ProcessVPUCVT_packed(8, 2, 2, &Computer::__i32_to_single);
+			case 45: return ProcessVPUCVT_packed(16, 2, 2, &Computer::__i32_to_single);
+
+			case 46: return ProcessVPUCVT_packed(2, 2, 3, &Computer::__double_to_single);
+			case 47: return ProcessVPUCVT_packed(4, 2, 3, &Computer::__double_to_single);
+			case 48: return ProcessVPUCVT_packed(8, 2, 3, &Computer::__double_to_single);
+
+			case 49: return ProcessVPUCVT_packed(2, 3, 2, &Computer::__single_to_double);
+			case 50: return ProcessVPUCVT_packed(4, 3, 2, &Computer::__single_to_double);
+			case 51: return ProcessVPUCVT_packed(8, 3, 2, &Computer::__single_to_double);
 
 			default: Terminate(ErrorCode::UndefinedBehavior); return false;
 			}

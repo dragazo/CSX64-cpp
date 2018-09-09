@@ -192,6 +192,15 @@ namespace CSX64
 		bool TryProcessVPUCVT_scalar_f2i(OPCode op, bool trunc, bool single);
 		bool TryProcessVPUCVT_scalar_i2f(OPCode op, bool single);
 		bool TryProcessVPUCVT_scalar_f2f(OPCode op, bool extend);
+
+		// these are helpers for the packed cvt formatters to reduce code duplication
+		bool __TryProcessVPUCVT_packed_formatter_reg(OPCode op, u8 mode, u64 elem_count, u64 dest, Expr *mask, bool zmask, u64 src);
+		bool __TryProcessVPUCVT_packed_formatter_mem(OPCode op, u8 mode, u64 elem_count, u64 dest, Expr *mask, bool zmask, u64 a, u64 b, Expr &&ptr_base);
+
+		// these internally handle all the vpu conversion encodings
+		bool TryProcessVPUCVT_packed_f2i(OPCode op, bool trunc, bool single);
+		bool TryProcessVPUCVT_packed_i2f(OPCode op, bool single);
+		bool TryProcessVPUCVT_packed_f2f(OPCode op, bool extend);
 	};
 }
 
