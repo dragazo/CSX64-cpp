@@ -125,15 +125,16 @@ namespace CSX64
 		}
 
 		// open the file - held by smart pointer for convenience
-		std::unique_ptr<std::fstream> f(new std::fstream);
+		std::unique_ptr<std::fstream> f = std::make_unique<std::fstream>();
 		try { f->open(path, cpp_flags); }
 		catch (...) { RAX() = ~(u64)0; return true; }
 
 		// if it didn't open, fail with -1
 		if (!*f) { RAX() = ~(u64)0; return true; }
 
-		// store in the file descriptor (make sure smart pointer is released)
-		fd->Open(f.release(), true, false);
+		// store in the file descriptor
+		fd->Open(f.get(), true, false); // provide fd->Open() with the stream pointer
+		f.release(); // only if it succeeded should we release the unique_ptr
 		RAX() = fd_index;
 
 		return true;

@@ -165,47 +165,6 @@ namespace CSX64
 		/// <param name="sub">the resulting subtracted terms. should be empty before the call</param>
 		void PopulateAddSub(std::vector<Expr> &add, std::vector<Expr> &sub) &&;
 
-		/*
-		void _ToString(std::string &b)
-		{
-		if (OP == OPs::None)
-		{
-		b.Append(Token == null ? _Floating ? AsDouble(_Result).ToString("e17") : ((i64)_Result).ToString() : Token);
-		}
-		else
-		{
-		// if we're a unary op
-		if (Right == nullptr)
-		{
-		b.Append(OP.ToString());
-
-		b.Append('(');
-		Left._ToString(b);
-		b.Append(')');
-		}
-		// otherwise we're a binary op
-		else
-		{
-		b.Append('(');
-		Left._ToString(b);
-		b.Append(')');
-
-		b.Append(OP.ToString());
-
-		b.Append('(');
-		Right._ToString(b);
-		b.Append(')');
-		}
-		}
-		}
-		std::string ToString() const
-		{
-		StringBuilder b = new StringBuilder();
-		_ToString(b);
-		return b.ToString();
-		}
-		*/
-
 		// ----------------------------
 
 		/// <summary>

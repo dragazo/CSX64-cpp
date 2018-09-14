@@ -16,6 +16,12 @@ namespace CSX64
 	typedef std::int16_t i16;
 	typedef std::int8_t i8;
 
+	typedef double f64;
+	typedef float f32;
+
+	static_assert(sizeof(f64) == sizeof(u64), "Uhoh!! double isn't 64-bit in this compiler!");
+	static_assert(sizeof(f32) == sizeof(u32), "Uhoh!! float isn't 32-bit in this compiler!");
+
 	enum class OPCode
 	{
 		// x86 instructions

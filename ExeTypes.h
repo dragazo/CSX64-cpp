@@ -5,6 +5,7 @@
 #include <iostream>
 #include <fstream>
 #include <exception>
+#include <algorithm>
 
 #include "CoreTypes.h"
 
@@ -283,6 +284,8 @@ namespace CSX64
 		FileDescriptor &operator=(const FileDescriptor&) = delete;
 		FileDescriptor &operator=(FileDescriptor &&other)
 		{
+			using std::swap;
+
 			std::swap(managed, other.managed);
 			std::swap(interactive, other.interactive);
 			std::swap(stream, other.stream);
@@ -295,7 +298,8 @@ namespace CSX64
 		// ----------------------------
 
 		/// <summary>
-		/// Assigns the given stream to this file descriptor. Throws <see cref="std::runtime_error"/> if already in use
+		/// Assigns the given stream to this file descriptor. Throws <see cref="std::runtime_error"/> if already in use.
+		/// On success, is usable. On failure, is not modified.
 		/// </summary>
 		/// <param name="stream">the stream source</param>
 		/// <param name="managed">marks that this stream is considered "managed". see CSX64 manual for more information</param>
@@ -315,9 +319,10 @@ namespace CSX64
 		/// </summary>
 		bool Close()
 		{
-			// if the file is managed, we need to close (and deallocate) it
+			// delete the stream if we were asked to manage it
 			if (managed) delete stream;
-			// unlink the stream
+
+			// unlink it in either case
 			stream = nullptr;
 
 			return true;

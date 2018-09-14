@@ -2393,7 +2393,7 @@ bool AssembleArgs::TryExtractVPUMask(std::string &arg, std::unique_ptr<Expr> &ma
 		if (!TryParseImm(innards, _mask, sizecode, explicit_size)) return false;
 
 		// we now need to return it as a dynamic object - handle with care
-		mask.reset(new Expr(std::move(_mask)));
+		mask = std::make_unique<Expr>(std::move(_mask));
 	}
 
 	return true;

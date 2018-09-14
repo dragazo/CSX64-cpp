@@ -14,6 +14,8 @@
 #include <queue>
 #include <algorithm>
 #include <memory>
+#include <limits>
+#include <memory>
 
 #include "Assembly.h"
 #include "Utility.h"
@@ -329,24 +331,20 @@ namespace CSX64
 		// add all the predefined symbols
 		args.file.Symbols.insert(PredefinedSymbols.begin(), PredefinedSymbols.end());
 		
-		// add a few more that we create ?? maybe --
-		/*
-		// create the table of predefined symbols
-		args.file.Symbols = new Dictionary<string, Expr>(PredefinedSymbols)
-		{
-		["__version__"] = new Expr(){IntResult = Computer.Version},
+		// -- add a few more that we create -- //
+		
+		//args.file.Symbols.insert(std::make_pair("__version__", Expr::CreateInt(Computer::Version)));
 
-		["__pinf__"] = new Expr(){FloatResult = double.PositiveInfinity},
-		["__ninf__"] = new Expr(){FloatResult = double.NegativeInfinity},
-		["__nan__"] = new Expr(){FloatResult = double.NaN},
+		args.file.Symbols.insert(std::make_pair("__pinf__", Expr::CreateFloat(std::numeric_limits<double>::infinity())));
+		args.file.Symbols.insert(std::make_pair("__ninf__", Expr::CreateFloat(-std::numeric_limits<double>::infinity())));
+		args.file.Symbols.insert(std::make_pair("__nan__", Expr::CreateFloat(std::numeric_limits<double>::quiet_NaN())));
 
-		["__fmax__"] = new Expr(){FloatResult = double.MaxValue},
-		["__fmin__"] = new Expr(){FloatResult = double.MinValue},
-		["__fepsilon__"] = new Expr(){FloatResult = double.Epsilon},
+		args.file.Symbols.insert(std::make_pair("__fmax__", Expr::CreateFloat(std::numeric_limits<double>::max())));
+		args.file.Symbols.insert(std::make_pair("__fmin__", Expr::CreateFloat(std::numeric_limits<double>::min())));
+		args.file.Symbols.insert(std::make_pair("__fepsilon__", Expr::CreateFloat(std::numeric_limits<double>::denorm_min())));
 
-		["__pi__"] = new Expr(){FloatResult = Math.PI},
-		["__e__"] = new Expr(){FloatResult = Math.E}
-		};*/
+		args.file.Symbols.insert(std::make_pair("__pi__", Expr::CreateFloat(3.141592653589793238462643383279502884197169399375105820974)));
+		args.file.Symbols.insert(std::make_pair("__e__", Expr::CreateFloat(2.718281828459045235360287471352662497757247093699959574966)));
 
 		// potential parsing args for an instruction
 		u64 a = 0, b = 0;
