@@ -529,59 +529,50 @@ namespace CSX64
 		return vals;
 	}
 
-	template<typename T>
-	void __PopulateAddSub(T &expr, std::vector<T*> &add, std::vector<T*> &sub)
+	void Expr::PopulateAddSub(std::vector<Expr> &add, std::vector<Expr> &sub) &&
 	{
 		// if it's addition
-		if (expr.OP == Expr::OPs::Add)
+		if (OP == Expr::OPs::Add)
 		{
 			// recurse to children
-			expr.Left->PopulateAddSub(add, sub);
-			expr.Right->PopulateAddSub(add, sub);
+			std::move(*Left).PopulateAddSub(add, sub);
+			std::move(*Right).PopulateAddSub(add, sub);
 		}
 		// if it's subtraction
-		else if (expr.OP == Expr::OPs::Sub)
+		else if (OP == Expr::OPs::Sub)
 		{
 			// recurse to children
-			expr.Left->PopulateAddSub(add, sub);
-			expr.Right->PopulateAddSub(sub, add); // reverse add/sub lists to account for subtraction
+			std::move(*Left).PopulateAddSub(add, sub);
+			std::move(*Right).PopulateAddSub(sub, add); // reverse add/sub lists to account for subtraction
 		}
 		// if it's negation
-		else if (expr.OP == Expr::OPs::Neg)
+		else if (OP == Expr::OPs::Neg)
 		{
 			// recurse to child
-			expr.Left->PopulateAddSub(sub, add); // reverse add/sub lists to account for subtraction
+			std::move(*Left).PopulateAddSub(sub, add); // reverse add/sub lists to account for subtraction
 		}
 		// otherwise it's not part of addition or subtraction
 		else
 		{
 			// add to addition tree
-			add.push_back(&expr);
+			add.push_back(std::move(*this));
 		}
 	}
-	void Expr::PopulateAddSub(std::vector<Expr*> &add, std::vector<Expr*> &sub)
-	{
-		__PopulateAddSub(*this, add, sub);
-	}
-	void Expr::PopulateAddSub(std::vector<const Expr*> &add, std::vector<const Expr*> &sub) const
-	{
-		__PopulateAddSub(*this, add, sub);
-	}
 
-	Expr Expr::ChainAddition(const std::vector<const Expr*> &items)
+	Expr Expr::ChainAddition(const std::vector<Expr> &items)
 	{
 		Expr res;
 
 		// if there's nothing, return a zero
 		if (items.size() == 0) return res;
 		// if there's 1 item, return it alone
-		else if (items.size() == 1) { res = std::move(*items[0]); return res; }
+		else if (items.size() == 1) { res = std::move(items[0]); return res; }
 		// otherwise we have work to do
 		else
 		{
 			// set up res for addition with the first item on the left
 			res.OP = OPs::Add;
-			res.Left = new Expr(std::move(*items[0]));
+			res.Left = new Expr(std::move(items[0]));
 
 			// working position - we'll add new addition nodes to the right, with items on their left
 			Expr *pos = &res;
@@ -592,11 +583,11 @@ namespace CSX64
 				// add this item to the tree
 				pos = pos->Right = new Expr;
 				pos->OP = OPs::Add;
-				pos->Left = new Expr(std::move(*items[i]));
+				pos->Left = new Expr(std::move(items[i]));
 			}
 
 			// add the last item to the tree
-			pos->Right = new Expr(std::move(*items[items.size() - 1]));
+			pos->Right = new Expr(std::move(items.back()));
 
 			// return the resulting tree
 			return res;

@@ -231,11 +231,11 @@ bool AssembleArgs::TryPad(u64 size)
 	}
 }
 
-bool AssembleArgs::__TryParseImm(const std::string &token, Expr *&expr)
+bool AssembleArgs::__TryParseImm(const std::string &token, std::unique_ptr<Expr> &expr)
 {
 	expr = nullptr; // initially-nulled result
 
-	Expr *temp, *_temp; // temporary for node creation
+	std::unique_ptr<Expr> temp, _temp; // temporary for node creation
 
 	int pos = 0, end; // position in token
 
@@ -330,7 +330,7 @@ bool AssembleArgs::__TryParseImm(const std::string &token, Expr *&expr)
 				// must be in a segment
 				if (current_seg == AsmSegment::INVALID) { res = {AssembleError::FormatError, "line " + tostr(line) + ": Attempt to take an address outside of a segment"}; return false; }
 
-				temp = new Expr;
+				temp = std::make_unique<Expr>();
 				temp->OP = Expr::OPs::Add;
 				temp->Left = Expr::NewToken(SegOffsets.at(current_seg)).release();
 				temp->Right = Expr::NewInt(line_pos_in_seg).release();
@@ -341,13 +341,13 @@ bool AssembleArgs::__TryParseImm(const std::string &token, Expr *&expr)
 				// must be in a segment
 				if (current_seg == AsmSegment::INVALID) { res = {AssembleError::FormatError, "line " + tostr(line) + ": Attempt to take an address outside of a segment"}; return false; }
 
-				temp = Expr::NewToken(SegOrigins.at(current_seg)).release();
+				temp = Expr::NewToken(SegOrigins.at(current_seg));
 			}
 			// otherwise it's a normal value/symbol
 			else
 			{
 				// create the hole for it
-				temp = Expr::NewToken(val).release();
+				temp = Expr::NewToken(val);
 
 				// it either needs to be evaluatable or a valid label name
 				if (!temp->Evaluatable(file.Symbols) && !IsValidName(val, err))
@@ -365,25 +365,25 @@ bool AssembleArgs::__TryParseImm(const std::string &token, Expr *&expr)
 			switch (uop)
 			{
 			case '+': break; // unary plus does nothing
-			case '-': _temp = new Expr; _temp->OP = Expr::OPs::Neg; _temp->Left = temp; temp = _temp; break;
-			case '~': _temp = new Expr; _temp->OP = Expr::OPs::BitNot; _temp->Left = temp; temp = _temp; break;
-			case '!': _temp = new Expr; _temp->OP = Expr::OPs::LogNot; _temp->Left = temp; temp = _temp; break;
-			case '*': _temp = new Expr; _temp->OP = Expr::OPs::Float; _temp->Left = temp; temp = _temp; break;
-			case '/': _temp = new Expr; _temp->OP = Expr::OPs::Int; _temp->Left = temp; temp = _temp; break;
+			case '-': _temp = std::make_unique<Expr>(); _temp->OP = Expr::OPs::Neg; /*   */ _temp->Left = temp.release(); temp = std::move(_temp); break;
+			case '~': _temp = std::make_unique<Expr>(); _temp->OP = Expr::OPs::BitNot; /**/ _temp->Left = temp.release(); temp = std::move(_temp); break;
+			case '!': _temp = std::make_unique<Expr>(); _temp->OP = Expr::OPs::LogNot; /**/ _temp->Left = temp.release(); temp = std::move(_temp); break;
+			case '*': _temp = std::make_unique<Expr>(); _temp->OP = Expr::OPs::Float; /* */ _temp->Left = temp.release(); temp = std::move(_temp); break;
+			case '/': _temp = std::make_unique<Expr>(); _temp->OP = Expr::OPs::Int; /*   */ _temp->Left = temp.release(); temp = std::move(_temp); break;
 
-			default: throw std::runtime_error("unary op \'" + tostr(uop) + "}\' not implemented");
+			default: throw std::runtime_error("unary op \'" + tostr(uop) + "\' not implemented");
 			}
 		}
 
 		// -- append subtree to main tree --
 
 		// if no tree yet, use this one
-		if (expr == nullptr) expr = temp;
+		if (expr == nullptr) expr = std::move(temp);
 		// otherwise append to current (guaranteed to be defined by second pass)
 		else
 		{
 			// put it in the right (guaranteed by this algorithm to be empty)
-			stack.back()->Right = temp;
+			stack.back()->Right = temp.release();
 		}
 
 		// flag as a valid binary pair (i.e. every binary op now has 2 operands)
@@ -428,19 +428,21 @@ bool AssembleArgs::__TryParseImm(const std::string &token, Expr *&expr)
 		if (stack.back())
 		{
 			// splice in the new operator, moving current's right sub-tree to left of new node
-			_temp = new Expr;
+			_temp = std::make_unique<Expr>();
 			_temp->OP = op;
 			_temp->Left = stack.back()->Right;
-			stack.push_back(stack.back()->Right = _temp);
+			stack.back()->Right = _temp.release();
+			stack.push_back(stack.back()->Right);
 		}
 		// otherwise we'll have to move the root
 		else
 		{
 			// splice in the new operator, moving entire tree to left of new node
-			_temp = new Expr;
+			_temp = std::make_unique<Expr>();
 			_temp->OP = op;
-			_temp->Left = expr;
-			stack.push_back(expr = _temp);
+			_temp->Left = expr.release();
+			expr = std::move(_temp);
+			stack.push_back(expr.get());
 		}
 
 		binPair = false; // flag as invalid binary pair
@@ -459,9 +461,9 @@ bool AssembleArgs::__TryParseImm(const std::string &token, Expr *&expr)
 	if (unpaired_conditionals != 0) { res = {AssembleError::FormatError, "line " + tostr(line) + ": Expression contained incomplete ternary conditionals"}; return false; }
 
 	// run ptrdiff logic on result
-	_temp = Ptrdiff(expr);
-	delete expr;
-	expr = _temp;
+	std::cerr << "before: " << *expr << '\n';
+	expr = Ptrdiff(std::move(expr));
+	std::cerr << "after:  " << *expr << "\n\n";
 
 	return true;
 }
@@ -477,10 +479,9 @@ bool AssembleArgs::TryParseImm(std::string token, Expr &expr, u64 &sizecode, boo
 	else if (StartsWithToken(utoken, "QWORD")) { sizecode = 3; explicit_size = true; token = TrimStart(token.substr(5)); }
 
 	// refer to helper (and iron out the pointer stuff for the caller)
-	Expr *ptr;
-	if (!__TryParseImm(token, ptr)) { delete ptr; return false; }
+	std::unique_ptr<Expr> ptr;
+	if (!__TryParseImm(token, ptr)) return false;
 	expr = std::move(*ptr);
-	delete ptr;
 
 	return true;
 }
@@ -497,6 +498,7 @@ bool AssembleArgs::TryParseInstantImm(std::string token, u64 &val, bool &floatin
 
 bool AssembleArgs::TryExtractPtrVal(const Expr *expr, const Expr *&val, const std::string &_base)
 {
+	// initially null val
 	val = nullptr;
 
 	// if this is a leaf
@@ -519,94 +521,88 @@ bool AssembleArgs::TryExtractPtrVal(const Expr *expr, const Expr *&val, const st
 	val = expr->Right;
 	return true;
 }
-Expr *AssembleArgs::Ptrdiff(Expr *expr)
+std::unique_ptr<Expr> AssembleArgs::Ptrdiff(std::unique_ptr<Expr> expr)
 {
 	// on null, return null as well
 	if (expr == nullptr) return nullptr;
 
-	std::vector<const Expr*> add; // list of added terms
-	std::vector<const Expr*> sub; // list of subtracted terms
+	std::vector<Expr> add; // list of added terms
+	std::vector<Expr> sub; // list of subtracted terms
 
-	const Expr *a = nullptr, *b = nullptr; // expression temporaries for lookup (initialized cause compiler yelled at me)
-	Expr *temp;
+	const Expr *a = nullptr, *b = nullptr; // expression pointers for lookup (initialized cause compiler yelled at me)
 
 	// populate lists
-	expr->PopulateAddSub(add, sub);
+	std::move(*expr).PopulateAddSub(add, sub);
 
 	// perform ptrdiff reduction on anything defined by the linker
-	for (const std::string &seg_name : VerifyLegalExpressionIgnores)
+	for (const std::string &seg_name : PtrdiffIDs)
 	{
+		// i and j incremented after each pass to ensure same pair isn't matched next time
 		for (int i = 0, j = 0; ; ++i, ++j)
 		{
 			// wind i up to next add label
-			for (; i < add.size() && !TryExtractPtrVal(add[i], a, seg_name); ++i);
+			for (; i < add.size() && !TryExtractPtrVal(&add[i], a, seg_name); ++i);
 			// if this exceeds bounds, break
 			if (i >= add.size()) break;
 
 			// wind j up to next sub label
-			for (; j < sub.size() && !TryExtractPtrVal(sub[j], b, seg_name); ++j);
+			for (; j < sub.size() && !TryExtractPtrVal(&sub[j], b, seg_name); ++j);
 			// if this exceeds bounds, break
 			if (j >= sub.size()) break;
 
 			// we got a pair: replace items in add/sub with their pointer values
 			// if extract succeeded but returned null, the "missing" value is zero - just remove from the list
-			if (a) add[i] = a; else { std::swap(add[i], add.back()); add.pop_back(); }
-			if (b) sub[j] = b; else { std::swap(sub[j], sub.back()); sub.pop_back(); }
+			if (a) add[i] = *a; else { std::swap(add[i], add.back()); add.pop_back(); }
+			if (b) sub[j] = *b; else { std::swap(sub[j], sub.back()); sub.pop_back(); }
 		}
 	}
-
+	
 	// for each add item
-	for (int i = 0; i < add.size(); ++i)
+	for (std::size_t i = 0; i < add.size(); ++i)
 	{
 		// if it's not a leaf
-		if (!add[i]->IsLeaf())
+		if (!add[i].IsLeaf())
 		{
 			// recurse on children
-			temp = new Expr;
-			temp->OP = add[i]->OP;
-			temp->Left = Ptrdiff(add[i]->Left);
-			temp->Right = Ptrdiff(add[i]->Right);
-			add[i] = temp;
+			Expr temp;
+			temp.OP = add[i].OP;
+			temp.Left = Ptrdiff(std::make_unique<Expr>(*add[i].Left)).release();
+			temp.Right = Ptrdiff(std::make_unique<Expr>(*add[i].Right)).release();
+			add[i] = std::move(temp);
 		}
-		// otherwise take a copy (so result won't be obliterated by deleting the source)
-		else add[i] = new Expr(std::move(*add[i]));
 	}
 	// for each sub item
-	for (int i = 0; i < sub.size(); ++i)
+	for (std::size_t i = 0; i < sub.size(); ++i)
 	{
 		// if it's not a leaf
-		if (!sub[i]->IsLeaf())
+		if (!sub[i].IsLeaf())
 		{
 			// recurse on children
-			temp = new Expr;
-			temp->OP = sub[i]->OP;
-			temp->Left = Ptrdiff(sub[i]->Left);
-			temp->Right = Ptrdiff(sub[i]->Right);
-			sub[i] = temp;
+			Expr temp;
+			temp.OP = sub[i].OP;
+			temp.Left = Ptrdiff(std::make_unique<Expr>(*sub[i].Left)).release();
+			temp.Right = Ptrdiff(std::make_unique<Expr>(*sub[i].Right)).release();
+			sub[i] = std::move(temp);
 		}
-		// otherwise take a copy (so result won't be obliterated by deleting the source)
-		else sub[i] = new Expr(std::move(*sub[i]));
 	}
-
+	
 	// stitch together the new tree
-	if (sub.size() == 0) temp = new Expr(Expr::ChainAddition(add));
+	if (sub.size() == 0) return std::make_unique<Expr>(Expr::ChainAddition(add));
 	else if (add.size() == 0)
 	{
-		temp = new Expr;
-		temp->OP = Expr::OPs::Neg;
-		temp->Left = new Expr(Expr::ChainAddition(sub));
-		return temp;
+		std::unique_ptr<Expr> res = std::make_unique<Expr>();
+		res->OP = Expr::OPs::Neg;
+		res->Left = new Expr(Expr::ChainAddition(sub));
+		return res;
 	}
 	else
 	{
-		temp = new Expr;
-		temp->OP = Expr::OPs::Sub;
-		temp->Left = new Expr(Expr::ChainAddition(add));
-		temp->Right = new Expr(Expr::ChainAddition(sub));
-		return temp;
+		std::unique_ptr<Expr> res = std::make_unique<Expr>();
+		res->OP = Expr::OPs::Sub;
+		res->Left = new Expr(Expr::ChainAddition(add));
+		res->Right = new Expr(Expr::ChainAddition(sub));
+		return res;
 	}
-
-	return temp;
 }
 
 bool AssembleArgs::TryParseInstantPrefixedImm(const std::string &token, const std::string &prefix, u64 &val, bool &floating, u64 &sizecode, bool &explicit_size)

@@ -166,8 +166,7 @@ namespace CSX64
 		/// </summary>
 		/// <param name="add">the resulting added terms. should be empty before the call</param>
 		/// <param name="sub">the resulting subtracted terms. should be empty before the call</param>
-		void PopulateAddSub(std::vector<Expr*> &add, std::vector<Expr*> &sub);
-		void PopulateAddSub(std::vector<const Expr*> &add, std::vector<const Expr*> &sub) const;
+		void PopulateAddSub(std::vector<Expr> &add, std::vector<Expr> &sub) &&;
 
 		/*
 		void _ToString(std::string &b)
@@ -217,7 +216,7 @@ namespace CSX64
 		/// Nodes are added to the tree via move construction - their values in the source will be changed
 		/// </summary>
 		/// <param name="items">the items to create a tree from</param>
-		static Expr ChainAddition(const std::vector<const Expr*> &items);
+		static Expr ChainAddition(const std::vector<Expr> &items);
 
 		static Expr CreateToken(std::string val);
 		static Expr CreateInt(u64 val);

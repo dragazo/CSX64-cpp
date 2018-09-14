@@ -66,7 +66,7 @@ namespace CSX64
 		bool TryAlign(u64 size);
 		bool TryPad(u64 size);
 
-		bool __TryParseImm(const std::string &token, Expr *&expr);
+		bool __TryParseImm(const std::string &token, std::unique_ptr<Expr> &expr);
 		bool TryParseImm(std::string token, Expr &expr, u64 &sizecode, bool &explicit_size);
 		bool TryParseInstantImm(std::string token, u64 &val, bool &floating, u64 &sizecode, bool &explicit_size);
 
@@ -80,7 +80,7 @@ namespace CSX64
 		/// Performs pointer difference arithmetic on the expression tree and returns the result
 		/// </summary>
 		/// <param name="expr">the expression tree to operate on</param>
-		Expr *Ptrdiff(Expr *expr);
+		std::unique_ptr<Expr> Ptrdiff(std::unique_ptr<Expr> expr);
 
 		/// <summary>
 		/// Attempts to parse an imm that has a prefix. If the imm is a compound expression, it must be parenthesized

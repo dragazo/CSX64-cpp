@@ -64,6 +64,14 @@ namespace CSX64
 	{AsmSegment::BSS, "#B"}
 	};
 
+	const std::unordered_set<std::string> PtrdiffIDs
+	{
+		"#t", "#r", "#d", "#b",
+		"#T", "#R", "#D", "#B",
+
+		"__heap__",
+	};
+
 	const std::unordered_set<std::string> VerifyLegalExpressionIgnores
 	{
 		"__heap__"

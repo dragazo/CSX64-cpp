@@ -24,6 +24,9 @@ namespace CSX64
 	extern const std::unordered_map<AsmSegment, std::string> SegOffsets;
 	extern const std::unordered_map<AsmSegment, std::string> SegOrigins;
 
+	// a set of all the ids to use for ptrdiff logic
+	extern const std::unordered_set<std::string> PtrdiffIDs;
+
 	extern const std::unordered_set<std::string> VerifyLegalExpressionIgnores;
 
 	extern const std::unordered_set<std::string> AdditionalReservedSymbols;
