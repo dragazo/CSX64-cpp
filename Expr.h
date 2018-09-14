@@ -70,22 +70,20 @@ namespace CSX64
 	public:
 
 		OPs OP;
-		Expr *Left, *Right;
+		std::unique_ptr<Expr> Left, Right;
 
 		// creates an expression with a value of integral zero
-		Expr() noexcept;
-		// destroys the expression tree recursively, leaving the object in an undefined state
-		~Expr() noexcept;
+		Expr();
 
 		// creates an expression tree by copying another tree
-		Expr(const Expr &other) noexcept;
+		Expr(const Expr &other);
 		// creates an expression tree using the resources of another tree. the other tree is left in a valid but undefined evaluated state
-		Expr(Expr &&other) noexcept;
+		Expr(Expr &&other);
 
 		// assigns this tree a copy of another tree
-		Expr &operator=(const Expr &other) noexcept;
+		Expr &operator=(const Expr &other);
 		// assigns this tree the resources of another tree. the other tree is left in a valid but undefined state.
-		Expr &operator=(Expr &&other) noexcept;
+		Expr &operator=(Expr &&other);
 
 		// frees children recursively and sets this node to a valid but undefined evaluated state - effectively creates an empty node
 		void Clear();
@@ -100,9 +98,8 @@ namespace CSX64
 			if (_Token.empty()) throw std::invalid_argument("Expr token cannot be empty string");
 
 			OP = OPs::None;
-			delete Left;
-			delete Right;
-			Left = Right = nullptr;
+			Left = nullptr;
+			Right = nullptr;
 		}
 
 		// Gets if this node is a leaf

@@ -332,8 +332,8 @@ bool AssembleArgs::__TryParseImm(const std::string &token, std::unique_ptr<Expr>
 
 				temp = std::make_unique<Expr>();
 				temp->OP = Expr::OPs::Add;
-				temp->Left = Expr::NewToken(SegOffsets.at(current_seg)).release();
-				temp->Right = Expr::NewInt(line_pos_in_seg).release();
+				temp->Left = Expr::NewToken(SegOffsets.at(current_seg));
+				temp->Right = Expr::NewInt(line_pos_in_seg);
 			}
 			// if it's the start of segment macro
 			else if (val == StartOfSegMacro)
@@ -365,11 +365,11 @@ bool AssembleArgs::__TryParseImm(const std::string &token, std::unique_ptr<Expr>
 			switch (uop)
 			{
 			case '+': break; // unary plus does nothing
-			case '-': _temp = std::make_unique<Expr>(); _temp->OP = Expr::OPs::Neg; /*   */ _temp->Left = temp.release(); temp = std::move(_temp); break;
-			case '~': _temp = std::make_unique<Expr>(); _temp->OP = Expr::OPs::BitNot; /**/ _temp->Left = temp.release(); temp = std::move(_temp); break;
-			case '!': _temp = std::make_unique<Expr>(); _temp->OP = Expr::OPs::LogNot; /**/ _temp->Left = temp.release(); temp = std::move(_temp); break;
-			case '*': _temp = std::make_unique<Expr>(); _temp->OP = Expr::OPs::Float; /* */ _temp->Left = temp.release(); temp = std::move(_temp); break;
-			case '/': _temp = std::make_unique<Expr>(); _temp->OP = Expr::OPs::Int; /*   */ _temp->Left = temp.release(); temp = std::move(_temp); break;
+			case '-': _temp = std::make_unique<Expr>(); _temp->OP = Expr::OPs::Neg; /*   */ _temp->Left = std::move(temp); temp = std::move(_temp); break;
+			case '~': _temp = std::make_unique<Expr>(); _temp->OP = Expr::OPs::BitNot; /**/ _temp->Left = std::move(temp); temp = std::move(_temp); break;
+			case '!': _temp = std::make_unique<Expr>(); _temp->OP = Expr::OPs::LogNot; /**/ _temp->Left = std::move(temp); temp = std::move(_temp); break;
+			case '*': _temp = std::make_unique<Expr>(); _temp->OP = Expr::OPs::Float; /* */ _temp->Left = std::move(temp); temp = std::move(_temp); break;
+			case '/': _temp = std::make_unique<Expr>(); _temp->OP = Expr::OPs::Int; /*   */ _temp->Left = std::move(temp); temp = std::move(_temp); break;
 
 			default: throw std::runtime_error("unary op \'" + tostr(uop) + "\' not implemented");
 			}
@@ -383,7 +383,7 @@ bool AssembleArgs::__TryParseImm(const std::string &token, std::unique_ptr<Expr>
 		else
 		{
 			// put it in the right (guaranteed by this algorithm to be empty)
-			stack.back()->Right = temp.release();
+			stack.back()->Right = std::move(temp);
 		}
 
 		// flag as a valid binary pair (i.e. every binary op now has 2 operands)
@@ -430,9 +430,9 @@ bool AssembleArgs::__TryParseImm(const std::string &token, std::unique_ptr<Expr>
 			// splice in the new operator, moving current's right sub-tree to left of new node
 			_temp = std::make_unique<Expr>();
 			_temp->OP = op;
-			_temp->Left = stack.back()->Right;
-			stack.back()->Right = _temp.release();
-			stack.push_back(stack.back()->Right);
+			_temp->Left = std::move(stack.back()->Right);
+			stack.back()->Right = std::move(_temp);
+			stack.push_back(stack.back()->Right.get());
 		}
 		// otherwise we'll have to move the root
 		else
@@ -440,7 +440,7 @@ bool AssembleArgs::__TryParseImm(const std::string &token, std::unique_ptr<Expr>
 			// splice in the new operator, moving entire tree to left of new node
 			_temp = std::make_unique<Expr>();
 			_temp->OP = op;
-			_temp->Left = expr.release();
+			_temp->Left = std::move(expr);
 			expr = std::move(_temp);
 			stack.push_back(expr.get());
 		}
@@ -461,9 +461,7 @@ bool AssembleArgs::__TryParseImm(const std::string &token, std::unique_ptr<Expr>
 	if (unpaired_conditionals != 0) { res = {AssembleError::FormatError, "line " + tostr(line) + ": Expression contained incomplete ternary conditionals"}; return false; }
 
 	// run ptrdiff logic on result
-	std::cerr << "before: " << *expr << '\n';
 	expr = Ptrdiff(std::move(expr));
-	std::cerr << "after:  " << *expr << "\n\n";
 
 	return true;
 }
@@ -518,7 +516,7 @@ bool AssembleArgs::TryExtractPtrVal(const Expr *expr, const Expr *&val, const st
 	if (expr->OP != Expr::OPs::Add || expr->Left->Token() && *expr->Left->Token() != _base) return false;
 
 	// return the value portion
-	val = expr->Right;
+	val = expr->Right.get();
 	return true;
 }
 std::unique_ptr<Expr> AssembleArgs::Ptrdiff(std::unique_ptr<Expr> expr)
@@ -556,7 +554,7 @@ std::unique_ptr<Expr> AssembleArgs::Ptrdiff(std::unique_ptr<Expr> expr)
 			if (b) sub[j] = *b; else { std::swap(sub[j], sub.back()); sub.pop_back(); }
 		}
 	}
-	
+
 	// for each add item
 	for (std::size_t i = 0; i < add.size(); ++i)
 	{
@@ -566,8 +564,8 @@ std::unique_ptr<Expr> AssembleArgs::Ptrdiff(std::unique_ptr<Expr> expr)
 			// recurse on children
 			Expr temp;
 			temp.OP = add[i].OP;
-			temp.Left = Ptrdiff(std::make_unique<Expr>(*add[i].Left)).release();
-			temp.Right = Ptrdiff(std::make_unique<Expr>(*add[i].Right)).release();
+			temp.Left = Ptrdiff(std::move(add[i].Left)); // we can use move on these because we'll be replacing add[i] anyway
+			temp.Right = Ptrdiff(std::move(add[i].Right));
 			add[i] = std::move(temp);
 		}
 	}
@@ -580,27 +578,27 @@ std::unique_ptr<Expr> AssembleArgs::Ptrdiff(std::unique_ptr<Expr> expr)
 			// recurse on children
 			Expr temp;
 			temp.OP = sub[i].OP;
-			temp.Left = Ptrdiff(std::make_unique<Expr>(*sub[i].Left)).release();
-			temp.Right = Ptrdiff(std::make_unique<Expr>(*sub[i].Right)).release();
+			temp.Left = Ptrdiff(std::move(sub[i].Left)); // we can use move on these because we'll be replacing sub[i] anyway
+			temp.Right = Ptrdiff(std::move(sub[i].Right));
 			sub[i] = std::move(temp);
 		}
 	}
-	
+
 	// stitch together the new tree
 	if (sub.size() == 0) return std::make_unique<Expr>(Expr::ChainAddition(add));
 	else if (add.size() == 0)
 	{
 		std::unique_ptr<Expr> res = std::make_unique<Expr>();
 		res->OP = Expr::OPs::Neg;
-		res->Left = new Expr(Expr::ChainAddition(sub));
+		res->Left = std::make_unique<Expr>(Expr::ChainAddition(sub));
 		return res;
 	}
 	else
 	{
 		std::unique_ptr<Expr> res = std::make_unique<Expr>();
 		res->OP = Expr::OPs::Sub;
-		res->Left = new Expr(Expr::ChainAddition(add));
-		res->Right = new Expr(Expr::ChainAddition(sub));
+		res->Left = std::make_unique<Expr>(Expr::ChainAddition(add));
+		res->Right = std::make_unique<Expr>(Expr::ChainAddition(sub));
 		return res;
 	}
 }
@@ -707,7 +705,7 @@ bool AssembleArgs::TryParseAddressReg(const std::string &label, Expr &hole, bool
 
 	std::string err; // evaluation error
 
-					 // while we can find this symbol
+	// while we can find this symbol
 	while (hole.FindPath(label, path, true))
 	{
 		// move path into list
@@ -722,11 +720,11 @@ bool AssembleArgs::TryParseAddressReg(const std::string &label, Expr &hole, bool
 		{
 			// add in a multiplier of 1
 			list[0]->OP = Expr::OPs::Mul;
-			list[0]->Left = Expr::NewInt(1).release();
-			list[0]->Right = Expr::NewToken(*list[0]->Token()).release();
+			list[0]->Left = Expr::NewInt(1);
+			list[0]->Right = Expr::NewToken(*list[0]->Token());
 
 			// insert new register location as beginning of path
-			list.insert(list.begin(), list[0]->Right);
+			list.insert(list.begin(), list[0]->Right.get());
 		}
 
 		// start 2 above (just above regular mult code)
@@ -739,7 +737,7 @@ bool AssembleArgs::TryParseAddressReg(const std::string &label, Expr &hole, bool
 			case Expr::OPs::Mul:
 			{
 				// toward leads to register, mult leads to mult value
-				Expr *toward = list[i - 1], *mult = list[i]->Left == list[i - 1] ? list[i]->Right : list[i]->Left;
+				Expr *toward = list[i - 1], *mult = list[i]->Left.get() == list[i - 1] ? list[i]->Right.get() : list[i]->Left.get();
 
 				// if pos is add/sub, we need to distribute
 				if (toward->OP == Expr::OPs::Add || toward->OP == Expr::OPs::Sub)
@@ -749,36 +747,36 @@ bool AssembleArgs::TryParseAddressReg(const std::string &label, Expr &hole, bool
 					toward->OP = Expr::OPs::Mul;
 
 					// create the distribution node
-					Expr *temp = new Expr;
+					std::unique_ptr<Expr> temp = std::make_unique<Expr>();
 					temp->OP = Expr::OPs::Mul;
-					temp->Left = mult;
+					temp->Left = std::make_unique<Expr>(*mult);
 
 					// compute right and transfer mult to toward
-					if (toward->Left == list[i - 2]) { temp->Right = toward->Right; toward->Right = mult; }
-					else { temp->Right = toward->Left; toward->Left = mult; }
+					if (toward->Left.get() == list[i - 2]) { temp->Right = std::move(toward->Right); toward->Right = std::make_unique<Expr>(*mult); }
+					else { temp->Right = std::move(toward->Left); toward->Left = std::make_unique<Expr>(*mult); }
 
 					// add it in
-					if (list[i]->Left == mult) list[i]->Left = temp; else list[i]->Right = temp;
+					if (list[i]->Left.get() == mult) list[i]->Left = std::move(temp); else list[i]->Right = std::move(temp);
 				}
 				// if pos is mul, we need to combine with pre-existing mult code
 				else if (toward->OP == Expr::OPs::Mul)
 				{
 					// create the combination node
-					Expr *temp = new Expr;
+					std::unique_ptr<Expr> temp = std::make_unique<Expr>();
 					temp->OP = Expr::OPs::Mul;
-					temp->Left = mult;
-					temp->Right = toward->Left == list[i - 2] ? toward->Right : toward->Left;
+					temp->Left = std::make_unique<Expr>(*mult);
+					temp->Right = toward->Left.get() == list[i - 2] ? std::move(toward->Right) : std::move(toward->Left);
 
 					// add it in
-					if (list[i]->Left == mult)
+					if (list[i]->Left.get() == mult)
 					{
-						list[i]->Left = temp; // replace mult with combination
-						list[i]->Right = list[i - 2]; // bump up toward
+						list[i]->Left = std::move(temp); // replace mult with combination
+						list[i]->Right = std::make_unique<Expr>(*list[i - 2]); // bump up toward
 					}
 					else
 					{
-						list[i]->Right = temp;
-						list[i]->Left = list[i - 2];
+						list[i]->Right = std::move(temp);
+						list[i]->Left = std::make_unique<Expr>(*list[i - 2]);
 					}
 
 					// remove the skipped list[i - 1]
@@ -787,21 +785,21 @@ bool AssembleArgs::TryParseAddressReg(const std::string &label, Expr &hole, bool
 				// if pos is neg, we need to put the negative on the mult
 				else if (toward->OP == Expr::OPs::Neg)
 				{
-					// create the combinartion node
-					Expr *temp = new Expr;
+					// create the combination node
+					std::unique_ptr<Expr> temp = std::make_unique<Expr>();
 					temp->OP = Expr::OPs::Neg;
-					temp->Left = mult;
+					temp->Left = std::make_unique<Expr>(*mult);
 
 					// add it in
-					if (list[i]->Left == mult)
+					if (list[i]->Left.get() == mult)
 					{
-						list[i]->Left = temp; // replace mult with combination
-						list[i]->Right = list[i - 2]; // bump up toward
+						list[i]->Left = std::move(temp); // replace mult with combination
+						list[i]->Right = std::make_unique<Expr>(*list[i - 2]); // bump up toward
 					}
 					else
 					{
-						list[i]->Right = temp;
-						list[i]->Left = list[i - 2];
+						list[i]->Right = std::move(temp);
+						list[i]->Left = std::make_unique<Expr>(*list[i - 2]);
 					}
 
 					// remove the skipped list[i - 1]
@@ -825,7 +823,7 @@ bool AssembleArgs::TryParseAddressReg(const std::string &label, Expr &hole, bool
 		// extract mult code fragment
 		u64 val;
 		bool floating;
-		if (!(list[1]->Left == list[0] ? list[1]->Right : list[1]->Left)->Evaluate(file.Symbols, val, floating, err))
+		if (!(list[1]->Left.get() == list[0] ? list[1]->Right : list[1]->Left)->Evaluate(file.Symbols, val, floating, err))
 		{
 			res = {AssembleError::FormatError, "line " + tostr(line) + ": Failed to evaluate register multiplier as an instant imm\n-> " + err}; return false;
 		}
@@ -836,7 +834,7 @@ bool AssembleArgs::TryParseAddressReg(const std::string &label, Expr &hole, bool
 		for (int i = (int)list.size() - 1; i >= 2; --i)
 		{
 			// if this will negate the register
-			if (list[i]->OP == Expr::OPs::Neg || list[i]->OP == Expr::OPs::Sub && list[i]->Right == list[i - 1])
+			if (list[i]->OP == Expr::OPs::Neg || list[i]->OP == Expr::OPs::Sub && list[i]->Right.get() == list[i - 1])
 			{
 				// negate found partial mult
 				val = ~val + 1;
@@ -1041,8 +1039,8 @@ bool AssembleArgs::TryProcessLabel()
 
 			Expr temp;
 			temp.OP = Expr::OPs::Add;
-			temp.Left = Expr::NewToken(SegOffsets.at(current_seg)).release();
-			temp.Right = Expr::NewInt(line_pos_in_seg).release();
+			temp.Left = Expr::NewToken(SegOffsets.at(current_seg));
+			temp.Right = Expr::NewInt(line_pos_in_seg);
 			file.Symbols.emplace(std::move(label_def), std::move(temp));
 		}
 	}
@@ -1705,8 +1703,8 @@ bool AssembleArgs::__TryProcessShift_mid()
 		if (!TryParseImm(args[1], imm, b_sizecode, explicit_size)) return false;
 
 		// mask the shift count to 6 bits (we just need to make sure it can't set the CL flag)
-		imm.Left = new Expr(std::move(imm));
-		imm.Right = Expr::NewInt(0x3f).release();
+		imm.Left = std::make_unique<Expr>(std::move(imm));
+		imm.Right = Expr::NewInt(0x3f);
 		imm.OP = Expr::OPs::BitAnd;
 
 		if (!TryAppendExpr(1, std::move(imm))) return false;

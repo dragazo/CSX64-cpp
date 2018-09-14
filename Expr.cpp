@@ -42,25 +42,23 @@ namespace CSX64
 
 	// ------------------------------
 
-	Expr::Expr() noexcept : OP(OPs::None), Left(nullptr), Right(nullptr), _Result(0), _Floating(false) {}
-	Expr::~Expr() noexcept { delete Left; delete Right; }
+	Expr::Expr() : OP(OPs::None), _Result(0), _Floating(false) {}
 
-	Expr::Expr(const Expr &other) noexcept : OP(other.OP), _Result(other._Result), _Floating(other._Floating), _Token(other._Token)
+	Expr::Expr(const Expr &other) : OP(other.OP), _Result(other._Result), _Floating(other._Floating), _Token(other._Token)
 	{
 		// copy children recursively
-		Left = other.Left ? new Expr(*other.Left) : nullptr;
-		Right = other.Right ? new Expr(*other.Right) : nullptr;
+		if (other.Left) Left = std::make_unique<Expr>(*other.Left);
+		if (other.Right) Right = std::make_unique<Expr>(*other.Right);
 	}
-	Expr::Expr(Expr &&other) noexcept : OP(other.OP), Left(other.Left), Right(other.Right),
+	Expr::Expr(Expr &&other) : OP(other.OP), Left(std::move(other.Left)), Right(std::move(other.Right)),
 		_Result(other._Result), _Floating(other._Floating), _Token(std::move(other._Token))
 	{
 		// empty other
 		other.OP = OPs::None;
-		other.Left = other.Right = nullptr;
 		other._Token.clear();
 	}
 
-	Expr &Expr::operator=(const Expr &other) noexcept
+	Expr &Expr::operator=(const Expr &other)
 	{
 		// do it in terms of the copy ctor
 		Expr temp(other);
@@ -68,7 +66,7 @@ namespace CSX64
 
 		return *this;
 	}
-	Expr &Expr::operator=(Expr &&other) noexcept
+	Expr &Expr::operator=(Expr &&other)
 	{
 		using std::swap;
 
@@ -87,18 +85,16 @@ namespace CSX64
 	void Expr::Clear()
 	{
 		OP = OPs::None;
-		delete Left;
-		delete Right;
-		Left = Right = nullptr;
+		Left = nullptr;
+		Right = nullptr;
 	}
 
 	void Expr::CacheResult(u64 result, bool floating)
 	{
 		// ensure this is now a leaf node
 		OP = OPs::None;
-		delete Left;
-		delete Right;
-		Left = Right = nullptr;
+		Left = nullptr;
+		Right = nullptr;
 
 		// discard token
 		_Token.clear();
@@ -572,7 +568,7 @@ namespace CSX64
 		{
 			// set up res for addition with the first item on the left
 			res.OP = OPs::Add;
-			res.Left = new Expr(std::move(items[0]));
+			res.Left = std::make_unique<Expr>(std::move(items[0]));
 
 			// working position - we'll add new addition nodes to the right, with items on their left
 			Expr *pos = &res;
@@ -581,13 +577,14 @@ namespace CSX64
 			for (std::size_t i = 1; i < items.size() - 1; ++i)
 			{
 				// add this item to the tree
-				pos = pos->Right = new Expr;
+				pos->Right = std::make_unique<Expr>();
+				pos = pos->Right.get();
 				pos->OP = OPs::Add;
-				pos->Left = new Expr(std::move(items[i]));
+				pos->Left = std::make_unique<Expr>(std::move(items[i]));
 			}
 
 			// add the last item to the tree
-			pos->Right = new Expr(std::move(items.back()));
+			pos->Right = std::make_unique<Expr>(std::move(items.back()));
 
 			// return the resulting tree
 			return res;
@@ -684,9 +681,9 @@ namespace CSX64
 		else
 		{
 			// do left branch
-			expr->Left = _ReadFrom(istr).release();
+			expr->Left = _ReadFrom(istr);
 			// do right branch if non-null
-			expr->Right = type & 32 ? _ReadFrom(istr).release() : nullptr;
+			if (type & 32) expr->Right = _ReadFrom(istr);
 		}
 
 		return expr;
