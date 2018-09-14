@@ -332,8 +332,8 @@ bool AssembleArgs::__TryParseImm(const std::string &token, Expr *&expr)
 
 				temp = new Expr;
 				temp->OP = Expr::OPs::Add;
-				temp->Left = Expr::NewToken(SegOffsets.at(current_seg));
-				temp->Right = Expr::NewInt(line_pos_in_seg);
+				temp->Left = Expr::NewToken(SegOffsets.at(current_seg)).release();
+				temp->Right = Expr::NewInt(line_pos_in_seg).release();
 			}
 			// if it's the start of segment macro
 			else if (val == StartOfSegMacro)
@@ -341,13 +341,13 @@ bool AssembleArgs::__TryParseImm(const std::string &token, Expr *&expr)
 				// must be in a segment
 				if (current_seg == AsmSegment::INVALID) { res = {AssembleError::FormatError, "line " + tostr(line) + ": Attempt to take an address outside of a segment"}; return false; }
 
-				temp = Expr::NewToken(SegOrigins.at(current_seg));
+				temp = Expr::NewToken(SegOrigins.at(current_seg)).release();
 			}
 			// otherwise it's a normal value/symbol
 			else
 			{
 				// create the hole for it
-				temp = Expr::NewToken(val);
+				temp = Expr::NewToken(val).release();
 
 				// it either needs to be evaluatable or a valid label name
 				if (!temp->Evaluatable(file.Symbols) && !IsValidName(val, err))
@@ -726,8 +726,8 @@ bool AssembleArgs::TryParseAddressReg(const std::string &label, Expr &hole, bool
 		{
 			// add in a multiplier of 1
 			list[0]->OP = Expr::OPs::Mul;
-			list[0]->Left = Expr::NewInt(1);
-			list[0]->Right = Expr::NewToken(*list[0]->Token());
+			list[0]->Left = Expr::NewInt(1).release();
+			list[0]->Right = Expr::NewToken(*list[0]->Token()).release();
 
 			// insert new register location as beginning of path
 			list.insert(list.begin(), list[0]->Right);
@@ -1045,8 +1045,8 @@ bool AssembleArgs::TryProcessLabel()
 
 			Expr temp;
 			temp.OP = Expr::OPs::Add;
-			temp.Left = Expr::NewToken(SegOffsets.at(current_seg));
-			temp.Right = Expr::NewInt(line_pos_in_seg);
+			temp.Left = Expr::NewToken(SegOffsets.at(current_seg)).release();
+			temp.Right = Expr::NewInt(line_pos_in_seg).release();
 			file.Symbols.emplace(std::move(label_def), std::move(temp));
 		}
 	}
@@ -1710,7 +1710,7 @@ bool AssembleArgs::__TryProcessShift_mid()
 
 		// mask the shift count to 6 bits (we just need to make sure it can't set the CL flag)
 		imm.Left = new Expr(std::move(imm));
-		imm.Right = Expr::NewInt(0x3f);
+		imm.Right = Expr::NewInt(0x3f).release();
 		imm.OP = Expr::OPs::BitAnd;
 
 		if (!TryAppendExpr(1, std::move(imm))) return false;

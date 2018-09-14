@@ -622,21 +622,21 @@ namespace CSX64
 		return expr;
 	}
 
-	Expr *Expr::NewToken(std::string val)
+	std::unique_ptr<Expr> Expr::NewToken(std::string val)
 	{
-		Expr *expr = new Expr;
+		std::unique_ptr<Expr> expr = std::make_unique<Expr>();
 		expr->Token(std::move(val));
 		return expr;
 	}
-	Expr *Expr::NewInt(u64 val)
+	std::unique_ptr<Expr> Expr::NewInt(u64 val)
 	{
-		Expr *expr = new Expr;
+		std::unique_ptr<Expr> expr = std::make_unique<Expr>();
 		expr->IntResult(val);
 		return expr;
 	}
-	Expr *Expr::NewFloat(double val)
+	std::unique_ptr<Expr> Expr::NewFloat(double val)
 	{
-		Expr *expr = new Expr;
+		std::unique_ptr<Expr> expr = std::make_unique<Expr>();
 		expr->FloatResult(val);
 		return expr;
 	}
@@ -665,10 +665,10 @@ namespace CSX64
 
 		return writer;
 	}
-	Expr *Expr::_ReadFrom(std::istream &istr)
+	std::unique_ptr<Expr> Expr::_ReadFrom(std::istream &istr)
 	{
 		// create the node
-		Expr *expr = new Expr;
+		std::unique_ptr<Expr> expr = std::make_unique<Expr>();
 
 		// read the type header
 		u8 type;
@@ -693,9 +693,9 @@ namespace CSX64
 		else
 		{
 			// do left branch
-			expr->Left = _ReadFrom(istr);
+			expr->Left = _ReadFrom(istr).release();
 			// do right branch if non-null
-			expr->Right = type & 32 ? _ReadFrom(istr) : nullptr;
+			expr->Right = type & 32 ? _ReadFrom(istr).release() : nullptr;
 		}
 
 		return expr;
@@ -703,11 +703,9 @@ namespace CSX64
 	std::istream &Expr::ReadFrom(std::istream &reader, Expr &expr)
 	{
 		// read the expression
-		Expr *temp = _ReadFrom(reader);
+		std::unique_ptr<Expr> temp = _ReadFrom(reader);
 		// move result to output
 		expr = std::move(*temp);
-		// free the temp
-		delete temp;
 
 		return reader;
 	}

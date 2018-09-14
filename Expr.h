@@ -5,6 +5,7 @@
 #include <iostream>
 #include <unordered_map>
 #include <vector>
+#include <memory>
 
 #include "CoreTypes.h"
 #include "Utility.h"
@@ -64,7 +65,7 @@ namespace CSX64
 		void _GetStringValues(std::vector<std::string*> &vals);
 
 		// helper for ReadFrom()
-		static Expr *_ReadFrom(std::istream &istr);
+		static std::unique_ptr<Expr> _ReadFrom(std::istream &istr);
 
 	public:
 
@@ -222,9 +223,9 @@ namespace CSX64
 		static Expr CreateInt(u64 val);
 		static Expr CreateFloat(double val);
 
-		static Expr *NewToken(std::string val);
-		static Expr *NewInt(u64 val);
-		static Expr *NewFloat(double val);
+		static std::unique_ptr<Expr> NewToken(std::string val);
+		static std::unique_ptr<Expr> NewInt(u64 val);
+		static std::unique_ptr<Expr> NewFloat(double val);
 
 		// Writes a binary representation of an expression to the stream
 		static std::ostream &WriteTo(std::ostream &writer, const Expr &expr);
