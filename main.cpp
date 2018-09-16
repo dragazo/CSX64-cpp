@@ -416,6 +416,10 @@ int main(int argc, const char *argv[])
 {
 	using namespace CSX64;
 
+	const char *new_args[] = {"./csx.exe", R"(C:\Users\Zuul\Desktop\csx64\cpp_CSX64\Release\fpu.exe)", "--time"};
+	argv = new_args;
+	argc = 3;
+
 	ProgramAction action = ProgramAction::ExecuteConsole; // requested action
 	std::vector<std::string> pathspec;                    // input paths
 	const char *entry_point = nullptr;                    // main entry point for linker

@@ -581,7 +581,7 @@ namespace CSX64
 	{"FNOP", asm_router_FNOP},
 
 	{"FWAIT", asm_router_FWAIT},
-	{"WAIT", asm_router_FWAIT} // WAIT aliases FWAIT
+	{"WAIT", asm_router_FWAIT}, // WAIT aliases FWAIT
 
 	{"FNINIT", asm_router_FNINIT},
 	{"FINIT", asm_router_FINIT},

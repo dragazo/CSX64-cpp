@@ -1,7 +1,16 @@
+#include <iostream>
+#include <iomanip>
+
 #include "Computer.h"
+
+#define __OPCODE_COUNTS 1
 
 namespace CSX64
 {
+	#if __OPCODE_COUNTS
+	u64 op_exe_count[256];
+	#endif
+
 	bool Computer::Initialize(std::vector<u8> &exe, std::vector<std::string> args, u64 stacksize)
 	{
 		// read header
@@ -90,6 +99,11 @@ namespace CSX64
 		Push(RSI());
 		Push(RDI());
 
+		#if __OPCODE_COUNTS
+		// clear op_exe_count
+		for (u64 i = 0; i < 256; ++i) op_exe_count[i] = 0;
+		#endif
+
 		return true;
 	}
 
@@ -107,6 +121,11 @@ namespace CSX64
 			// fetch the instruction
 			if (!GetMemAdv<u8>(op)) break;
 
+			#if __OPCODE_COUNTS
+			// update op exe count
+			++op_exe_count[op];
+			#endif
+
 			//std::cout << op << '\n';
 
 			// perform the instruction
@@ -120,7 +139,19 @@ namespace CSX64
 	{
 		switch ((SyscallCode)RAX())
 		{
-		case SyscallCode::sys_exit: Exit((int)RBX()); return true;
+		case SyscallCode::sys_exit:
+
+			#if __OPCODE_COUNTS
+			std::cout << "\n\nOPCode Counts:\n" << std::dec << std::setfill(' ');
+			for (u64 i = 0; i < 256; ++i)
+			{
+				std::cout << std::setw(3) << i << ": " << std::setw(16) << op_exe_count[i] << "   ";
+				if (i > 0 && i % 4 == 3) std::cout << '\n';
+			}
+			#endif
+
+			Exit((int)RBX());
+			return true;
 
 		case SyscallCode::sys_read: return Process_sys_read();
 		case SyscallCode::sys_write: return Process_sys_write();

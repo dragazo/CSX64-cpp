@@ -39,6 +39,9 @@
 #define MASK_UNION_15(a,b,c,d,e,f,g,h,i,j,k,l,m,n,o)   (MASK_UNION_1(a) | MASK_UNION_14(b,c,d,e,f,g,h,i,j,k,l,m,n,o))
 #define MASK_UNION_16(a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p) (MASK_UNION_1(a) | MASK_UNION_15(b,c,d,e,f,g,h,i,j,k,l,m,n,o,p))
 
+// if set to 1, uses mask unions to perform the UpdateFlagsZSP() function - otherwise uses flag accessors
+#define FLAG_ACCESS_MASKING 1
+
 namespace CSX64
 {
 	class Computer
@@ -1138,11 +1141,20 @@ namespace CSX64
 		}
 
 		// updates the flags for integral ops (identical for most integral ops)
-		void UpdateFlagsZSP(u64 value, u64 sizecode)
+		inline void UpdateFlagsZSP(u64 value, u64 sizecode)
 		{
+			#if FLAG_ACCESS_MASKING
+
+			EFLAGS() &= ~MASK_UNION_3(ZF, SF, PF);
+			EFLAGS() |= (value == 0 ? MASK_UNION_1(ZF) : 0) | (Negative(value, sizecode) ? MASK_UNION_1(SF) : 0) | (parity_table[value & 0xff] ? MASK_UNION_1(PF) : 0);
+
+			#else
+
 			ZF() = value == 0;
 			SF() = Negative(value, sizecode);
 			PF() = parity_table[value & 0xff];
+
+			#endif
 		}
 
 		// -- impl -- //
@@ -1620,10 +1632,11 @@ namespace CSX64
 		}
 		bool ProcessSUB()
 		{
-			return ProcessSUB_raw(true);
+			return ProcessSUB_raw<true>();
 		}
 
-		bool ProcessSUB_raw(bool apply)
+		template<bool apply>
+		inline bool ProcessSUB_raw()
 		{
 			u64 s1, s2, m, a, b;
 			if (!FetchBinaryOpFormat(s1, s2, m, a, b)) return false;
@@ -1631,12 +1644,23 @@ namespace CSX64
 
 			u64 res = Truncate(a - b, sizecode);
 
+			#if FLAG_ACCESS_MASKING
+
+			EFLAGS() &= ~MASK_UNION_6(ZF, SF, PF, CF, AF, OF);
+			EFLAGS() |= (res == 0 ? MASK_UNION_1(ZF) : 0) | (Negative(res, sizecode) ? MASK_UNION_1(SF) : 0) | (parity_table[res & 0xff] ? MASK_UNION_1(PF) : 0)
+				| (a < b ? MASK_UNION_1(CF) : 0) | ((a & 0xf) < (b & 0xf) ? MASK_UNION_1(AF) : 0) | (Negative(a ^ b, sizecode) && Negative(a ^ res, sizecode) ? MASK_UNION_1(OF) : 0);
+
+			#else
+
 			UpdateFlagsZSP(res, sizecode);
 			CF() = a < b; // if a < b, a borrow was taken from the highest bit
 			AF() = (a & 0xf) < (b & 0xf); // AF is just like CF but only the low nibble
 			OF() = Negative(a ^ b, sizecode) && Negative(a ^ res, sizecode); // overflow if sign(a)!=sign(b) and sign(a)!=sign(res)
 
-			return !apply || StoreBinaryOpFormat(s1, s2, m, res);
+			#endif
+
+			if constexpr (apply) return StoreBinaryOpFormat(s1, s2, m, res);
+			else return true;
 		}
 
 		bool ProcessMUL_x()
@@ -2098,7 +2122,8 @@ namespace CSX64
 			else return true;
 		}
 
-		bool ProcessAND_raw(bool apply)
+		template<bool apply>
+		bool ProcessAND_raw()
 		{
 			u64 s1, s2, m, a, b;
 			if (!FetchBinaryOpFormat(s1, s2, m, a, b)) return false;
@@ -2111,12 +2136,13 @@ namespace CSX64
 			CF() = false;
 			AF() = Rand() & 1;
 
-			return !apply || StoreBinaryOpFormat(s1, s2, m, res);
+			if constexpr (apply) return StoreBinaryOpFormat(s1, s2, m, res);
+			else return true;
 		}
 
 		bool ProcessAND()
 		{
-			return ProcessAND_raw(true);
+			return ProcessAND_raw<true>();
 		}
 		bool ProcessOR()
 		{
@@ -2205,11 +2231,11 @@ namespace CSX64
 
 		bool ProcessCMP()
 		{
-			return ProcessSUB_raw(false);
+			return ProcessSUB_raw<false>();
 		}
 		bool ProcessTEST()
 		{
-			return ProcessAND_raw(false);
+			return ProcessAND_raw<false>();
 		}
 
 		bool ProcessCMPZ()
