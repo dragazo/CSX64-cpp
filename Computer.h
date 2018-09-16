@@ -2517,34 +2517,113 @@ namespace CSX64
 		[8: ext]
 		ext = 0: AAA
 		ext = 1: AAS
+		ext = 2: DAA
+		ext = 3: DAS
 		else UND
 		*/
 		bool ProcessAAX()
 		{
 			u64 ext;
+			u8 temp_u8;
+			bool temp_b;
 			if (!GetMemAdv<u8>(ext)) return false;
-			if (ext > 1) { Terminate(ErrorCode::UndefinedBehavior); return false; }
 
-			if ((AL() & 0xf) > 9 || AF())
+			switch (ext)
 			{
-				// handle ext cases here
-				if (ext == 0) AX() += 0x106;
+			case 0:
+				if ((AL() & 0x0f) > 9 || AF())
+				{
+					AX() += 0x106;
+					AF() = true;
+					CF() = true;
+				}
 				else
+				{
+					AF() = false;
+					CF() = false;
+				}
+				AL() &= 0x0f;
+
+				EFLAGS() ^= Rand() & MASK_UNION_4(OF, SF, ZF, PF);
+
+				return true;
+
+			case 1:
+				if ((AL() & 0x0f) > 9 || AF())
 				{
 					AX() -= 6;
 					--AH();
+					AF() = true;
+					CF() = true;
 				}
-				AF() = true;
-				CF() = true;
-			}
-			else
-			{
-				AF() = false;
-				CF() = false;
-			}
-			AL() &= 0xf;
+				else
+				{
+					AF() = false;
+					CF() = false;
+				}
+				AL() &= 0x0f;
 
-			EFLAGS() ^= Rand() & MASK_UNION_4(OF, SF, ZF, PF);
+				EFLAGS() ^= Rand() & MASK_UNION_4(OF, SF, ZF, PF);
+
+				return true;
+
+			case 2:
+				// Intel's reference has this instruction modify CF unnecessarily - leaving those lines in but commenting them out
+
+				temp_u8 = AL();
+				temp_b = CF();
+
+				//CF() = false;
+
+				if ((AL() & 0x0f) > 9 || AF())
+				{
+					AL() += 6;
+					//CF() = temp_b || AL() < 6; // AL() < 6 gets the carry flag we need from the above addition
+					AF() = true;
+				}
+				else AF() = false;
+
+				if (temp_u8 > 0x99 || temp_b)
+				{
+					AL() += 0x60;
+					CF() = true;
+				}
+				else CF() = false;
+
+				// update flags
+				UpdateFlagsZSP(AL(), 0);
+				EFLAGS() ^= Rand() & MASK_UNION_1(OF);
+
+				return true;
+
+			case 3:
+				temp_u8 = AL();
+				temp_b = CF();
+
+				CF() = false;
+				
+				if ((AL() & 0x0f) > 9 || AF())
+				{
+					CF() = temp_b || AL() < 6; // AL() < 6 gets the borrow flag we need from the next subtraction:
+					AL() -= 6;
+					AF() = true;
+				}
+				else AF() = false;
+
+				if (temp_u8 > 0x99 || temp_b)
+				{
+					AL() -= 0x60;
+					CF() = true;
+				}
+
+				// update flags
+				UpdateFlagsZSP(AL(), 0);
+				EFLAGS() ^= Rand() & MASK_UNION_1(OF);
+
+				return true;
+
+			default: Terminate(ErrorCode::UndefinedBehavior); return false;
+			}
 
 			return true;
 		}

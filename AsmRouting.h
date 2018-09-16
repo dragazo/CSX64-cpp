@@ -260,6 +260,8 @@ namespace CSX64
 
 	inline bool asm_router_AAA(AssembleArgs &args) { return args.TryProcessNoArgOp(OPCode::AAX, true, 0); }
 	inline bool asm_router_AAS(AssembleArgs &args) { return args.TryProcessNoArgOp(OPCode::AAX, true, 1); }
+	inline bool asm_router_DAA(AssembleArgs &args) { return args.TryProcessNoArgOp(OPCode::AAX, true, 2); }
+	inline bool asm_router_DAS(AssembleArgs &args) { return args.TryProcessNoArgOp(OPCode::AAX, true, 3); }
 
 	// MOVS (string) requires disambiguation
 	inline bool asm_router_MOVSB(AssembleArgs &args) { return args.TryProcessNoArgOp(OPCode::string, true, 0); }

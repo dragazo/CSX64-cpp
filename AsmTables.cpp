@@ -523,6 +523,8 @@ namespace CSX64
 
 	{"AAA", asm_router_AAA},
 	{"AAS", asm_router_AAS},
+	{"DAA", asm_router_DAA},
+	{"DAS", asm_router_DAS},
 
 	// MOVS (string) requires disambiguation
 	{"MOVSB", asm_router_MOVSB},
@@ -579,6 +581,7 @@ namespace CSX64
 	{"FNOP", asm_router_FNOP},
 
 	{"FWAIT", asm_router_FWAIT},
+	{"WAIT", asm_router_FWAIT} // WAIT aliases FWAIT
 
 	{"FNINIT", asm_router_FNINIT},
 	{"FINIT", asm_router_FINIT},
