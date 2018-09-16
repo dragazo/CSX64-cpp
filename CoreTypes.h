@@ -3,6 +3,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <type_traits>
 
 namespace CSX64
 {
@@ -19,8 +20,16 @@ namespace CSX64
 	typedef double f64;
 	typedef float f32;
 
-	static_assert(sizeof(f64) == sizeof(u64), "Uhoh!! double isn't 64-bit in this compiler!");
-	static_assert(sizeof(f32) == sizeof(u32), "Uhoh!! float isn't 32-bit in this compiler!");
+	static_assert(sizeof(f64) * CHAR_BIT == 64, "Uhoh!! double isn't 64-bit in this compiler!");
+	static_assert(sizeof(f32) * CHAR_BIT == 32, "Uhoh!! float isn't 32-bit in this compiler!");
+
+	// true if long double uses 80-bit extended precision
+	constexpr bool f80_enabled = sizeof(long double) * CHAR_BIT == 80;
+
+	// if f80_enabled, aliases long double, otherwise aliases void
+	typedef std::conditional<f80_enabled, long double, void> f80;
+
+	// ---------------------------------------
 
 	enum class OPCode
 	{

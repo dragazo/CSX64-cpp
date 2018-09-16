@@ -2148,7 +2148,7 @@ bool AssembleArgs::TryProcessFSTLD_WORD(OPCode op, u8 mode, u64 _sizecode)
 	if (!TryParseAddress(args[0], a, b, ptr_base, sizecode, explicit_size)) return false;
 
 	// must be the dictated size
-	if (explicit_size && sizecode != _sizecode) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Operand size mismatch"}; return false; }
+	if (explicit_size && sizecode != _sizecode) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Specified operand size is not supported"}; return false; }
 
 	// write data
 	if (!TryAppendByte((u8)op)) return false;

@@ -167,6 +167,7 @@ namespace CSX64
 		bool TryProcessFPUBinaryOp(OPCode op, bool integral, bool pop);
 		bool TryProcessFPURegisterOp(OPCode op, bool has_ext_op = false, u8 ext_op = 0);
 
+		// _sizecode is only used for validating explicit memory operand sizes
 		bool TryProcessFSTLD_WORD(OPCode op, u8 mode, u64 _sizecode);
 
 		bool TryProcessFLD(OPCode op, bool integral);

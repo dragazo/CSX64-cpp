@@ -429,6 +429,16 @@ namespace CSX64
 
 	inline bool asm_router_FFREE(AssembleArgs &args) { return args.TryProcessFPURegisterOp(OPCode::FFREE); }
 
+	inline bool asm_router_FNSAVE(AssembleArgs &args) { return args.TryProcessFSTLD_WORD(OPCode::FSTLD_WORD, 6, ~(u64)0); } // sizecode = 0xff.ff to ensure user can't use explicit size (since it's not a standard size)
+	inline bool asm_router_FSAVE(AssembleArgs &args) { return args.TryAppendByte((u8)OPCode::FWAIT) && asm_router_FNSAVE(args); }
+
+	inline bool asm_router_FRSTOR(AssembleArgs &args) { return args.TryProcessFSTLD_WORD(OPCode::FSTLD_WORD, 7, ~(u64)0); } // sizecode = 0xff.ff to ensure user can't use explicit size (since it's not a standard size)
+
+	inline bool asm_router_FNSTENV(AssembleArgs &args) { return args.TryProcessFSTLD_WORD(OPCode::FSTLD_WORD, 8, ~(u64)0); } // sizecode = 0xff.ff to ensure user can't use explicit size (since it's not a standard size)
+	inline bool asm_router_FSTENV(AssembleArgs &args) { return args.TryAppendByte((u8)OPCode::FWAIT) && asm_router_FNSTENV(args); }
+
+	inline bool asm_router_FLDENV(AssembleArgs &args) { return args.TryProcessFSTLD_WORD(OPCode::FSTLD_WORD, 9, ~(u64)0); } // sizecode = 0xff.ff to ensure user can't use explicit size (since it's not a standard size)
+
 	// ------------- //
 
 	// -- vpu ops -- //

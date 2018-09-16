@@ -693,6 +693,16 @@ namespace CSX64
 
 	{"FFREE", asm_router_FFREE},
 
+	{"FNSAVE", asm_router_FNSAVE},
+	{"FSAVE", asm_router_FSAVE},
+
+	{"FRSTOR", asm_router_FRSTOR},
+
+	{"FNSTENV", asm_router_FNSTENV},
+	{"FSTENV", asm_router_FSTENV},
+
+	{"FLDENV", asm_router_FLDENV},
+
 	// ------------- //
 
 	// -- vec ops -- //

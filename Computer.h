@@ -3029,11 +3029,15 @@ namespace CSX64
 		mode = 3: FLDCW
 		mode = 4: STMXCSR
 		mode = 5: LDMXCSR
+		mode = 6: FSAVE
+		mode = 7: FRSTOR
+		mode = 8: FSTENV
+		mode = 9: FLDENV
 		else UND
 		*/
 		bool ProcessFSTLD_WORD()
 		{
-			u64 m, s;
+			u64 m, s, temp;
 			if (!GetMemAdv<u8>(s)) return false;
 
 			// handle FSTSW AX case specially (doesn't have an address)
@@ -3053,10 +3057,70 @@ namespace CSX64
 				if (!GetMemRaw<u16>(m, m)) return false;
 				FPU_control = (u16)m;
 				return true;
+
 			case 4: return SetMemRaw<u32>(m, _MXCSR);
 			case 5:
 				if (!GetMemRaw<u32>(m, m)) return false;
 				_MXCSR = (_MXCSR & 0xffff0000) | (u16)m; // make sure user can't modify the upper 16 reserved bits
+				return true;
+
+			case 6:
+				if (!SetMemRaw<u16>(m + 0, FPU_control)) return false;
+				if (!SetMemRaw<u16>(m + 4, FPU_status)) return false;
+				if (!SetMemRaw<u16>(m + 8, FPU_tag)) return false;
+
+				if (!SetMemRaw<u32>(m + 12, EIP())) return false;
+				if (!SetMemRaw<u16>(m + 16, 0)) return false;
+
+				if (!SetMemRaw<u32>(m + 20, (u32)m)) return false;
+				if (!SetMemRaw<u16>(m + 24, 0)) return false;
+
+				// for cross-platformability/speed, writes native double instead of some tword hacks
+				if (!SetMemRaw<u64>(m + 28, DoubleAsUInt64((double)ST(0)))) return false;
+				if (!SetMemRaw<u64>(m + 38, DoubleAsUInt64((double)ST(1)))) return false;
+				if (!SetMemRaw<u64>(m + 48, DoubleAsUInt64((double)ST(2)))) return false;
+				if (!SetMemRaw<u64>(m + 58, DoubleAsUInt64((double)ST(3)))) return false;
+				if (!SetMemRaw<u64>(m + 68, DoubleAsUInt64((double)ST(4)))) return false;
+				if (!SetMemRaw<u64>(m + 78, DoubleAsUInt64((double)ST(5)))) return false;
+				if (!SetMemRaw<u64>(m + 88, DoubleAsUInt64((double)ST(6)))) return false;
+				if (!SetMemRaw<u64>(m + 98, DoubleAsUInt64((double)ST(7)))) return false;
+
+				// after storing fpu state, re-initializes
+				return FINIT();
+			case 7:
+				if (!GetMemRaw<u16>(m + 0, temp)) return false; FPU_control = (u16)temp;
+				if (!GetMemRaw<u16>(m + 4, temp)) return false; FPU_status = (u16)temp;
+				if (!GetMemRaw<u16>(m + 8, temp)) return false; FPU_tag = (u16)temp;
+
+				// for cross-platformability/speed, writes native double instead of some tword hacks
+				if (!GetMemRaw<u64>(m + 28, temp)) return false; ST(0) = AsDouble(temp);
+				if (!GetMemRaw<u64>(m + 38, temp)) return false; ST(1) = AsDouble(temp);
+				if (!GetMemRaw<u64>(m + 48, temp)) return false; ST(2) = AsDouble(temp);
+				if (!GetMemRaw<u64>(m + 58, temp)) return false; ST(3) = AsDouble(temp);
+				if (!GetMemRaw<u64>(m + 68, temp)) return false; ST(4) = AsDouble(temp);
+				if (!GetMemRaw<u64>(m + 78, temp)) return false; ST(5) = AsDouble(temp);
+				if (!GetMemRaw<u64>(m + 88, temp)) return false; ST(6) = AsDouble(temp);
+				if (!GetMemRaw<u64>(m + 98, temp)) return false; ST(7) = AsDouble(temp);
+
+				return true;
+
+			case 8:
+				if (!SetMemRaw<u16>(m + 0, FPU_control)) return false;
+				if (!SetMemRaw<u16>(m + 4, FPU_status)) return false;
+				if (!SetMemRaw<u16>(m + 8, FPU_tag)) return false;
+
+				if (!SetMemRaw<u32>(m + 12, EIP())) return false;
+				if (!SetMemRaw<u16>(m + 16, 0)) return false;
+
+				if (!SetMemRaw<u32>(m + 20, (u32)m)) return false;
+				if (!SetMemRaw<u16>(m + 24, 0)) return false;
+
+				return true;
+			case 9:
+				if (!GetMemRaw<u16>(m + 0, temp)) return false; FPU_control = (u16)temp;
+				if (!GetMemRaw<u16>(m + 4, temp)) return false; FPU_status = (u16)temp;
+				if (!GetMemRaw<u16>(m + 8, temp)) return false; FPU_tag = (u16)temp;
+
 				return true;
 
 			default: Terminate(ErrorCode::UndefinedBehavior); return false;
