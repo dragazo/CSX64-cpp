@@ -492,10 +492,10 @@ namespace CSX64
 
 			switch (size)
 			{
-			case 8: res = *(u64*)((char*)mem + pos); return true;
-			case 4: res = *(u32*)((char*)mem + pos); return true;
-			case 2: res = *(u16*)((char*)mem + pos); return true;
 			case 1: res = *(u8*)((char*)mem + pos); return true;
+			case 2: res = *(u16*)((char*)mem + pos); return true;
+			case 4: res = *(u32*)((char*)mem + pos); return true;
+			case 8: res = *(u64*)((char*)mem + pos); return true;
 
 			default: throw std::runtime_error("GetMemRaw size was non-standard");
 			}
@@ -515,6 +515,22 @@ namespace CSX64
 			return true;
 		}
 
+		// as GetMemRaw() but takes a sizecode instead of a size
+		bool GetMemRaw_szc(u64 pos, u64 sizecode, u64 &res)
+		{
+			if (pos >= mem_size || pos + Size(sizecode) > mem_size) { Terminate(ErrorCode::OutOfBounds); return false; }
+
+			switch (sizecode)
+			{
+			case 0: res = *(u8*)((char*)mem + pos); return true;
+			case 1: res = *(u16*)((char*)mem + pos); return true;
+			case 2: res = *(u32*)((char*)mem + pos); return true;
+			case 3: res = *(u64*)((char*)mem + pos); return true;
+
+			default: throw std::runtime_error("GetMemRaw size was non-standard");
+			}
+		}
+
 		// writes a raw value to memory. returns true on success
 		bool SetMemRaw(u64 pos, u64 size, u64 val)
 		{
@@ -523,10 +539,10 @@ namespace CSX64
 
 			switch (size)
 			{
-			case 8: *(u64*)((char*)mem + pos) = (u64)val; return true;
-			case 4: *(u32*)((char*)mem + pos) = (u32)val; return true;
-			case 2: *(u16*)((char*)mem + pos) = (u16)val; return true;
 			case 1: *(u8*)((char*)mem + pos) = (u8)val; return true;
+			case 2: *(u16*)((char*)mem + pos) = (u16)val; return true;
+			case 4: *(u32*)((char*)mem + pos) = (u32)val; return true;
+			case 8: *(u64*)((char*)mem + pos) = (u64)val; return true;
 
 			default: throw std::runtime_error("GetMemRaw size was non-standard");
 			}
@@ -548,6 +564,23 @@ namespace CSX64
 			return true;
 		}
 
+		// as SetMemRaw() but takes a sizecode instead of a size
+		bool SetMemRaw_szc(u64 pos, u64 sizecode, u64 val)
+		{
+			if (pos >= mem_size || pos + Size(sizecode) > mem_size) { Terminate(ErrorCode::OutOfBounds); return false; }
+			if (pos < ReadonlyBarrier) { Terminate(ErrorCode::AccessViolation); return false; }
+
+			switch (sizecode)
+			{
+			case 0: *(u8*)((char*)mem + pos) = (u8)val; return true;
+			case 1: *(u16*)((char*)mem + pos) = (u16)val; return true;
+			case 2: *(u32*)((char*)mem + pos) = (u32)val; return true;
+			case 3: *(u64*)((char*)mem + pos) = (u64)val; return true;
+
+			default: throw std::runtime_error("GetMemRaw size was non-standard");
+			}
+		}
+
 		// gets a value and advances the execution pointer. returns true on success
 		bool GetMemAdv(u64 size, u64 &res)
 		{
@@ -566,6 +599,14 @@ namespace CSX64
 		bool GetMemAdv<u8>(u64 &res)
 		{
 			return GetMemRaw<u8>(RIP()++, res);
+		}
+
+		// as GetMemAdv() but takes a sizecode instead of a size
+		bool GetMemAdv_szc(u64 sizecode, u64 &res)
+		{
+			if (!GetMemRaw_szc(RIP(), sizecode, res)) return false;
+			RIP() += Size(sizecode);
+			return true;
 		}
 
 		// reads a byte at RIP and advances the execution pointer
@@ -887,7 +928,7 @@ namespace CSX64
 				}
 				else if (get_a) a = CPURegisters[s1 >> 4][a_sizecode];
 				// get imm
-				return GetMemAdv(Size(b_sizecode), b);
+				return GetMemAdv_szc(b_sizecode, b);
 
 			case 2:
 				// handle allow_b_mem case
@@ -902,11 +943,11 @@ namespace CSX64
 				}
 				else if (get_a) a = CPURegisters[s1 >> 4][a_sizecode];
 				// get mem
-				return GetAddressAdv(m) && GetMemRaw(m, Size(b_sizecode), b);
+				return GetAddressAdv(m) && GetMemRaw_szc(m, b_sizecode, b);
 
 			case 3:
 				// get mem
-				if (!GetAddressAdv(m) || get_a && !GetMemRaw(m, Size(a_sizecode), a)) return false;
+				if (!GetAddressAdv(m) || get_a && !GetMemRaw_szc(m, a_sizecode, a)) return false;
 				// if sh is flagged
 				if ((s1 & 1) != 0)
 				{
@@ -919,9 +960,9 @@ namespace CSX64
 
 			case 4:
 				// get mem
-				if (!GetAddressAdv(m) || get_a && !GetMemRaw(m, Size(a_sizecode), a)) return false;
+				if (!GetAddressAdv(m) || get_a && !GetMemRaw_szc(m, a_sizecode, a)) return false;
 				// get imm
-				return GetMemAdv(Size(b_sizecode), b);
+				return GetMemAdv_szc(b_sizecode, b);
 
 			default: Terminate(ErrorCode::UndefinedBehavior); return false;
 			}
@@ -942,7 +983,7 @@ namespace CSX64
 
 			case 3:
 			case 4:
-				return SetMemRaw(m, Size(sizecode), res);
+				return SetMemRaw_szc(m, sizecode, res);
 
 			default: Terminate(ErrorCode::UndefinedBehavior); return false;
 			}
@@ -1295,12 +1336,10 @@ namespace CSX64
 			return StoreUnaryOpFormat(s, m, flag);
 		}
 
-		bool ProcessMOV()
+		inline bool ProcessMOV()
 		{
 			u64 s1, s2, m, a, b;
-			if (!FetchBinaryOpFormat(s1, s2, m, a, b, false)) return false;
-
-			return StoreBinaryOpFormat(s1, s2, m, b);
+			return FetchBinaryOpFormat(s1, s2, m, a, b, false) && StoreBinaryOpFormat(s1, s2, m, b);
 		}
 		/*
 		[op][cnd]
@@ -1648,14 +1687,14 @@ namespace CSX64
 
 			EFLAGS() &= ~MASK_UNION_6(ZF, SF, PF, CF, AF, OF);
 			EFLAGS() |= (res == 0 ? MASK_UNION_1(ZF) : 0) | (Negative(res, sizecode) ? MASK_UNION_1(SF) : 0) | (parity_table[res & 0xff] ? MASK_UNION_1(PF) : 0)
-				| (a < b ? MASK_UNION_1(CF) : 0) | ((a & 0xf) < (b & 0xf) ? MASK_UNION_1(AF) : 0) | (Negative(a ^ b, sizecode) && Negative(a ^ res, sizecode) ? MASK_UNION_1(OF) : 0);
+				| (a < b ? MASK_UNION_1(CF) : 0) | ((a & 0xf) < (b & 0xf) ? MASK_UNION_1(AF) : 0) | (Negative((a ^ b) & (a ^ res), sizecode) ? MASK_UNION_1(OF) : 0);
 
 			#else
 
 			UpdateFlagsZSP(res, sizecode);
 			CF() = a < b; // if a < b, a borrow was taken from the highest bit
 			AF() = (a & 0xf) < (b & 0xf); // AF is just like CF but only the low nibble
-			OF() = Negative(a ^ b, sizecode) && Negative(a ^ res, sizecode); // overflow if sign(a)!=sign(b) and sign(a)!=sign(res)
+			OF() = Negative((a ^ b) & (a ^ res), sizecode); // overflow if sign(a)!=sign(b) and sign(a)!=sign(res)
 
 			#endif
 
@@ -2183,9 +2222,19 @@ namespace CSX64
 
 			u64 res = Truncate(a + 1, sizecode);
 
+			#if FLAG_ACCESS_MASKING
+
+			EFLAGS() &= ~MASK_UNION_5(ZF, SF, PF, AF, OF);
+			EFLAGS() |= (res == 0 ? MASK_UNION_1(ZF) : 0) | (Negative(res, sizecode) ? MASK_UNION_1(SF) : 0) | (parity_table[res & 0xff] ? MASK_UNION_1(PF) : 0)
+				| ((res & 0xf) == 0 ? MASK_UNION_1(AF) : 0) | (Positive(a, sizecode) && Negative(res, sizecode) ? MASK_UNION_1(OF) : 0);
+
+			#else
+
 			UpdateFlagsZSP(res, sizecode);
 			AF() = (res & 0xf) == 0; // low nibble of 0 was a nibble overflow (TM)
 			OF() = Positive(a, sizecode) && Negative(res, sizecode); // + -> - is overflow
+
+			#endif
 
 			return StoreUnaryOpFormat(s, m, res);
 		}
@@ -2197,9 +2246,19 @@ namespace CSX64
 
 			u64 res = Truncate(a - 1, sizecode);
 
+			#if FLAG_ACCESS_MASKING
+
+			EFLAGS() &= ~MASK_UNION_5(ZF, SF, PF, AF, OF);
+			EFLAGS() |= (res == 0 ? MASK_UNION_1(ZF) : 0) | (Negative(res, sizecode) ? MASK_UNION_1(SF) : 0) | (parity_table[res & 0xff] ? MASK_UNION_1(PF) : 0)
+				| ((a & 0xf) == 0 ? MASK_UNION_1(AF) : 0) | (Negative(a, sizecode) && Positive(res, sizecode) ? MASK_UNION_1(OF) : 0);
+
+			#else
+
 			UpdateFlagsZSP(res, sizecode);
 			AF() = (a & 0xf) == 0; // nibble a = 0 results in borrow from the low nibble
 			OF() = Negative(a, sizecode) && Positive(res, sizecode); // - -> + is overflow
+
+			#endif
 
 			return StoreUnaryOpFormat(s, m, res);
 		}

@@ -151,7 +151,7 @@ namespace CSX64
 	struct CPURegister_sizecode_wrapper
 	{
 		CPURegister &reg;
-		u32 sizecode;
+		u8 sizecode;
 
 		inline constexpr operator u64() const
 		{
@@ -165,21 +165,21 @@ namespace CSX64
 			default: throw std::invalid_argument("sizecode must be on range [0,3]");
 			}
 		}
-		inline constexpr CPURegister_sizecode_wrapper operator=(u64 value)
+		inline constexpr CPURegister_sizecode_wrapper &operator=(u64 value)
 		{
 			switch (sizecode)
 			{
-			case 3: reg.x64() = (u64)value; return *this;
-			case 2: reg.x32() = (u32)value; return *this;
-			case 1: reg.x16() = (u16)value; return *this;
 			case 0: reg.x8() = (u8)value; return *this;
+			case 1: reg.x16() = (u16)value; return *this;
+			case 2: reg.x32() = (u32)value; return *this;
+			case 3: reg.x64() = (u64)value; return *this;
 
 			default: throw std::invalid_argument("sizecode must be on range [0,3]");
 			}
 		}
-		inline constexpr CPURegister_sizecode_wrapper operator=(CPURegister_sizecode_wrapper other) { *this = (u64)other; return *this; }
+		inline constexpr CPURegister_sizecode_wrapper &operator=(CPURegister_sizecode_wrapper other) { *this = (u64)other; return *this; }
 	};
-	CPURegister_sizecode_wrapper CPURegister::operator[](u64 sizecode) { return {*this, (u32)sizecode}; }
+	CPURegister_sizecode_wrapper CPURegister::operator[](u64 sizecode) { return {*this, (u8)sizecode}; }
 
 	struct ZMMRegister_sizecode_wrapper;
 	// Represents a 512-bit register used by vpu instructions
@@ -217,8 +217,8 @@ namespace CSX64
 	struct ZMMRegister_sizecode_wrapper
 	{
 		ZMMRegister &reg;
-		u16 index;
-		u16 sizecode;
+		u8 index;
+		u8 sizecode;
 
 		inline constexpr operator u64() const
 		{
@@ -232,21 +232,21 @@ namespace CSX64
 			default: throw std::invalid_argument("sizecode must be on range [0,3]");
 			}
 		}
-		inline constexpr ZMMRegister_sizecode_wrapper operator=(u64 value)
+		inline constexpr ZMMRegister_sizecode_wrapper &operator=(u64 value)
 		{
 			switch (sizecode)
 			{
-			case 3: reg.uint64(index) = (u64)value; return *this;
-			case 2: reg.uint32(index) = (u32)value; return *this;
-			case 1: reg.uint16(index) = (u16)value; return *this;
 			case 0: reg.uint8(index) = (u8)value; return *this;
+			case 1: reg.uint16(index) = (u16)value; return *this;
+			case 2: reg.uint32(index) = (u32)value; return *this;
+			case 3: reg.uint64(index) = (u64)value; return *this;
 
 			default: throw std::invalid_argument("sizecode must be on range [0,3]");
 			}
 		}
-		inline constexpr ZMMRegister_sizecode_wrapper operator=(ZMMRegister_sizecode_wrapper other) { *this = (u64)other; return *this; }
+		inline constexpr ZMMRegister_sizecode_wrapper &operator=(ZMMRegister_sizecode_wrapper other) { *this = (u64)other; return *this; }
 	};
-	ZMMRegister_sizecode_wrapper ZMMRegister::uint(u64 sizecode, u64 index) { return {*this, (u16)index, (u16)sizecode}; }
+	ZMMRegister_sizecode_wrapper ZMMRegister::uint(u64 sizecode, u64 index) { return {*this, (u8)index, (u8)sizecode}; }
 
 	/// <summary>
 	/// Represents a file descriptor used by the <see cref="CSX64"/> processor
@@ -254,10 +254,11 @@ namespace CSX64
 	class FileDescriptor
 	{
 	private:
-		bool managed;
-		bool interactive;
 
 		std::iostream *stream;
+
+		bool managed;
+		bool interactive;
 
 	public:
 		// gets if this file is managed (i.e. stream will be deleted on close)
@@ -276,7 +277,7 @@ namespace CSX64
 		~FileDescriptor() { Close(); }
 
 		FileDescriptor(const FileDescriptor&) = delete;
-		FileDescriptor(FileDescriptor &&other) : managed(other.managed), interactive(other.interactive), stream(other.stream)
+		FileDescriptor(FileDescriptor &&other) : stream(other.stream), managed(other.managed), interactive(other.interactive)
 		{
 			other.stream = nullptr;
 		}
@@ -284,16 +285,28 @@ namespace CSX64
 		FileDescriptor &operator=(const FileDescriptor&) = delete;
 		FileDescriptor &operator=(FileDescriptor &&other)
 		{
-			using std::swap;
+			// make sure we close our stream before we steal other's
+			Close();
 
-			std::swap(managed, other.managed);
-			std::swap(interactive, other.interactive);
-			std::swap(stream, other.stream);
+			// steal other's stuff
+			stream = other.stream;
+			managed = other.managed;
+			interactive = other.interactive;
+
+			// empty other
+			other.stream = nullptr;
 
 			return *this;
 		}
 
-		friend void swap(FileDescriptor &a, FileDescriptor &b) { a = std::move(b); }
+		friend void swap(FileDescriptor &a, FileDescriptor &b)
+		{
+			using std::swap;
+
+			swap(a.managed, b.managed);
+			swap(a.interactive, b.interactive);
+			swap(a.stream, b.stream);
+		}
 
 		// ----------------------------
 
