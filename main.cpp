@@ -308,19 +308,38 @@ int Assemble(const std::string &from)
 /// <summary>
 /// Links several object files to create an executable and saves it to the (to) file. Returns true if successful
 /// </summary>
-/// <param name="paths">the object files to link
-/// <param name="to">destination for the resulting executable
-/// <param name="entry_point">the main entry point
-int Link(std::vector<std::string> &paths, const std::string &to, const std::string &entry_point)
+/// <param name="paths">the object files to link</param>
+/// <param name="to">destination for the resulting executable</param>
+/// <param name="entry_point">the main entry point</param>
+/// <param name="rootdir">the root directory to use for core file lookup - null for default</param>
+int Link(std::vector<std::string> &paths, const std::string &to, const std::string &entry_point, const char *rootdir)
 {
 	std::vector<ObjectFile> objs;
 
+	// get exe directory - default to provided root dir if present
+	const char *dir = rootdir ? rootdir : exe_dir();
+
+	// if that failed, error
+	if (!dir)
+	{
+		// print the error message and a hint of how to fix it
+		std::cerr <<
+R"(
+Uhoh! Looks like I don't have full support for your system.
+I couldn't find your install directory.
+You can specify it explicitly with --rootdir <pathspec> to bypass this issue.
+)";
+
+		// return error code
+		return -1;
+	}
+
 	// load the _start file
-	int ret = LoadObjectFile(objs, exe_dir() + "/_start.o");
+	int ret = LoadObjectFile(objs, dir + (std::string)"/_start.o");
 	if (ret != 0) return ret;
 
 	// load the stdlib files
-	ret = LoadObjectFileDir(objs, exe_dir() + "/stdlib");
+	ret = LoadObjectFileDir(objs, dir + (std::string)"/stdlib");
 	if (ret != 0) return ret;
 
 	// load the user-defined pathspecs
@@ -420,6 +439,7 @@ int main(int argc, const char *argv[])
 	std::vector<std::string> pathspec;                    // input paths
 	const char *entry_point = nullptr;                    // main entry point for linker
 	const char *output = nullptr;                         // output path
+	const char *rootdir = nullptr;                        // root directory to use for std lookup
 	bool fsf = false;                                     // fsf flag
 	bool time = false;                                    // time flag
 	bool accepting_options = true;                        // marks that we're still accepting options
@@ -436,6 +456,7 @@ int main(int argc, const char *argv[])
 			else if (strcmp(argv[i], "--link") == 0) { if (action != ProgramAction::ExecuteConsole) { std::cout << "usage error - see -h for help\n"; return 0; } action = ProgramAction::Link; }
 			else if (strcmp(argv[i], "--output") == 0) { if (output != nullptr || i + 1 >= argc) { std::cout << "usage error - see -h for help\n"; return 0; } output = argv[++i]; }
 			else if (strcmp(argv[i], "--entry") == 0) { if (entry_point != nullptr || i + 1 >= argc) { std::cout << "usage error - see -h for help\n"; return 0; } entry_point = argv[++i]; }
+			else if (strcmp(argv[i], "--rootdir") == 0) { if (rootdir != nullptr || i + 1 >= argc) { std::cout << "usage error - see -h for help\n"; return 0; } rootdir = argv[++i]; }
 			else if (strcmp(argv[i], "--end") == 0) { accepting_options = false; }
 			else if (strcmp(argv[i], "--fs") == 0) { fsf = true; }
 			else if (strcmp(argv[i], "--time") == 0) { time = true; }
@@ -494,10 +515,7 @@ int main(int argc, const char *argv[])
 	case ProgramAction::Link:
 		if (pathspec.empty()) { std::cout << ("Linker expected at least 1 file to link\n"); return 0; }
 
-		// initialize exe dir now
-		init_exe_dir();
-
-		return Link(pathspec, output ? output : "a.exe", entry_point ? entry_point : "main");
+		return Link(pathspec, output ? output : "a.exe", entry_point ? entry_point : "main", rootdir);
 	}
 
 	return 0;

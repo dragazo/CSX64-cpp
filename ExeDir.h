@@ -3,7 +3,8 @@
 
 #include <string>
 
-void init_exe_dir();
-const std::string &exe_dir();
+// on success, returns a c-style string - path to the directory containing this executable.
+// on failure, returns null.
+const char *exe_dir();
 
 #endif

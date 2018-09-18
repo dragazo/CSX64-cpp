@@ -9,23 +9,38 @@
 #include <string>
 #include <Windows.h>
 
-std::string __exe_dir;
-
-void init_exe_dir()
+const char *exe_dir()
 {
-	// get absolute path to exe
-	char __exe_dir_buf[256];
-	GetModuleFileNameA(NULL, __exe_dir_buf, sizeof(__exe_dir_buf));
+	// create a static instance of a helper type
+	static struct obj_t
+	{
+		// buffer for storing exe dir
+		char buf[MAX_PATH];
 
-	// load into the string
-	__exe_dir = __exe_dir_buf;
+		// constructor of this object gets the dir name
+		obj_t()
+		{
+			// get absolute path to ex e
+			std::size_t len = (std::size_t)GetModuleFileNameA(NULL, buf, sizeof(buf));
 
-	// chip off the file name
-	while (!__exe_dir.empty() && __exe_dir.back() != '\\' && __exe_dir.back() != '/') __exe_dir.pop_back();
+			// slide back len to remove the file name
+			while (len > 0 && buf[len - 1] != '\\' && buf[len - 1] != '/') --len;
+
+			// place the terminator at the resulting len
+			buf[len] = 0;
+		}
+	} obj;
+
+	// return our exe dir buffer
+	return obj.buf;
 }
-const std::string &exe_dir()
+
+#else
+
+// default implementation returns nullptr - we don't have localization for this platform
+const char *exe_dir()
 {
-	return __exe_dir;
+	return nullptr;
 }
 
 #endif
