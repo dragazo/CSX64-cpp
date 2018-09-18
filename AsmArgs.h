@@ -35,7 +35,7 @@ namespace CSX64
 
 	public: // -- ctor/dtor -- //
 
-		AssembleArgs() {}
+		AssembleArgs() = default;
 		
 		AssembleArgs(const AssembleArgs&) = delete;
 		AssembleArgs(AssembleArgs&&) = delete;

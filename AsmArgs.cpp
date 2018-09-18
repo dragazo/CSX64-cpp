@@ -291,7 +291,7 @@ bool AssembleArgs::__TryParseImm(const std::string &token, std::unique_ptr<Expr>
 				else if (depth == 0 && (std::isspace(token[end]) || TryGetOp(token, end, op, oplen))) break; // break on white space or binary op
 
 				// can't ever have negative depth
-				if (depth < 0) { res = {AssembleError::FormatError, "line " + tostr(line) + ": Mismatched parenthesis: {token}"}; return false; }
+				if (depth < 0) { res = {AssembleError::FormatError, "line " + tostr(line) + ": Mismatched parenthesis: " + token}; return false; }
 			}
 			// otherwise we're in a quote
 			else
@@ -1079,7 +1079,7 @@ bool AssembleArgs::TryProcessGlobal()
 		// special error message for using global on local labels
 		if (symbol[0] == '.') { res = {AssembleError::ArgError, "line " + tostr(line) + ": Cannot export local symbols without their full declaration"}; return false; }
 		// test name for legality
-		if (!IsValidName(symbol, err)) { res = {AssembleError::InvalidLabel, "line " + tostr(line) + ": {err}"}; return false; }
+		if (!IsValidName(symbol, err)) { res = {AssembleError::InvalidLabel, "line " + tostr(line) + ": " + err}; return false; }
 
 		// don't add to global list twice
 		if (Contains(file.GlobalSymbols, symbol)) { res = {AssembleError::SymbolRedefinition, "line " + tostr(line) + ": Attempt to export \"" + symbol + "\" multiple times"}; return false; }
@@ -1102,15 +1102,15 @@ bool AssembleArgs::TryProcessExtern()
 		// special error message for using extern on local labels
 		if (symbol[0] == '.') { res = {AssembleError::ArgError, "line " + tostr(line) + ": Cannot import local symbols"}; return false; }
 		// test name for legality
-		if (!IsValidName(symbol, err)) { res = {AssembleError::InvalidLabel, "line " + tostr(line) + ": {err}"}; return false; }
+		if (!IsValidName(symbol, err)) { res = {AssembleError::InvalidLabel, "line " + tostr(line) + ": " + err}; return false; }
 
 		// ensure we don't extern a symbol that already exists
-		if (ContainsKey(file.Symbols, symbol)) { res = {AssembleError::SymbolRedefinition, "line " + tostr(line) + ": Cannot define symbol \"{symbol}\" (defined internally) as external"}; return false; }
+		if (ContainsKey(file.Symbols, symbol)) { res = {AssembleError::SymbolRedefinition, "line " + tostr(line) + ": Cannot define symbol \"" + symbol + "\" (defined internally) as external"}; return false; }
 
 		// don't add to external list twice
-		if (Contains(file.ExternalSymbols, symbol)) { res = {AssembleError::SymbolRedefinition, "line " + tostr(line) + ": Attempt to import \"{symbol}\" multiple times"}; return false; }
+		if (Contains(file.ExternalSymbols, symbol)) { res = {AssembleError::SymbolRedefinition, "line " + tostr(line) + ": Attempt to import \"" + symbol + "\" multiple times"}; return false; }
 		// ensure we don't extern a global
-		if (Contains(file.GlobalSymbols, symbol)) { res = {AssembleError::SymbolRedefinition, "line " + tostr(line) + ": Cannot define global \"{symbol}\" as external"}; return false; }
+		if (Contains(file.GlobalSymbols, symbol)) { res = {AssembleError::SymbolRedefinition, "line " + tostr(line) + ": Cannot define global \"" + symbol + "\" as external"}; return false; }
 
 		// add it to the external list
 		file.ExternalSymbols.emplace(std::move(symbol));
@@ -1209,7 +1209,7 @@ bool AssembleArgs::TryProcessSegment()
 	else { res = {AssembleError::ArgError, "line " + tostr(line) + ": Unknown segment specified"}; return false; }
 
 	// if this segment has already been done, fail
-	if ((int)done_segs & (int)current_seg) { res = {AssembleError::FormatError, "line " + tostr(line) + ": Attempt to redeclare segment {current_seg}"}; return false; }
+	if ((int)done_segs & (int)current_seg) { res = {AssembleError::FormatError, "line " + tostr(line) + ": Attempt to redeclare segment"}; return false; }
 	// add to list of completed segments
 	done_segs = (AsmSegment)((int)done_segs | (int)current_seg);
 
@@ -1674,6 +1674,7 @@ bool AssembleArgs::TryProcessPOP(OPCode op)
 
 		if (!explicit_size) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Could not deduce operand size"}; return false; }
 
+		// make sure operand size is 2, 4, or 8-bytes
 		if ((Size(a_sizecode) & 14) == 0) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Specified size is not supported"}; return false; }
 
 		if (!TryAppendVal(1, (a_sizecode << 2) | 1)) return false;
@@ -1749,6 +1750,7 @@ bool AssembleArgs::TryProcessShift(OPCode op)
 	return true;
 }
 
+// helper for MOVxX formatter - additionally, ensures the sizes for dest/src are valid
 bool AssembleArgs::__TryProcessMOVxX_settings_byte(bool sign, u64 dest, u64 dest_sizecode, u64 src_sizecode)
 {
 	// 16, *
