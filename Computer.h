@@ -841,7 +841,7 @@ namespace CSX64
 		dest <- f(M[address], imm)
 		(dh and sh mark AH, BH, CH, or DH for dest or src)
 		*/
-		bool FetchTernaryOpFormat(u64 &s, u64 &a, u64 &b)
+		inline bool FetchTernaryOpFormat(u64 &s, u64 &a, u64 &b)
 		{
 			if (!GetMemAdv<u8>(s)) return false;
 			u64 sizecode = (s >> 2) & 3;
@@ -866,7 +866,7 @@ namespace CSX64
 			}
 			else return GetAddressAdv(a) && GetMemRaw(a, Size(sizecode), a);
 		}
-		bool StoreTernaryOPFormat(u64 s, u64 res)
+		inline bool StoreTernaryOPFormat(u64 s, u64 res)
 		{
 			if ((s & 2) != 0) CPURegisters[s >> 4].x8h() = (u8)res;
 			else CPURegisters[s >> 4][(s >> 2) & 3] = res;
@@ -883,7 +883,7 @@ namespace CSX64
 		Else UND
 		(dh and sh mark AH, BH, CH, or DH for dest or src)
 		*/
-		bool FetchBinaryOpFormat(u64 &s1, u64 &s2, u64 &m, u64 &a, u64 &b,
+		inline bool FetchBinaryOpFormat(u64 &s1, u64 &s2, u64 &m, u64 &a, u64 &b,
 			bool get_a = true, int _a_sizecode = -1, int _b_sizecode = -1, bool allow_b_mem = true)
 		{
 			// read settings
@@ -967,26 +967,18 @@ namespace CSX64
 			default: Terminate(ErrorCode::UndefinedBehavior); return false;
 			}
 		}
-		bool StoreBinaryOpFormat(u64 s1, u64 s2, u64 m, u64 res)
+		inline bool StoreBinaryOpFormat(u64 s1, u64 s2, u64 m, u64 res)
 		{
 			u64 sizecode = (s1 >> 2) & 3;
 
-			// switch through mode
-			switch (s2 >> 4)
+			// modes 0-2 - this method avoids having to perform the shift
+			if (s2 <= 0x2f)
 			{
-			case 0:
-			case 1:
-			case 2:
 				if ((s1 & 2) != 0) CPURegisters[s1 >> 4].x8h() = (u8)res;
 				else CPURegisters[s1 >> 4][sizecode] = res;
 				return true;
-
-			case 3:
-			case 4:
-				return SetMemRaw_szc(m, sizecode, res);
-
-			default: Terminate(ErrorCode::UndefinedBehavior); return false;
-			}
+			// modes 3-4 - the fetch already validated mode was in the proper range
+			} else return SetMemRaw_szc(m, sizecode, res);
 		}
 
 		/*
@@ -995,7 +987,7 @@ namespace CSX64
 		mem = 1: [address]   M[address] <- f(M[address])
 		(dh marks AH, BH, CH, or DH for dest)
 		*/
-		bool FetchUnaryOpFormat(u64 &s, u64 &m, u64 &a, bool get_a = true, int _a_sizecode = -1)
+		inline bool FetchUnaryOpFormat(u64 &s, u64 &m, u64 &a, bool get_a = true, int _a_sizecode = -1)
 		{
 			// read settings
 			if (!GetMemAdv<u8>(s)) return false;
@@ -1025,7 +1017,7 @@ namespace CSX64
 			default: return true; // this should never happen but compiler is complainy
 			}
 		}
-		bool StoreUnaryOpFormat(u64 s, u64 m, u64 res)
+		inline bool StoreUnaryOpFormat(u64 s, u64 m, u64 res)
 		{
 			u64 sizecode = (s >> 2) & 3;
 
@@ -1047,7 +1039,7 @@ namespace CSX64
 		/*
 		[4: dest][2: size][1: dh][1: mem]   [1: CL][1:][6: count]   ([address])
 		*/
-		bool FetchShiftOpFormat(u64 &s, u64 &m, u64 &val, u64 &count)
+		inline bool FetchShiftOpFormat(u64 &s, u64 &m, u64 &val, u64 &count)
 		{
 			// read settings byte
 			if (!GetMemAdv<u8>(s) || !GetMemAdv<u8>(count)) return false;
@@ -1075,7 +1067,7 @@ namespace CSX64
 			// otherwise is memory value
 			else return GetAddressAdv(m) && GetMemRaw(m, Size(sizecode), val);
 		}
-		bool StoreShiftOpFormat(u64 s, u64 m, u64 res)
+		inline bool StoreShiftOpFormat(u64 s, u64 m, u64 res)
 		{
 			u64 sizecode = (s >> 2) & 3;
 
@@ -1099,7 +1091,7 @@ namespace CSX64
 		mode = 2: [size: imm]   imm
 		mode = 3: [address]     M[address]
 		*/
-		bool FetchIMMRMFormat(u64 &s, u64 &a, int _a_sizecode = -1)
+		inline bool FetchIMMRMFormat(u64 &s, u64 &a, int _a_sizecode = -1)
 		{
 			if (!GetMemAdv<u8>(s)) return false;
 
@@ -1130,7 +1122,7 @@ namespace CSX64
 		mem = 0: [1: src_2_h][3:][4: src_2]
 		mem = 1: [address_src_2]
 		*/
-		bool FetchRR_RMFormat(u64 &s1, u64 &s2, u64 &dest, u64 &a, u64 &b)
+		inline bool FetchRR_RMFormat(u64 &s1, u64 &s2, u64 &dest, u64 &a, u64 &b)
 		{
 			if (!GetMemAdv<u8>(s1) || !GetMemAdv<u8>(s2)) return false;
 			u64 sizecode = (s1 >> 2) & 3;
@@ -1172,7 +1164,7 @@ namespace CSX64
 
 			return true;
 		}
-		bool StoreRR_RMFormat(u64 s1, u64 res)
+		inline bool StoreRR_RMFormat(u64 s1, u64 res)
 		{
 			// if dest is high
 			if ((s1 & 2) != 0) CPURegisters[s1 >> 4].x8h() = (u8)res;

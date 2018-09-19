@@ -3,7 +3,7 @@
 
 #include "Computer.h"
 
-#define __OPCODE_COUNTS 1
+#define __OPCODE_COUNTS 0
 
 namespace CSX64
 {
