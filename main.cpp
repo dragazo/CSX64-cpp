@@ -146,7 +146,6 @@ void AddPredefines()
 	DefineSymbol("O_TRUNC", (u64)OpenFlags::trunc);
 
 	DefineSymbol("O_APPEND", (u64)OpenFlags::append);
-	DefineSymbol("O_BINARY", (u64)OpenFlags::binary);
 
 	// -- file seek modes -- //
 

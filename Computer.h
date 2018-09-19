@@ -39,8 +39,13 @@
 #define MASK_UNION_15(a,b,c,d,e,f,g,h,i,j,k,l,m,n,o)   (MASK_UNION_1(a) | MASK_UNION_14(b,c,d,e,f,g,h,i,j,k,l,m,n,o))
 #define MASK_UNION_16(a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p) (MASK_UNION_1(a) | MASK_UNION_15(b,c,d,e,f,g,h,i,j,k,l,m,n,o,p))
 
-// if set to 1, uses mask unions to perform the UpdateFlagsZSP() function - otherwise uses flag accessors
+// if nonzero, uses mask unions to perform the UpdateFlagsZSP() function - otherwise uses flag accessors
 #define FLAG_ACCESS_MASKING 1
+
+// CSX64 considers many valid, but non-intel things to be undefined behavior at runtime (e.g. 8-bit addressing).
+// however, these types of things are already blocked by the assembler.
+// if this macro is nonzero, emits ErrorCode::UndefinedBehavior in these cases - otherwise permits them (more efficient).
+#define STRICT_UND 0
 
 namespace CSX64
 {
@@ -194,7 +199,7 @@ namespace CSX64
 			mem(nullptr), mem_size(0),
 			running(false), error(ErrorCode::None), max_mem_size((u64)8 * 1024 * 1024 * 1024),
 			Rand((unsigned int)std::time(nullptr)) {}
-		virtual ~Computer() { aligned_free(mem); }
+		virtual ~Computer() { CSX64::aligned_free(mem); }
 		
 		Computer(const Computer&) = delete;
 		Computer(Computer&&) = delete;
@@ -224,7 +229,7 @@ namespace CSX64
 		{
 			// trick realloc() to do our work for us
 			mem_size = 0;
-			realloc(size);
+			this->realloc(size);
 		}
 
 		// Closes all the managed file descriptors and severs ties to unmanaged ones.
@@ -630,8 +635,11 @@ namespace CSX64
 
 			// get the sizecode
 			sizecode = (settings >> 2) & 3;
+
+			#if STRICT_UND
 			// 8-bit addressing is not allowed
 			if (sizecode == 0) { Terminate(ErrorCode::UndefinedBehavior); return false; }
+			#endif
 
 			// get the imm if applicable - store into res
 			if ((settings & 0x80) != 0 && !GetMemAdv(Size(sizecode), res)) return false;
@@ -824,8 +832,8 @@ namespace CSX64
 		static bool(Computer::* const opcode_handlers[])();
 
 		// types used for simd computation handlers
-		typedef bool (Computer::* VPUBinaryDelegate)(u64 elem_sizecode, u64 &res, u64 a, u64 b, int index);
-		typedef bool (Computer::* VPUUnaryDelegate)(u64 elem_sizecode, u64 &res, u64 a, int index);
+		typedef bool (Computer::* VPUBinaryDelegate)(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
+		typedef bool (Computer::* VPUUnaryDelegate)(u64 elem_sizecode, u64 &res, u64 a, u64 index);
 		typedef bool (Computer::* VPUCVTDelegate)(u64 &res, u64 a);
 
 		// holds cpu delegates for simd fp comparisons
@@ -846,8 +854,10 @@ namespace CSX64
 			if (!GetMemAdv<u8>(s)) return false;
 			u64 sizecode = (s >> 2) & 3;
 
+			#if STRICT_UND
 			// make sure dest will be valid for storing (high flag)
 			if ((s & 2) != 0 && ((s & 0xc0) != 0 || sizecode != 0)) { Terminate(ErrorCode::UndefinedBehavior); return false; }
+			#endif
 
 			// get b (imm)
 			if (!GetMemAdv(Size(sizecode), b)) { a = 0; return false; }
@@ -858,7 +868,11 @@ namespace CSX64
 				if (!GetMemAdv<u8>(a)) return false;
 				if ((a & 128) != 0)
 				{
+					#if STRICT_UND
+					// make sure we're in (ABCD)H
 					if ((a & 0x0c) != 0 || sizecode != 0) { Terminate(ErrorCode::UndefinedBehavior); return false; }
+					#endif
+
 					a = CPURegisters[a & 15].x8h();
 				}
 				else a = CPURegisters[a & 15][sizecode];
@@ -903,16 +917,22 @@ namespace CSX64
 				// if dh is flagged
 				if ((s1 & 2) != 0)
 				{
+					#if STRICT_UND
 					// make sure we're in registers 0-3 and 8-bit mode
 					if ((s1 & 0xc0) != 0 || a_sizecode != 0) { Terminate(ErrorCode::UndefinedBehavior); return false; }
+					#endif
+
 					if (get_a) a = CPURegisters[s1 >> 4].x8h();
 				}
 				else if (get_a) a = CPURegisters[s1 >> 4][a_sizecode];
 				// if sh is flagged
 				if ((s1 & 1) != 0)
 				{
+					#if STRICT_UND
 					// make sure we're in registers 0-3 and 8-bit mode
 					if ((s2 & 0x0c) != 0 || b_sizecode != 0) { Terminate(ErrorCode::UndefinedBehavior); return false; }
+					#endif
+
 					b = CPURegisters[s2 & 15].x8h();
 				}
 				else b = CPURegisters[s2 & 15][b_sizecode];
@@ -922,8 +942,11 @@ namespace CSX64
 				// if dh is flagged
 				if ((s1 & 2) != 0)
 				{
+					#if STRICT_UND
 					// make sure we're in registers 0-3 and 8-bit mode
 					if ((s1 & 0xc0) != 0 || a_sizecode != 0) { Terminate(ErrorCode::UndefinedBehavior); return false; }
+					#endif
+
 					if (get_a) a = CPURegisters[s1 >> 4].x8h();
 				}
 				else if (get_a) a = CPURegisters[s1 >> 4][a_sizecode];
@@ -931,14 +954,19 @@ namespace CSX64
 				return GetMemAdv_szc(b_sizecode, b);
 
 			case 2:
+				#if STRICT_UND
 				// handle allow_b_mem case
 				if (!allow_b_mem) { Terminate(ErrorCode::UndefinedBehavior); return false; }
+				#endif
 
 				// if dh is flagged
 				if ((s1 & 2) != 0)
 				{
+					#if STRICT_UND
 					// make sure we're in registers 0-3 and 8-bit mode
 					if ((s1 & 0xc0) != 0 || a_sizecode != 0) { Terminate(ErrorCode::UndefinedBehavior); return false; }
+					#endif
+
 					if (get_a) a = CPURegisters[s1 >> 4].x8h();
 				}
 				else if (get_a) a = CPURegisters[s1 >> 4][a_sizecode];
@@ -951,8 +979,11 @@ namespace CSX64
 				// if sh is flagged
 				if ((s1 & 1) != 0)
 				{
+					#if STRICT_UND
 					// make sure we're in registers 0-3 and 8-bit mode
 					if ((s2 & 0x0c) != 0 || b_sizecode != 0) { Terminate(ErrorCode::UndefinedBehavior); return false; }
+					#endif
+
 					b = CPURegisters[s2 & 15].x8h();
 				}
 				else b = CPURegisters[s2 & 15][b_sizecode];
@@ -1004,8 +1035,11 @@ namespace CSX64
 				// if h is flagged
 				if ((s & 2) != 0)
 				{
+					#if STRICT_UND
 					// make sure we're in registers 0-3 and 8-bit mode
 					if ((s & 0xc0) != 0 || a_sizecode != 0) { Terminate(ErrorCode::UndefinedBehavior); return false; }
+					#endif
+
 					if (get_a) a = CPURegisters[s >> 4].x8h();
 				}
 				else if (get_a) a = CPURegisters[s >> 4][a_sizecode];
@@ -1056,8 +1090,11 @@ namespace CSX64
 				// if high flag set
 				if ((s & 2) != 0)
 				{
+					#if STRICT_UND
 					// need to be in (ABCD)H
 					if ((s & 0xc0) != 0 || sizecode != 0) { Terminate(ErrorCode::UndefinedBehavior); return false; }
+					#endif
+
 					val = CPURegisters[s >> 4].x8h();
 				}
 				else val = CPURegisters[s >> 4][sizecode];
@@ -1105,7 +1142,11 @@ namespace CSX64
 				return true;
 
 			case 1:
+				#if STRICT_UND
+				// make sure we're in (ABCD)H
 				if ((s & 0xc0) != 0) { Terminate(ErrorCode::UndefinedBehavior); return false; }
+				#endif
+
 				a = CPURegisters[s >> 4].x8h();
 				return true;
 
@@ -1130,7 +1171,11 @@ namespace CSX64
 			// if dest is high
 			if ((s1 & 2) != 0)
 			{
+				#if STRICT_UND
+				// make sure we're in (ABCD)H
 				if (sizecode != 0 || (s1 & 0xc0) != 0) { Terminate(ErrorCode::UndefinedBehavior); return false; }
+				#endif
+
 				dest = CPURegisters[s1 >> 4].x8h();
 			}
 			else dest = CPURegisters[s1 >> 4][sizecode];
@@ -1138,7 +1183,11 @@ namespace CSX64
 			// if a is high
 			if ((s2 & 128) != 0)
 			{
+				#if STRICT_UND
+				// make sure we're in (ABCD)H
 				if (sizecode != 0 || (s2 & 0x0c) != 0) { Terminate(ErrorCode::UndefinedBehavior); return false; }
+				#endif
+
 				a = CPURegisters[s2 & 15].x8h();
 			}
 			else a = CPURegisters[s2 & 15][sizecode];
@@ -1151,7 +1200,11 @@ namespace CSX64
 				// if b is high
 				if ((b & 128) != 0)
 				{
+					#if STRICT_UND
+					// make sure we're in (ABCD)H
 					if (sizecode != 0 || (b & 0x0c) != 0) { Terminate(ErrorCode::UndefinedBehavior); return false; }
+					#endif
+
 					b = CPURegisters[b & 15].x8h();
 				}
 				else b = CPURegisters[b & 15][sizecode];
@@ -1422,7 +1475,11 @@ namespace CSX64
 			// if a is high
 			if ((a & 2) != 0)
 			{
+				#if STRICT_UND
+				// make sure we're in (ABCD)H
 				if ((a & 0xc0) != 0 || sizecode != 0) { Terminate(ErrorCode::UndefinedBehavior); return false; }
+				#endif
+
 				temp_1 = CPURegisters[a >> 4].x8h();
 			}
 			else temp_1 = CPURegisters[a >> 4][sizecode];
@@ -1435,7 +1492,11 @@ namespace CSX64
 				// if b is high
 				if ((b & 128) != 0)
 				{
+					#if STRICT_UND
+					// make sure we're in (ABCD)H
 					if ((b & 0x0c) != 0 || sizecode != 0) { Terminate(ErrorCode::UndefinedBehavior); return false; }
+					#endif
+
 					temp_2 = CPURegisters[b & 15].x8h();
 					CPURegisters[b & 15].x8h() = (u8)temp_1;
 				}
@@ -1467,8 +1528,10 @@ namespace CSX64
 			if (!FetchIMMRMFormat(s, val)) return false;
 			u64 sizecode = (s >> 2) & 3;
 
+			#if STRICT_UND
 			// 8-bit addressing not allowed
 			if (sizecode == 0) { Terminate(ErrorCode::UndefinedBehavior); return false; }
+			#endif
 
 			aft = RIP(); // record point immediately after reading (for CALL return address)
 			RIP() = val; // jump
@@ -1509,8 +1572,10 @@ namespace CSX64
 			if (!FetchIMMRMFormat(s, val)) return false;
 			u64 sizecode = (s >> 2) & 3;
 
+			#if STRICT_UND
 			// 8-bit addressing not allowed
 			if (sizecode == 0) { Terminate(ErrorCode::UndefinedBehavior); return false; }
+			#endif
 
 			// get the flag
 			bool flag;
@@ -1597,8 +1662,10 @@ namespace CSX64
 			if (!FetchIMMRMFormat(s, a)) return false;
 			u64 sizecode = (s >> 2) & 3;
 
+			#if STRICT_UND
 			// 8-bit push not allowed
 			if (sizecode == 0) { Terminate(ErrorCode::UndefinedBehavior); return false; }
+			#endif
 
 			return PushRaw(Size(sizecode), a);
 		}
@@ -1613,8 +1680,10 @@ namespace CSX64
 			if (!GetMemAdv<u8>(s)) return false;
 			u64 sizecode = (s >> 2) & 3;
 
+			#if STRICT_UND
 			// 8-bit pop not allowed
 			if (sizecode == 0) { Terminate(ErrorCode::UndefinedBehavior); return false; }
+			#endif
 
 			// get the value
 			if (!PopRaw(Size(sizecode), val)) return false;
@@ -1639,8 +1708,10 @@ namespace CSX64
 			if (!GetMemAdv<u8>(s) || !GetAddressAdv(address)) return false;
 			u64 sizecode = (s >> 2) & 3;
 
+			#if STRICT_UND
 			// LEA doesn't allow 8-bit addressing
 			if (sizecode == 0) { Terminate(ErrorCode::UndefinedBehavior); return false; }
+			#endif
 
 			CPURegisters[s >> 4][sizecode] = address;
 			return true;
@@ -2397,8 +2468,10 @@ namespace CSX64
 			if (!FetchRR_RMFormat(s1, s2, dest, a, b)) return false;
 			u64 sizecode = (s1 >> 2) & 3;
 
+			#if STRICT_UND
 			// only supports 32 and 64-bit operands
 			if (sizecode != 2 && sizecode != 3) { Terminate(ErrorCode::UndefinedBehavior); return false; }
+			#endif
 
 			u64 res = ~a & b;
 
@@ -2463,9 +2536,9 @@ namespace CSX64
 			case 1: EDX() = (i32)EAX() >= 0 ? 0 : 0xffffffff; return true;
 			case 2: RDX() = (i64)RAX() >= 0 ? 0 : 0xffffffffffffffff; return true;
 
-			case 3: AX() = (u16)SignExtend(AL(), 0); return true;
-			case 4: EAX() = (u32)SignExtend(AX(), 1); return true;
-			case 5: RAX() = (u64)SignExtend(EAX(), 2); return true;
+			case 3: AX() = (u16)(i8)AL(); return true;
+			case 4: EAX() = (u32)(i16)AX(); return true;
+			case 5: RAX() = (u64)(i32)EAX(); return true;
 
 			default: Terminate(ErrorCode::UndefinedBehavior); return false;
 			}
@@ -2503,8 +2576,11 @@ namespace CSX64
 				case 8:
 					if ((s2 & 64) != 0) // if high register
 					{
+						#if STRICT_UND
 						// make sure we're in registers A-D
 						if ((s2 & 0x0c) != 0) { Terminate(ErrorCode::UndefinedBehavior); return false; }
+						#endif
+
 						src = CPURegisters[s2 & 15].x8h();
 					}
 					else src = CPURegisters[s2 & 15].x8();
@@ -3961,14 +4037,23 @@ namespace CSX64
 			u64 reg_sizecode = s1 & 3;
 			u64 elem_sizecode = (s2 >> 2) & 3;
 
-			// get the register to work with
+			// -- get the register to work with -- //
+
+			// this check isn't optional - if it's 3 it can go out of bounds of the ZMMRegister object
 			if (reg_sizecode == 3) { Terminate(ErrorCode::UndefinedBehavior); return false; }
+
+			#if STRICT_UND
+			// this check is optional - just prevents XMM / YMM ops from accessing vpu registers 16-31 (standard intel stuff)
 			if (reg_sizecode != 2 && (s1 & 0x80) != 0) { Terminate(ErrorCode::UndefinedBehavior); return false; }
-			int reg = (int)(s1 >> 3);
+			#endif
+
+			u64 reg = s1 >> 3;
+
+			// -- prepare for execution -- //
 
 			// get number of elements to process (accounting for scalar flag)
-			int elem_count = (s2 & 0x20) != 0 ? 1 : (int)(Size(reg_sizecode + 4) >> elem_sizecode);
-			int src;
+			u64 elem_count = s2 & 0x20 ? 1 : Size(reg_sizecode + 4) >> elem_sizecode;
+			u64 src;
 
 			// get the mask (default of all 1's)
 			u64 mask = ~(u64)0;
@@ -3981,7 +4066,12 @@ namespace CSX64
 			{
 			case 0:
 				if (!GetMemAdv<u8>(_src)) return false;
+
+				#if STRICT_UND
+				// this check is optional - just prevents XMM / YMM ops from accessing vpu registers 16-31 (standard intel stuff)
 				if (reg_sizecode != 2 && (_src & 0x10) != 0) { Terminate(ErrorCode::UndefinedBehavior); return false; }
+				#endif
+
 				src = (int)_src & 0x1f;
 
 				for (int i = 0; i < elem_count; ++i, mask >>= 1)
@@ -4038,13 +4128,22 @@ namespace CSX64
 			// make sure this element size is allowed
 			if ((Size(elem_sizecode) & elem_size_mask) == 0) { Terminate(ErrorCode::UndefinedBehavior); return false; }
 
-			// get the register to work with
+			// -- get the register to work with -- //
+
+			// this check isn't optional - if it's 3 it can go out of bounds of the ZMMRegister object
 			if (dest_sizecode == 3) { Terminate(ErrorCode::UndefinedBehavior); return false; }
+
+			#if STRICT_UND
+			// this check is optional - just prevents XMM / YMM ops from accessing vpu registers 16-31 (standard intel stuff)
 			if (dest_sizecode != 2 && s1 & 0x80) { Terminate(ErrorCode::UndefinedBehavior); return false; }
-			int dest = (int)(s1 >> 3);
+			#endif
+
+			u64 dest = s1 >> 3;
+
+			// -- prepare for execution -- //
 
 			// get number of elements to process (accounting for scalar flag)
-			int elem_count = s2 & 0x20 ? 1 : (int)(Size(dest_sizecode + 4) >> elem_sizecode);
+			u64 elem_count = s2 & 0x20 ? 1 : Size(dest_sizecode + 4) >> elem_sizecode;
 
 			// get the mask (default of all 1's)
 			u64 mask = ~(u64)0;
@@ -4054,24 +4153,34 @@ namespace CSX64
 
 			// get src1
 			if (!GetMemAdv<u8>(_src1)) return false;
+
+			#if STRICT_UND
+			// this check is optional - just prevents XMM / YMM ops from accessing vpu registers 16-31 (standard intel stuff)
 			if (dest_sizecode != 2 && (_src1 & 0x10) != 0) { Terminate(ErrorCode::UndefinedBehavior); return false; }
-			int src1 = (int)(_src1 & 0x1f);
+			#endif
+
+			u64 src1 = _src1 & 0x1f;
 
 			// if src2 is a register
 			if ((s2 & 1) == 0)
 			{
 				if (!GetMemAdv<u8>(_src2)) return false;
-				if (dest_sizecode != 2 && _src2 & 0x10) { Terminate(ErrorCode::UndefinedBehavior); return false; }
-				int src2 = (int)(_src2 & 0x1f);
 
-				for (int i = 0; i < elem_count; ++i, mask >>= 1)
-					if ((mask & 1) != 0)
+				#if STRICT_UND
+				// this check is optional - just prevents XMM / YMM ops from accessing vpu registers 16-31 (standard intel stuff)
+				if (dest_sizecode != 2 && _src2 & 0x10) { Terminate(ErrorCode::UndefinedBehavior); return false; }
+				#endif
+
+				u64 src2 = _src2 & 0x1f;
+
+				for (u64 i = 0; i < elem_count; ++i, mask >>= 1)
+					if (mask & 1)
 					{
 						// hand over to the delegate for processing
-						if (!(this->*func)(elem_sizecode, res, ZMMRegisters[src1].uint((int)elem_sizecode, i), ZMMRegisters[src2].uint((int)elem_sizecode, i), i)) return false;
-						ZMMRegisters[dest].uint((int)elem_sizecode, i) = res;
+						if (!(this->*func)(elem_sizecode, res, ZMMRegisters[src1].uint(elem_sizecode, i), ZMMRegisters[src2].uint(elem_sizecode, i), i)) return false;
+						ZMMRegisters[dest].uint(elem_sizecode, i) = res;
 					}
-					else if (zmask) ZMMRegisters[dest].uint((int)elem_sizecode, i) = 0;
+					else if (zmask) ZMMRegisters[dest].uint(elem_sizecode, i) = 0;
 			}
 			// otherwise src is memory
 			else
@@ -4080,16 +4189,16 @@ namespace CSX64
 				// if we're in vector mode and aligned flag is set, make sure address is aligned
 				if (elem_count > 1 && (s1 & 4) != 0 && m % Size(dest_sizecode + 4) != 0) { Terminate(ErrorCode::AlignmentViolation); return false; }
 
-				for (int i = 0; i < elem_count; ++i, mask >>= 1, m += Size(elem_sizecode))
-					if ((mask & 1) != 0)
+				for (u64 i = 0; i < elem_count; ++i, mask >>= 1, m += Size(elem_sizecode))
+					if (mask & 1)
 					{
 						if (!GetMemRaw(m, Size(elem_sizecode), res)) return false;
 
 						// hand over to the delegate for processing
-						if (!(this->*func)(elem_sizecode, res, ZMMRegisters[src1].uint((int)elem_sizecode, i), res, i)) return false;
-						ZMMRegisters[dest].uint((int)elem_sizecode, i) = res;
+						if (!(this->*func)(elem_sizecode, res, ZMMRegisters[src1].uint(elem_sizecode, i), res, i)) return false;
+						ZMMRegisters[dest].uint(elem_sizecode, i) = res;
 					}
-					else if (zmask) ZMMRegisters[dest].uint((int)elem_sizecode, i) = 0;
+					else if (zmask) ZMMRegisters[dest].uint(elem_sizecode, i) = 0;
 			}
 
 			return true;
@@ -4110,13 +4219,22 @@ namespace CSX64
 			// make sure this element size is allowed
 			if ((Size(elem_sizecode) & elem_size_mask) == 0) { Terminate(ErrorCode::UndefinedBehavior); return false; }
 
-			// get the register to work with
+			// -- get the register to work with -- //
+
+			// this check isn't optional - if it's 3 it can go out of bounds of the ZMMRegister object
 			if (dest_sizecode == 3) { Terminate(ErrorCode::UndefinedBehavior); return false; }
+
+			#if STRICT_UND
+			// this check is optional - just prevents XMM / YMM ops from accessing vpu registers 16-31 (standard intel stuff)
 			if (dest_sizecode != 2 && s1 & 0x80) { Terminate(ErrorCode::UndefinedBehavior); return false; }
-			int dest = (int)(s1 >> 3);
+			#endif
+
+			u64 dest = s1 >> 3;
+
+			// -- prepare for execution -- //
 
 			// get number of elements to process (accounting for scalar flag)
-			int elem_count = s2 & 0x20 ? 1 : (int)(Size(dest_sizecode + 4) >> elem_sizecode);
+			u64 elem_count = s2 & 0x20 ? 1 : Size(dest_sizecode + 4) >> elem_sizecode;
 			
 			// get the mask (default of all 1's)
 			u64 mask = ~(u64)0;
@@ -4128,17 +4246,22 @@ namespace CSX64
 			if ((s2 & 1) == 0)
 			{
 				if (!GetMemAdv<u8>(_src)) return false;
-				if (dest_sizecode != 2 && _src & 0x10) { Terminate(ErrorCode::UndefinedBehavior); return false; }
-				int src = (int)(_src & 0x1f);
 
-				for (int i = 0; i < elem_count; ++i, mask >>= 1)
+				#if STRICT_UND
+				// this check is optional - just prevents XMM / YMM ops from accessing vpu registers 16-31 (standard intel stuff)
+				if (dest_sizecode != 2 && _src & 0x10) { Terminate(ErrorCode::UndefinedBehavior); return false; }
+				#endif
+
+				u64 src = _src & 0x1f;
+
+				for (u64 i = 0; i < elem_count; ++i, mask >>= 1)
 					if (mask & 1)
 					{
 						// hand over to the delegate for processing
-						if (!(this->*func)(elem_sizecode, res, ZMMRegisters[src].uint((int)elem_sizecode, i), i)) return false;
-						ZMMRegisters[dest].uint((int)elem_sizecode, i) = res;
+						if (!(this->*func)(elem_sizecode, res, ZMMRegisters[src].uint(elem_sizecode, i), i)) return false;
+						ZMMRegisters[dest].uint(elem_sizecode, i) = res;
 					}
-					else if (zmask) ZMMRegisters[dest].uint((int)elem_sizecode, i) = 0;
+					else if (zmask) ZMMRegisters[dest].uint(elem_sizecode, i) = 0;
 			}
 			// otherwise src is memory
 			else
@@ -4147,16 +4270,16 @@ namespace CSX64
 				// if we're in vector mode and aligned flag is set, make sure address is aligned
 				if (elem_count > 1 && (s1 & 4) != 0 && m % Size(dest_sizecode + 4) != 0) { Terminate(ErrorCode::AlignmentViolation); return false; }
 
-				for (int i = 0; i < elem_count; ++i, mask >>= 1, m += Size(elem_sizecode))
+				for (u64 i = 0; i < elem_count; ++i, mask >>= 1, m += Size(elem_sizecode))
 					if (mask & 1)
 					{
 						if (!GetMemRaw(m, Size(elem_sizecode), res)) return false;
-
+						
 						// hand over to the delegate for processing
 						if (!(this->*func)(elem_sizecode, res, res, i)) return false;
-						ZMMRegisters[dest].uint((int)elem_sizecode, i) = res;
+						ZMMRegisters[dest].uint(elem_sizecode, i) = res;
 					}
-					else if (zmask) ZMMRegisters[dest].uint((int)elem_sizecode, i) = 0;
+					else if (zmask) ZMMRegisters[dest].uint(elem_sizecode, i) = 0;
 			}
 
 			return true;
@@ -4323,7 +4446,7 @@ namespace CSX64
 			return true;
 		}
 
-		bool __TryPerformVEC_FADD(u64 elem_sizecode, u64 &res, u64 a, u64 b, int index)
+		bool __TryPerformVEC_FADD(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index)
 		{
 			// 64-bit fp
 			if (elem_sizecode == 3) res = DoubleAsUInt64(AsDouble(a) + AsDouble(b));
@@ -4332,7 +4455,7 @@ namespace CSX64
 
 			return true;
 		}
-		bool __TryPerformVEC_FSUB(u64 elem_sizecode, u64 &res, u64 a, u64 b, int index)
+		bool __TryPerformVEC_FSUB(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index)
 		{
 			// 64-bit fp
 			if (elem_sizecode == 3) res = DoubleAsUInt64(AsDouble(a) - AsDouble(b));
@@ -4341,7 +4464,7 @@ namespace CSX64
 
 			return true;
 		}
-		bool __TryPerformVEC_FMUL(u64 elem_sizecode, u64 &res, u64 a, u64 b, int index)
+		bool __TryPerformVEC_FMUL(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index)
 		{
 			// 64-bit fp
 			if (elem_sizecode == 3) res = DoubleAsUInt64(AsDouble(a) * AsDouble(b));
@@ -4350,7 +4473,7 @@ namespace CSX64
 
 			return true;
 		}
-		bool __TryPerformVEC_FDIV(u64 elem_sizecode, u64 &res, u64 a, u64 b, int index)
+		bool __TryPerformVEC_FDIV(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index)
 		{
 			// 64-bit fp
 			if (elem_sizecode == 3) res = DoubleAsUInt64(AsDouble(a) / AsDouble(b));
@@ -4365,22 +4488,22 @@ namespace CSX64
 		bool TryProcessVEC_FMUL() { return ProcessVPUBinary(12, &Computer::__TryPerformVEC_FMUL); }
 		bool TryProcessVEC_FDIV() { return ProcessVPUBinary(12, &Computer::__TryPerformVEC_FDIV); }
 
-		bool __TryPerformVEC_AND(u64 elem_sizecode, u64 &res, u64 a, u64 b, int index)
+		bool __TryPerformVEC_AND(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index)
 		{
 			res = a & b;
 			return true;
 		}
-		bool __TryPerformVEC_OR(u64 elem_sizecode, u64 &res, u64 a, u64 b, int index)
+		bool __TryPerformVEC_OR(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index)
 		{
 			res = a | b;
 			return true;
 		}
-		bool __TryPerformVEC_XOR(u64 elem_sizecode, u64 &res, u64 a, u64 b, int index)
+		bool __TryPerformVEC_XOR(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index)
 		{
 			res = a ^ b;
 			return true;
 		}
-		bool __TryPerformVEC_ANDN(u64 elem_sizecode, u64 &res, u64 a, u64 b, int index)
+		bool __TryPerformVEC_ANDN(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index)
 		{
 			res = ~a & b;
 			return true;
@@ -4391,12 +4514,12 @@ namespace CSX64
 		bool TryProcessVEC_XOR() { return ProcessVPUBinary(15, &Computer::__TryPerformVEC_XOR); }
 		bool TryProcessVEC_ANDN() { return ProcessVPUBinary(15, &Computer::__TryPerformVEC_ANDN); }
 
-		bool __TryPerformVEC_ADD(u64 elem_sizecode, u64 &res, u64 a, u64 b, int index)
+		bool __TryPerformVEC_ADD(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index)
 		{
 			res = a + b;
 			return true;
 		}
-		bool __TryPerformVEC_ADDS(u64 elem_sizecode, u64 &res, u64 a, u64 b, int index)
+		bool __TryPerformVEC_ADDS(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index)
 		{
 			// get sign mask
 			u64 smask = SignMask(elem_sizecode);
@@ -4413,7 +4536,7 @@ namespace CSX64
 
 			return true;
 		}
-		bool __TryPerformVEC_ADDUS(u64 elem_sizecode, u64 &res, u64 a, u64 b, int index)
+		bool __TryPerformVEC_ADDUS(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index)
 		{
 			// get trunc mask
 			u64 tmask = TruncMask(elem_sizecode);
@@ -4430,17 +4553,17 @@ namespace CSX64
 		bool TryProcessVEC_ADDS() { return ProcessVPUBinary(15, &Computer::__TryPerformVEC_ADDS); }
 		bool TryProcessVEC_ADDUS() { return ProcessVPUBinary(15, &Computer::__TryPerformVEC_ADDUS); }
 
-		bool __TryPerformVEC_SUB(u64 elem_sizecode, u64 &res, u64 a, u64 b, int index)
+		bool __TryPerformVEC_SUB(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index)
 		{
 			res = a - b;
 			return true;
 		}
-		bool __TryPerformVEC_SUBS(u64 elem_sizecode, u64 &res, u64 a, u64 b, int index)
+		bool __TryPerformVEC_SUBS(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index)
 		{
 			// since this one's signed, we can just add the negative
 			return __TryPerformVEC_ADDS(elem_sizecode, res, a, Truncate(~b + 1, elem_sizecode), index);
 		}
-		bool __TryPerformVEC_SUBUS(u64 elem_sizecode, u64 &res, u64 a, u64 b, int index)
+		bool __TryPerformVEC_SUBUS(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index)
 		{
 			// handle unsigned sub saturation
 			res = a > b ? a - b : 0;
@@ -4451,7 +4574,7 @@ namespace CSX64
 		bool TryProcessVEC_SUBS() { return ProcessVPUBinary(15, &Computer::__TryPerformVEC_SUBS); }
 		bool TryProcessVEC_SUBUS() { return ProcessVPUBinary(15, &Computer::__TryPerformVEC_SUBUS); }
 
-		bool __TryPerformVEC_MULL(u64 elem_sizecode, u64 &res, u64 a, u64 b, int index)
+		bool __TryPerformVEC_MULL(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index)
 		{
 			res = (i64)SignExtend(a, elem_sizecode) * (i64)SignExtend(b, elem_sizecode);
 			return true;
@@ -4459,7 +4582,7 @@ namespace CSX64
 
 		bool TryProcessVEC_MULL() { return ProcessVPUBinary(15, &Computer::__TryPerformVEC_MULL); }
 
-		bool __TryProcessVEC_FMIN(u64 elem_sizecode, u64 &res, u64 a, u64 b, int index)
+		bool __TryProcessVEC_FMIN(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index)
 		{
 			// this exploits c++ returning false on comparison to NaN. see http://www.felixcloutier.com/x86/MINPD.html for the actual algorithm
 			if (elem_sizecode == 3) res = AsDouble(a) < AsDouble(b) ? a : b;
@@ -4467,7 +4590,7 @@ namespace CSX64
 
 			return true;
 		}
-		bool __TryProcessVEC_FMAX(u64 elem_sizecode, u64 &res, u64 a, u64 b, int index)
+		bool __TryProcessVEC_FMAX(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index)
 		{
 			// this exploits c++ returning false on comparison to NaN. see http://www.felixcloutier.com/x86/MAXPD.html for the actual algorithm
 			if (elem_sizecode == 3) res = AsDouble(a) > AsDouble(b) ? a : b;
@@ -4479,23 +4602,23 @@ namespace CSX64
 		bool TryProcessVEC_FMIN() { return ProcessVPUBinary(12, &Computer::__TryProcessVEC_FMIN); }
 		bool TryProcessVEC_FMAX() { return ProcessVPUBinary(12, &Computer::__TryProcessVEC_FMAX); }
 
-		bool __TryProcessVEC_UMIN(u64 elem_sizecode, u64 &res, u64 a, u64 b, int index)
+		bool __TryProcessVEC_UMIN(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index)
 		{
 			res = a < b ? a : b; // a and b are guaranteed to be properly truncated, so this is invariant of size
 			return true;
 		}
-		bool __TryProcessVEC_SMIN(u64 elem_sizecode, u64 &res, u64 a, u64 b, int index)
+		bool __TryProcessVEC_SMIN(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index)
 		{
 			// just extend to 64-bit and do a signed compare
 			res = (i64)SignExtend(a, elem_sizecode) < (i64)SignExtend(b, elem_sizecode) ? a : b;
 			return true;
 		}
-		bool __TryProcessVEC_UMAX(u64 elem_sizecode, u64 &res, u64 a, u64 b, int index)
+		bool __TryProcessVEC_UMAX(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index)
 		{
 			res = a > b ? a : b; // a and b are guaranteed to be properly truncated, so this is invariant of size
 			return true;
 		}
-		bool __TryProcessVEC_SMAX(u64 elem_sizecode, u64 &res, u64 a, u64 b, int index)
+		bool __TryProcessVEC_SMAX(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index)
 		{
 			// just extend to 64-bit and do a signed compare
 			res = (i64)SignExtend(a, elem_sizecode) > (i64)SignExtend(b, elem_sizecode) ? a : b;
@@ -4507,7 +4630,7 @@ namespace CSX64
 		bool TryProcessVEC_UMAX() { return ProcessVPUBinary(15, &Computer::__TryProcessVEC_UMAX); }
 		bool TryProcessVEC_SMAX() { return ProcessVPUBinary(15, &Computer::__TryProcessVEC_SMAX); }
 
-		bool __TryPerformVEC_FADDSUB(u64 elem_sizecode, u64 &res, u64 a, u64 b, int index)
+		bool __TryPerformVEC_FADDSUB(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index)
 		{
 			// 64-bit fp
 			if (elem_sizecode == 3) res = DoubleAsUInt64(index % 2 == 0 ? AsDouble(a) - AsDouble(b) : AsDouble(a) + AsDouble(b));
@@ -4519,7 +4642,7 @@ namespace CSX64
 
 		bool TryProcessVEC_FADDSUB() { return ProcessVPUBinary(12, &Computer::__TryPerformVEC_FADDSUB); }
 
-		bool __TryPerformVEC_AVG(u64 elem_sizecode, u64 &res, u64 a, u64 b, int index)
+		bool __TryPerformVEC_AVG(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index)
 		{
 			res = (a + b + 1) >> 1; // doesn't work for 64-bit, but Intel doesn't offer a 64-bit variant anyway, so that's fine
 			return true;
@@ -4533,7 +4656,7 @@ namespace CSX64
 
 		// macro to build functions for handling simd floating-point comparisons
 		#define __TryProcessVEC_FCMP_formatter(pred_name, great, less, equal, unord, signal) \
-		bool __TryProcessVEC_FCMP_ ## pred_name(u64 elem_sizecode, u64 &res, u64 a, u64 b, int index) \
+		bool __TryProcessVEC_FCMP_ ## pred_name(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index) \
 		{ \
 			if (elem_sizecode == 3) \
 			{ \
@@ -4607,7 +4730,7 @@ namespace CSX64
 			u64 cond;
 			if (!GetMemAdv<u8>(cond)) return false;
 
-			// ensure condition is in range
+			// ensure condition is in range - not optional
 			if (cond >= 32) { Terminate(ErrorCode::UndefinedBehavior); return false; }
 
 			// perform the comparison
@@ -4618,7 +4741,7 @@ namespace CSX64
 		// the result will be src1, thus creating the desired no-modification behavior so long as dest == src1.
 		// each pair of elements will update the flags in turn, thus the total comparison is on the last pair processed - standard behavior requires it be scalar operation.
 		// the assembler will ensure all of this is the case.
-		bool __TryProcessVEC_FCOMI(u64 elem_sizecode, u64 &res, u64 _a, u64 _b, int index)
+		bool __TryProcessVEC_FCOMI(u64 elem_sizecode, u64 &res, u64 _a, u64 _b, u64 index)
 		{
 			// temporaries for cmp results
 			bool x, y, z;
@@ -4661,7 +4784,7 @@ namespace CSX64
 		bool TryProcessVEC_FCOMI() { return ProcessVPUBinary(12, &Computer::__TryProcessVEC_FCOMI); }
 
 		// these trigger ArithmeticError on negative sqrt - spec doesn't specify explicitly what to do
-		bool __TryProcessVEC_FSQRT(u64 elem_sizecode, u64 &res, u64 a, int index)
+		bool __TryProcessVEC_FSQRT(u64 elem_sizecode, u64 &res, u64 a, u64 index)
 		{
 			if (elem_sizecode == 3)
 			{
@@ -4677,7 +4800,7 @@ namespace CSX64
 			}
 			return true;
 		}
-		bool __TryProcessVEC_FRSQRT(u64 elem_sizecode, u64 &res, u64 a, int index)
+		bool __TryProcessVEC_FRSQRT(u64 elem_sizecode, u64 &res, u64 a, u64 index)
 		{
 			if (elem_sizecode == 3)
 			{

@@ -84,8 +84,8 @@ namespace CSX64
 		std::string path;
 		if (!GetCString(RBX(), path)) return false;
 
-		int raw_flags = (int)RCX(); // flags provided by user
-		int cpp_flags = 0;          // flags to provide to C++
+		int raw_flags = (int)RCX();       // flags provided by user
+		int cpp_flags = std::ios::binary; // flags to provide to C++
 		
 		// process raw flags
 		if (raw_flags & (int)OpenFlags::read) cpp_flags |= std::ios::in;
@@ -94,7 +94,6 @@ namespace CSX64
 		if (raw_flags & (int)OpenFlags::trunc) cpp_flags |= std::ios::trunc;
 		
 		if (raw_flags & (int)OpenFlags::append) cpp_flags |= std::ios::app;
-		if (raw_flags & (int)OpenFlags::binary) cpp_flags |= std::ios::binary;
 		
 		// handle creation mode flags
 		if (raw_flags & (int)OpenFlags::temp)
@@ -197,7 +196,7 @@ namespace CSX64
 		// otherwise perform the reallocation
 		else
 		{
-			realloc(RBX());
+			this->realloc(RBX());
 			RAX() = 0;
 		}
 
