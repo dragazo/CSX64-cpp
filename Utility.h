@@ -20,6 +20,23 @@
 
 namespace CSX64
 {
+	// -- arch encoding helpers -- //
+
+	// returns true iff the current system is little-endian
+	inline bool IsLittleEndian()
+	{
+		static constexpr u64 val = 0x0102030405060708;
+		return *(u8*)&val == 8;
+	}
+
+	// returns true iff the current system uses bit-zero to represent floating zero for f32 and f64
+	inline bool IsBitZeroFP()
+	{
+		static constexpr f64 _64 = 0;
+		static constexpr f32 _32 = 0;
+		return *(u64*)&_64 == 0 && *(u32*)&_32 == 0;
+	}
+
 	// -- serialization -- //
 
 	// writes the value's binary representation verbatim

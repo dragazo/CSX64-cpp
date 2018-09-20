@@ -156,10 +156,10 @@ namespace CSX64
 		{
 			switch (sizecode)
 			{
-			case 3: return reg.x64();
-			case 2: return reg.x32();
-			case 1: return reg.x16();
 			case 0: return reg.x8();
+			case 1: return reg.x16();
+			case 2: return reg.x32();
+			case 3: return reg.x64();
 
 			default: throw std::invalid_argument("sizecode must be on range [0,3]");
 			}
@@ -196,18 +196,18 @@ namespace CSX64
 
 		// -- index access utilities -- //
 
-		inline u64 &uint64(int index) { return ((u64*)data)[index]; }
-		inline u32 &uint32(int index) { return ((u32*)data)[index]; }
-		inline u16 &uint16(int index) { return ((u16*)data)[index]; }
-		inline u8 &uint8(int index) { return ((u8*)data)[index]; }
+		inline u64 &uint64(u64 index) { return ((u64*)data)[index]; }
+		inline u32 &uint32(u64 index) { return ((u32*)data)[index]; }
+		inline u16 &uint16(u64 index) { return ((u16*)data)[index]; }
+		inline u8 &uint8(u64 index) { return ((u8*)data)[index]; }
 
-		inline std::int64_t &int64(int index) { return ((std::int64_t*)data)[index]; }
-		inline std::int32_t &int32(int index) { return ((std::int32_t*)data)[index]; }
-		inline std::int16_t &int16(int index) { return ((std::int16_t*)data)[index]; }
-		inline std::int8_t &int8(int index) { return ((std::int8_t*)data)[index]; }
+		inline u64 &int64(u64 index) { return ((u64*)data)[index]; }
+		inline u32 &int32(u64 index) { return ((u32*)data)[index]; }
+		inline u16 &int16(u64 index) { return ((u16*)data)[index]; }
+		inline u8 &int8(u64 index) { return ((u8*)data)[index]; }
 
-		inline double &fp64(int index) { return ((double*)data)[index]; }
-		inline float &fp32(int index) { return ((float*)data)[index]; }
+		inline double &fp64(u64 index) { return ((double*)data)[index]; }
+		inline float &fp32(u64 index) { return ((float*)data)[index]; }
 
 		// -- sizecode access utilities -- //
 
@@ -223,10 +223,10 @@ namespace CSX64
 		{
 			switch (sizecode)
 			{
-			case 3: return reg.uint64(index);
-			case 2: return reg.uint32(index);
-			case 1: return reg.uint16(index);
 			case 0: return reg.uint8(index);
+			case 1: return reg.uint16(index);
+			case 2: return reg.uint32(index);
+			case 3: return reg.uint64(index);
 
 			default: throw std::invalid_argument("sizecode must be on range [0,3]");
 			}

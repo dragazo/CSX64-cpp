@@ -434,6 +434,29 @@ int main(int argc, const char *argv[])
 {
 	using namespace CSX64;
 
+	// we make a lot of assumptions about the current platform being little-endian (in fact some code still artificially simulates it)
+	// however, the majority isn't simulated since that'd be ridiculously-slow - so we need to make sure this system is really little-endian.
+
+	if (!IsLittleEndian())
+	{
+		std::cerr << "Uhoh!! Looks like this platform isn't little-endian!\n"
+			"Most everything in CSX64 assumes little-endian,\n"
+			"so none of it will work on this system!\n\n";
+		return -1;
+	}
+
+	// we also make a lot of assumptions that floating-zero is integral-zero, so we need to make sure that's a valid assumption
+
+	if (!IsBitZeroFP())
+	{
+		std::cerr << "Uhoh!! Looks like this platform doesn't use IEEE-754 floating-point!\n"
+			"Most floating-point operations in CSX64 assume this,\n"
+			"so none of it will work on this system!\n\n";
+		return -1;
+	}
+
+	// --------------------------------------------------------------------------------------- //
+
 	ProgramAction action = ProgramAction::ExecuteConsole; // requested action
 	std::vector<std::string> pathspec;                    // input paths
 	const char *entry_point = nullptr;                    // main entry point for linker

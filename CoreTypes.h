@@ -7,6 +7,8 @@
 
 namespace CSX64
 {
+	// -- core typedefs -- //
+
 	typedef std::uint64_t u64;
 	typedef std::uint32_t u32;
 	typedef std::uint16_t u16;
@@ -20,14 +22,28 @@ namespace CSX64
 	typedef double f64;
 	typedef float f32;
 
-	static_assert(sizeof(f64) * CHAR_BIT == 64, "Uhoh!! double isn't 64-bit in this compiler!");
-	static_assert(sizeof(f32) * CHAR_BIT == 32, "Uhoh!! float isn't 32-bit in this compiler!");
+	// the standard dictates fixed-size ints operate as if they were that size, but doesn't guarantee they actually /are/ that size
+	// we do some stuff that only works if they really /are/ the proper size
 
-	// true if long double uses 80-bit extended precision
-	constexpr bool f80_enabled = sizeof(long double) * CHAR_BIT == 80;
+	static_assert(sizeof(u64) * CHAR_BIT == 64, "Uhoh!! This compiler's std::uint64_t isn't really 64-bit!");
+	static_assert(sizeof(u32) * CHAR_BIT == 32, "Uhoh!! This compiler's std::uint32_t isn't really 32-bit!");
+	static_assert(sizeof(u16) * CHAR_BIT == 16, "Uhoh!! This compiler's std::uint64_t isn't really 16-bit!");
+	static_assert(sizeof(u8) * CHAR_BIT == 8, "Uhoh!! This compiler's std::uint64_t isn't really 8-bit!");
 
-	// if f80_enabled, aliases long double, otherwise aliases void
-	typedef std::conditional<f80_enabled, long double, void> f80;
+	static_assert(sizeof(i64) * CHAR_BIT == 64, "Uhoh!! This compiler's std::int64_t isn't really 64-bit!");
+	static_assert(sizeof(i32) * CHAR_BIT == 32, "Uhoh!! This compiler's std::int32_t isn't really 32-bit!");
+	static_assert(sizeof(i16) * CHAR_BIT == 16, "Uhoh!! This compiler's std::int64_t isn't really 16-bit!");
+	static_assert(sizeof(i8) * CHAR_BIT == 8, "Uhoh!! This compiler's std::int64_t isn't really 8-bit!");
+
+	// additionally, we do a lot of things involving reading floating values as integers, and we need to make sure they're the assumed size
+
+	static_assert(sizeof(f64) * CHAR_BIT == 64, "Uhoh!! This compiler's double isn't 64-bit!");
+	static_assert(sizeof(f32) * CHAR_BIT == 32, "Uhoh!! This compiler's float isn't 32-bit!");
+
+	// -- extra type info -- //
+
+	// true if long double has greater precision than double
+	constexpr bool ld_is_extended_fp = sizeof(long double) * CHAR_BIT > 64;
 
 	// ---------------------------------------
 

@@ -19,7 +19,7 @@ namespace CSX64
 		u64 data_seglen;
 		u64 bss_seglen;
 		if (!Read(exe, 0, 8, text_seglen) || !Read(exe, 8, 8, rodata_seglen) || !Read(exe, 16, 8, data_seglen) || !Read(exe, 24, 8, bss_seglen)) return false;
-
+		
 		// make sure exe is well-formed
 		if (32 + text_seglen + rodata_seglen + data_seglen != exe.size()) return false;
 
