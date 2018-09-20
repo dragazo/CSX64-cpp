@@ -119,8 +119,13 @@ namespace CSX64
 		}
 		else if (raw_flags & (int)OpenFlags::create)
 		{
-			// if file does not exist, create it
-			std::ifstream(path) || std::ofstream(path);
+			// if the file does not exist
+			std::error_code err;
+			if (!fs::exists(path, err))
+			{
+				// create it
+				std::ofstream(path);
+			}
 		}
 
 		// open the file - held by smart pointer for convenience
