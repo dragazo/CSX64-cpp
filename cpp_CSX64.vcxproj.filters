@@ -89,5 +89,8 @@
     <ClInclude Include="BiggerInts\BiggerInts.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="ios-frstor\iosfrstor.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

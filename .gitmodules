@@ -4,3 +4,6 @@
 [submodule "BiggerInts"]
 	path = BiggerInts
 	url = https://github.com/dragazo/BiggerInts
+[submodule "ios-frstor"]
+	path = ios-frstor
+	url = https://github.com/dragazo/ios-frstor

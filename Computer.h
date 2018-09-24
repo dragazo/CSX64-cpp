@@ -18,6 +18,7 @@
 #include "CoreTypes.h"
 #include "ExeTypes.h"
 #include "Utility.h"
+#include "ios-frstor/iosfrstor.h"
 
 // macros for generating flag union expressions for use with a Computer object
 // __VA_ARGS__ was expanding non-standardly, which is why the below macro recursion doesn't use it
@@ -136,9 +137,8 @@ namespace CSX64
 				if (wrapper.Empty()) ostr << "Empty";
 				else
 				{
-					std::ios::fmtflags flags = ostr.flags();
+					iosfrstor _frstor(ostr);
 					ostr << std::defaultfloat << std::setprecision(17) << (long double)wrapper;
-					ostr.flags(flags);
 				}
 				return ostr;
 			}
@@ -308,7 +308,8 @@ namespace CSX64
 		// Writes a string containing all non-vpu register/flag states"/>
 		std::ostream &WriteCPUDebugString(std::ostream &ostr)
 		{
-			std::ios::fmtflags flags = ostr.flags();
+			iosfrstor _frstor(ostr);
+
 			ostr << std::hex << std::setfill('0') << std::noboolalpha;
 
 			ostr << '\n';
@@ -329,13 +330,13 @@ namespace CSX64
 			ostr << "R14: " << std::setw(16) << R14() << "     g:  " << cc_g() << "     C2: " << FPU_C2() << '\n';
 			ostr << "R15: " << std::setw(16) << R15() << "     ge: " << cc_ge() << "     C3: " << FPU_C3() << '\n';
 
-			ostr.flags(flags);
 			return ostr;
 		}
 		// Writes a string containing all vpu register states
 		std::ostream &WriteVPUDebugString(std::ostream &ostr)
 		{
-			std::ios::fmtflags flags = ostr.flags();
+			iosfrstor _frstor(ostr);
+
 			ostr << std::setfill('0');
 
 			ostr << '\n';
@@ -349,7 +350,6 @@ namespace CSX64
 				ostr << '\n';
 			}
 
-			ostr.flags(flags);
 			return ostr;
 		}
 		// Writes a string containing both <see cref="GetCPUDebugString"/> and <see cref="GetVPUDebugString"/>
