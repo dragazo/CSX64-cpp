@@ -45,14 +45,14 @@ namespace CSX64
 		StackBarrier = text_seglen + rodata_seglen + data_seglen + bss_seglen;
 
 		// set up cpu registers
-		for (int i = 0; i < 16; ++i) CPURegisters[i].x64() = Rand64(Rand);
+		for (int i = 0; i < 16; ++i) CPURegisters[i].x64() = Rand();
 
 		// set up fpu registers
 		FINIT();
 
 		// set up vpu registers
 		for (int i = 0; i < 32; ++i)
-			for (int j = 0; j < 8; ++j) ZMMRegisters[i].uint64(j) = Rand64(Rand);
+			for (int j = 0; j < 8; ++j) ZMMRegisters[i].uint64(j) = Rand();
 		_MXCSR = 0x1f80;
 
 		// set execution state

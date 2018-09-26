@@ -18,6 +18,7 @@
 #include "CoreTypes.h"
 #include "ExeTypes.h"
 #include "Utility.h"
+#include "FastRng.h"
 #include "ios-frstor/iosfrstor.h"
 
 // macros for generating flag union expressions for use with a Computer object
@@ -172,7 +173,7 @@ namespace CSX64
 
 		FileDescriptor FileDescriptors[FDCount];
 
-		std::default_random_engine Rand;
+		FastRNG Rand;
 
 	public: // -- data access -- //
 
@@ -3085,7 +3086,7 @@ namespace CSX64
 			if (src == 0)
 			{
 				ZF() = true;
-				res = Rand64(Rand); // result is undefined in this case
+				res = Rand(); // result is undefined in this case
 			}
 			// otherwise perform the search
 			else

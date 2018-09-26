@@ -107,7 +107,7 @@ namespace CSX64
 			do
 			{
 				ostr.str(""); // make sure ostr is empty
-				ostr << path << '/' << std::setw(16) << Rand64(Rand) << ".tmp";
+				ostr << path << '/' << std::setw(16) << Rand() << ".tmp";
 				tmp_path = ostr.str();
 			}
 			// repeat while that already exists

@@ -178,6 +178,7 @@
     <ClInclude Include="Computer.h" />
     <ClInclude Include="ExeDir.h" />
     <ClInclude Include="Expr.h" />
+    <ClInclude Include="FastRng.h" />
     <ClInclude Include="HoleData.h" />
     <ClInclude Include="ExeTypes.h" />
     <ClInclude Include="ios-frstor\iosfrstor.h" />

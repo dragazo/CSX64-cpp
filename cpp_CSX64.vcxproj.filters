@@ -92,5 +92,8 @@
     <ClInclude Include="ios-frstor\iosfrstor.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="FastRng.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>
