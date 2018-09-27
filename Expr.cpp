@@ -8,8 +8,13 @@ namespace CSX64
 	const std::unordered_map<Expr::OPs, std::string> Expr::Op_to_Str
 	{
 		{Expr::OPs::Mul, "*"},
-		{Expr::OPs::Div, "/"},
-		{Expr::OPs::Mod, "%"},
+		
+		{Expr::OPs::UDiv, "/"},
+		{Expr::OPs::UMod, "%"},
+
+		{Expr::OPs::SDiv, "//"},
+		{Expr::OPs::SMod, "%%"},
+
 		{Expr::OPs::Add, "+"},
 		{Expr::OPs::Sub, "-"},
 
@@ -193,7 +198,48 @@ namespace CSX64
 			if (LF || RF) { res = DoubleAsUInt64((LF ? AsDouble(L) : (i64)L) * (RF ? AsDouble(R) : (i64)R)); floating = true; }
 			else res = L * R;
 			break;
-		case OPs::Div:
+
+		case OPs::UDiv:
+			if (!Left->__Evaluate__(symbols, L, LF, err, visited)) ret = false;
+			if (!Right->__Evaluate__(symbols, R, RF, err, visited)) ret = false;
+			if (ret == false) return false;
+
+			if (LF || RF) { res = DoubleAsUInt64((LF ? AsDouble(L) : L) / (RF ? AsDouble(R) : R)); floating = true; }
+			else
+			{
+				// catch division by zero in integral case (floating-point is ok (inf))
+				if (R == 0) { err = "divide by zero"; return false; }
+				res = L / R;
+			}
+
+			break;
+		case OPs::UMod:
+			if (!Left->__Evaluate__(symbols, L, LF, err, visited)) ret = false;
+			if (!Right->__Evaluate__(symbols, R, RF, err, visited)) ret = false;
+			if (ret == false) return false;
+
+			// catch division by zero in both float/int cases (floaing zero is integral zero)
+			if (R == 0) { err = "divide by zero"; return false; }
+
+			if (LF || RF)
+			{
+				double _num = LF ? AsDouble(L) : L, _denom = RF ? AsDouble(R) : R;
+
+				// catch division by zero in floating case
+				if (_denom == 0) { err = "divide by zero"; return false; }
+
+				res = DoubleAsUInt64(std::fmod(_num, _denom));
+				floating = true;
+			}
+			else
+			{
+				// catch division by zero in integral case
+				if (R == 0) { err = "divide by zero"; return false; }
+				res = L % R;
+			}
+			break;
+
+		case OPs::SDiv:
 			if (!Left->__Evaluate__(symbols, L, LF, err, visited)) ret = false;
 			if (!Right->__Evaluate__(symbols, R, RF, err, visited)) ret = false;
 			if (ret == false) return false;
@@ -203,12 +249,11 @@ namespace CSX64
 			{
 				// catch division by zero in integral case (floating-point is ok (inf))
 				if (R == 0) { err = "divide by zero"; return false; }
-
 				res = (u64)((i64)L / (i64)R);
 			}
 
 			break;
-		case OPs::Mod:
+		case OPs::SMod:
 			if (!Left->__Evaluate__(symbols, L, LF, err, visited)) ret = false;
 			if (!Right->__Evaluate__(symbols, R, RF, err, visited)) ret = false;
 			if (ret == false) return false;
@@ -230,10 +275,10 @@ namespace CSX64
 			{
 				// catch division by zero in integral case
 				if (R == 0) { err = "divide by zero"; return false; }
-
 				res = (u64)((i64)L % (i64)R);
 			}
 			break;
+
 		case OPs::Add:
 			if (!Left->__Evaluate__(symbols, L, LF, err, visited)) ret = false;
 			if (!Right->__Evaluate__(symbols, R, RF, err, visited)) ret = false;

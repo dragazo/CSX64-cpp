@@ -19,8 +19,12 @@ namespace CSX64
 	const std::unordered_map<Expr::OPs, int> Precedence
 	{
 		{Expr::OPs::Mul, 5},
-	{Expr::OPs::Div, 5},
-	{Expr::OPs::Mod, 5},
+
+	{Expr::OPs::UDiv, 5},
+	{Expr::OPs::UMod, 5},
+
+	{Expr::OPs::SDiv, 5},
+	{Expr::OPs::SMod, 5},
 
 	{Expr::OPs::Add, 6},
 	{Expr::OPs::Sub, 6},

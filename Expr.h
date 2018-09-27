@@ -22,7 +22,9 @@ namespace CSX64
 
 			// binary ops
 
-			Mul, Div, Mod,
+			Mul,
+			UDiv, UMod,
+			SDiv, SMod,
 			Add, Sub,
 
 			SL, SR,

@@ -171,11 +171,13 @@ namespace CSX64
 		{
 			oplen = 2; // record oplen
 
-					   // do ops where both chars are the same
+			// do ops where both chars are the same
 			if (token[pos] == token[pos + 1])
 			{
 				switch (token[pos])
 				{
+				case '/': op = Expr::OPs::SDiv; return true;
+				case '%': op = Expr::OPs::SMod; return true;
 				case '<': op = Expr::OPs::SL; return true;
 				case '>': op = Expr::OPs::SR; return true;
 				case '=': op = Expr::OPs::Eq; return true;
@@ -201,8 +203,8 @@ namespace CSX64
 			switch (token[pos])
 			{
 			case '*': op = Expr::OPs::Mul; return true;
-			case '/': op = Expr::OPs::Div; return true;
-			case '%': op = Expr::OPs::Mod; return true;
+			case '/': op = Expr::OPs::UDiv; return true;
+			case '%': op = Expr::OPs::UMod; return true;
 
 			case '+': op = Expr::OPs::Add; return true;
 			case '-': op = Expr::OPs::Sub; return true;
