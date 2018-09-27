@@ -30,7 +30,7 @@ namespace CSX64
 		if (size > max_mem_size) return false;
 
 		// get new memory array (does not include header)
-		this->alloc(size);
+		if (!this->realloc(size, false)) return false;
 
 		// copy over the text/rodata/data segments (not including header)
 		std::memcpy(mem, exe.data() + 32, exe.size() - 32);

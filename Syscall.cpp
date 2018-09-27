@@ -199,11 +199,7 @@ namespace CSX64
 		// if the request is too high or goes below init size, don't do it - return -1
 		else if (RBX() > max_mem_size || RBX() < min_mem_size) RAX() = ~(u64)0;
 		// otherwise perform the reallocation
-		else
-		{
-			this->realloc(RBX());
-			RAX() = 0;
-		}
+		else RAX() = this->realloc(RBX(), true) ? 0 : ~(u64)0;
 
 		return true;
 	}

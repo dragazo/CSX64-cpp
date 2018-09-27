@@ -149,6 +149,7 @@ namespace CSX64
 
 		void *mem;    // pointer to position 0 of memory array (alloc/dealloc with CSX64::aligned_malloc/free)
 		u64 mem_size; // current size of memory array
+		u64 mem_cap;  // current capacity of memory array (cap >= size) (size is the user-accessible portion)
 
 		u64 min_mem_size; // memory size after initialization (acts as a minimum for sys_brk)
 		u64 max_mem_size; // requested limit on memory size (acts as a maximum for sys_brk)
@@ -197,7 +198,7 @@ namespace CSX64
 
 		// Validates the machine for operation, but does not prepare it for execute (see Initialize)
 		inline Computer() :
-			mem(nullptr), mem_size(0),
+			mem(nullptr), mem_size(0), mem_cap(0),
 			running(false), error(ErrorCode::None), max_mem_size((u64)8 * 1024 * 1024 * 1024),
 			Rand((unsigned int)std::time(nullptr)) {}
 		virtual ~Computer() { CSX64::aligned_free(mem); }
@@ -210,27 +211,40 @@ namespace CSX64
 
 	public: // -- exe interface -- //
 
-		// reallocates the current array to be the specified size
-		void realloc(u64 size)
+		// reallocates the current array to be the specified size. returns true on success.
+		// if preserve_contents is true, the contents of the result is identical up to the lesser of the current and requested sizes. otherwise the contents are undefined.
+		// this will attempt to resize the array in-place; however, if force_realloc is true it will guarantee a full reallocation operation (e.g. for releasing extraneous memory).
+		// on success, the memory size is updated to the specified size.
+		// on failure, nothing is changed (as if the request was not made).
+		bool realloc(u64 size, bool preserve_contents, bool force_realloc = false)
 		{
-			// get the new array (64-byte aligned in case we want to use mm512 intrinsics later on)
-			void *ptr = CSX64::aligned_malloc(size, 64);
-			// copy over the data
-			std::memcpy(ptr, mem, std::min(mem_size, size));
+			// if we have enough space already, just use that unless we were told not to
+			if (size <= mem_cap && !force_realloc)
+			{
+				// just need to update size
+				mem_size = size;
+				return true;
+			}
+			// otherwise we need to reallocate
+			else
+			{
+				// get the new array (64-byte aligned in case we want to use mm512 intrinsics later on)
+				void *ptr = CSX64::aligned_malloc(size, 64);
+				// make sure that succeeded
+				if (!ptr) return false;
 
-			// delete old array
-			CSX64::aligned_free(mem);
+				// copy over the data if requested
+				if (preserve_contents) std::memcpy(ptr, mem, std::min(mem_size, size));
 
-			// use new array
-			mem = ptr;
-			mem_size = size;
-		}
-		// trashes the current array and creates a new array with the specified size
-		void alloc(u64 size)
-		{
-			// trick realloc() to do our work for us
-			mem_size = 0;
-			this->realloc(size);
+				// delete old array
+				CSX64::aligned_free(mem);
+
+				// use new array
+				mem = ptr;
+				mem_size = mem_cap = size;
+
+				return true;
+			}
 		}
 
 		// Closes all the managed file descriptors and severs ties to unmanaged ones.

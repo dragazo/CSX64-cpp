@@ -148,7 +148,8 @@ namespace CSX64
 
 	// -- memory utilities -- //
 
-	// allocates aligned memory. must be deallocated by aligned_free(). calling with 0 returns nullptr
+	// allocates aligned memory. must be deallocated by aligned_free(). calling with 0 returns nullptr. on failure, returns nullptr.
+	[[nodiscard]]
 	void *aligned_malloc(std::size_t size, std::size_t align);
 	// deallocates memory allocated by aligned_malloc(). calling with nullptr is no-op.
 	void aligned_free(void *ptr);
