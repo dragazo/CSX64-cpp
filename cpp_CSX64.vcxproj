@@ -155,6 +155,7 @@
     <ClCompile Include="AsmArgs.cpp" />
     <ClCompile Include="AsmTables.cpp" />
     <ClCompile Include="Assembly.cpp" />
+    <ClCompile Include="CompIO.cpp" />
     <ClCompile Include="ExeDir.cpp">
       <DisableLanguageExtensions Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">false</DisableLanguageExtensions>
       <DisableLanguageExtensions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</DisableLanguageExtensions>

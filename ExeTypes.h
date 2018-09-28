@@ -182,7 +182,7 @@ namespace CSX64
 
 	struct ZMMRegister_sizecode_wrapper;
 	// Represents a 512-bit register used by vpu instructions
-	struct ZMMRegister
+	struct alignas(64) ZMMRegister
 	{
 	private:
 		u64 data[8]; // reserves the needed space and ensures 8-byte alignment

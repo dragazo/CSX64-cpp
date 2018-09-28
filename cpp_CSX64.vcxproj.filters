@@ -51,6 +51,9 @@
     <ClCompile Include="ExeTables.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="CompIO.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Utility.h">

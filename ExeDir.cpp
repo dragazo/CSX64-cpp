@@ -6,7 +6,7 @@
 
 #ifdef _WIN32
 
-#include <string>
+#include <cstddef>
 #include <Windows.h>
 
 const char *exe_dir()
