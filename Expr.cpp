@@ -135,14 +135,35 @@ namespace CSX64
 			// if it's a number
 			if (std::isdigit((*tok)[0]))
 			{
-				// remove underscores (e.g. 0b_0011_1101_1101_1111)
-				std::string fixed_tok = remove_ch((*tok), '_');
+				// remove underscores (e.g. 0b_0011_1101_1101_1111) and convert to lowercase for convenience
+				std::string fixed_tok = ToLower(remove_ch((*tok), '_'));
 
-				// try several integral radicies
-				if (StartsWith(fixed_tok, "0x")) { if (TryParseUInt64(fixed_tok.substr(2), res, 16)) break; }
-				else if (StartsWith(fixed_tok, "0b")) { if (TryParseUInt64(fixed_tok.substr(2), res, 2)) break; }
-				else if (fixed_tok[0] == '0' && fixed_tok.size() > 1) { if (TryParseUInt64(fixed_tok.substr(1), res, 8)) break; }
+				// -- try parsing as int -- //
+
+				// hex prefixes
+				if (StartsWith(fixed_tok, "0x") || StartsWith(fixed_tok, "0h")) { if (TryParseUInt64(fixed_tok.substr(2), res, 16)) break; }
+				// hex suffixes
+				else if (fixed_tok.back() == 'x' || fixed_tok.back() == 'h') { if (TryParseUInt64(fixed_tok.substr(0, fixed_tok.size() - 1), res, 16)) break; }
+
+				// dec prefixes
+				if (StartsWith(fixed_tok, "0d") || StartsWith(fixed_tok, "0t")) { if (TryParseUInt64(fixed_tok.substr(2), res, 10)) break; }
+				// dec suffixes
+				else if (fixed_tok.back() == 'd' || fixed_tok.back() == 't') { if (TryParseUInt64(fixed_tok.substr(0, fixed_tok.size() - 1), res, 10)) break; }
+
+				// oct prefixes
+				if (StartsWith(fixed_tok, "0o") || StartsWith(fixed_tok, "0q")) { if (TryParseUInt64(fixed_tok.substr(2), res, 8)) break; }
+				// oct suffixes
+				else if (fixed_tok.back() == 'o' || fixed_tok.back() == 'q') { if (TryParseUInt64(fixed_tok.substr(0, fixed_tok.size() - 1), res, 8)) break; }
+
+				// bin prefixes
+				if (StartsWith(fixed_tok, "0b") || StartsWith(fixed_tok, "0y")) { if (TryParseUInt64(fixed_tok.substr(2), res, 2)) break; }
+				// bin suffixes
+				else if (fixed_tok.back() == 'b' || fixed_tok.back() == 'y') { if (TryParseUInt64(fixed_tok.substr(0, fixed_tok.size() - 1), res, 2)) break; }
+
+				// otherwise is dec
 				else { if (TryParseUInt64(fixed_tok, res, 10)) break; }
+
+				// -- try parsing as float -- //
 
 				// try floating-point
 				double fval;

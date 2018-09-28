@@ -225,13 +225,22 @@ namespace CSX64
 		return ostr.str();
 	}
 
-	// converts a string to uppercase (std::toupper)
+	// converts a string to uppercase (via std::toupper for each char)
 	template<typename T>
 	std::string ToUpper(T &&str)
 	{
 		std::string res(std::forward<T>(str));
 		for (std::size_t i = 0; i < res.size(); ++i)
 			res[i] = std::toupper(res[i]);
+		return res;
+	}
+	// converts a string to uppercase (via std::tolower for each char)
+	template<typename T>
+	std::string ToLower(T &&str)
+	{
+		std::string res(std::forward<T>(str));
+		for (std::size_t i = 0; i < res.size(); ++i)
+			res[i] = std::tolower(res[i]);
 		return res;
 	}
 

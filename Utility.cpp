@@ -384,9 +384,12 @@ namespace CSX64
 	}
 	bool TryParseDouble(const std::string &str, double &val)
 	{
+		// extract the double value
 		std::istringstream istr(str);
 		istr >> val;
-		return (bool)istr;
+
+		// that should've succeeded and consumed the entire string
+		return istr && istr.peek() == EOF;
 	}
 
 	/// <summary>
