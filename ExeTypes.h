@@ -138,11 +138,19 @@ namespace CSX64
 
 	public:
 		inline constexpr u64 &x64() noexcept { return data; }
+		inline constexpr u64 x64() const noexcept { return data; }
+
 		inline constexpr ReferenceRouter<u32, u64> x32() noexcept { return {data}; }
+		inline constexpr u32 x32() const noexcept { return *(u32*)&data; }
+
 		inline constexpr u16 &x16() noexcept { return *(u16*)&data; }
+		inline constexpr u16 x16() const noexcept { return *(u16*)&data; }
+
 		inline constexpr u8 &x8() noexcept { return *(u8*)&data; }
+		inline constexpr u8 x8() const noexcept { return *(u8*)&data; }
 
 		inline constexpr u8 &x8h() noexcept { return *((u8*)&data + 1); }
+		inline constexpr u8 x8h() const noexcept { return *((u8*)&data + 1); }
 
 		// Gets/sets the register partition with the specified size code
 		inline CPURegister_sizecode_wrapper operator[](u64 sizecode);

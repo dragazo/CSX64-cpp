@@ -146,17 +146,17 @@ namespace CSX64
 				else if (fixed_tok.back() == 'x' || fixed_tok.back() == 'h') { if (TryParseUInt64(fixed_tok.substr(0, fixed_tok.size() - 1), res, 16)) break; }
 
 				// dec prefixes
-				if (StartsWith(fixed_tok, "0d") || StartsWith(fixed_tok, "0t")) { if (TryParseUInt64(fixed_tok.substr(2), res, 10)) break; }
+				else if (StartsWith(fixed_tok, "0d") || StartsWith(fixed_tok, "0t")) { if (TryParseUInt64(fixed_tok.substr(2), res, 10)) break; }
 				// dec suffixes
 				else if (fixed_tok.back() == 'd' || fixed_tok.back() == 't') { if (TryParseUInt64(fixed_tok.substr(0, fixed_tok.size() - 1), res, 10)) break; }
 
 				// oct prefixes
-				if (StartsWith(fixed_tok, "0o") || StartsWith(fixed_tok, "0q")) { if (TryParseUInt64(fixed_tok.substr(2), res, 8)) break; }
+				else if (StartsWith(fixed_tok, "0o") || StartsWith(fixed_tok, "0q")) { if (TryParseUInt64(fixed_tok.substr(2), res, 8)) break; }
 				// oct suffixes
 				else if (fixed_tok.back() == 'o' || fixed_tok.back() == 'q') { if (TryParseUInt64(fixed_tok.substr(0, fixed_tok.size() - 1), res, 8)) break; }
 
 				// bin prefixes
-				if (StartsWith(fixed_tok, "0b") || StartsWith(fixed_tok, "0y")) { if (TryParseUInt64(fixed_tok.substr(2), res, 2)) break; }
+				else if (StartsWith(fixed_tok, "0b") || StartsWith(fixed_tok, "0y")) { if (TryParseUInt64(fixed_tok.substr(2), res, 2)) break; }
 				// bin suffixes
 				else if (fixed_tok.back() == 'b' || fixed_tok.back() == 'y') { if (TryParseUInt64(fixed_tok.substr(0, fixed_tok.size() - 1), res, 2)) break; }
 

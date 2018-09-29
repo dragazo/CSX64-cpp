@@ -41,6 +41,8 @@
 #define MASK_UNION_15(a,b,c,d,e,f,g,h,i,j,k,l,m,n,o)   (MASK_UNION_1(a) | MASK_UNION_14(b,c,d,e,f,g,h,i,j,k,l,m,n,o))
 #define MASK_UNION_16(a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p) (MASK_UNION_1(a) | MASK_UNION_15(b,c,d,e,f,g,h,i,j,k,l,m,n,o,p))
 
+#define COMMA ,
+
 // if nonzero, uses mask unions to perform the UpdateFlagsZSP() function - otherwise uses flag accessors
 #define FLAG_ACCESS_MASKING 1
 
@@ -625,173 +627,195 @@ namespace CSX64
 
 	public: // -- register access -- //
 
-		inline constexpr u64 &RFLAGS() noexcept { return _RFLAGS; }
-		inline constexpr u32 &EFLAGS() noexcept { return *(u32*)&_RFLAGS; }
-		inline constexpr u16 &FLAGS() noexcept { return *(u16*)&_RFLAGS; }
+		// helper for creating register accessor functions (non-const returns T&, const returns T)
+		#define _REG_ACCESSOR(name, src) \
+			inline constexpr std::remove_reference_t<decltype(src)>& name()       noexcept { return src; } \
+			inline constexpr std::remove_reference_t<decltype(src)>  name() const noexcept { return src; }
+		// helper for creating register accessor functions with non-standard typing for const/non-const
+		#define _REG_ACCESSOR_X(name, src, mutable_t, const_t) \
+			inline constexpr mutable_t name()       noexcept { return src; } \
+			inline constexpr const_t   name() const noexcept { return src; }
 
-		inline constexpr u64 &RIP() noexcept { return _RIP; }
+		// helper for creating flag accessor functions
+		#define _FLAG_ACCESSOR(name, src, pos) \
+			inline constexpr FlagWrapper<decltype(src), pos> name()       noexcept { return {src};                                       } \
+			inline constexpr bool                            name() const noexcept { return src & FlagWrapper<decltype(src), pos>::mask; }
+		// helper for creating bitfield accessor functions
+		#define _BITFIELD_ACCESSOR(name, src, pos, len) \
+			inline constexpr BitfieldWrapper<decltype(src), pos, len> name()       noexcept { return {src}; } \
+			inline constexpr decltype(src)                            name() const noexcept { return (src & BitfieldWrapper<decltype(src), pos, len>::mask) >> pos; }
+
+		_REG_ACCESSOR(RFLAGS, _RFLAGS)
+		_REG_ACCESSOR(EFLAGS, *(u32*)&_RFLAGS)
+		_REG_ACCESSOR(FLAGS,  *(u16*)&_RFLAGS)
+
+		_REG_ACCESSOR(RIP, _RIP)
+
 		inline constexpr ReferenceRouter<u32, u64> EIP() noexcept { return {_RIP}; }
+		inline constexpr u32 EIP() const noexcept { return (u32)_RIP; }
+
 		inline constexpr ReferenceRouter<u16, u64> IP() noexcept { return {_RIP}; }
+		inline constexpr u16 IP() const noexcept { return (u16)_RIP; }
 
-		inline constexpr u64 &RAX() noexcept { return CPURegisters[0].x64(); }
-		inline constexpr u64 &RBX() noexcept { return CPURegisters[1].x64(); }
-		inline constexpr u64 &RCX() noexcept { return CPURegisters[2].x64(); }
-		inline constexpr u64 &RDX() noexcept { return CPURegisters[3].x64(); }
-		inline constexpr u64 &RSI() noexcept { return CPURegisters[4].x64(); }
-		inline constexpr u64 &RDI() noexcept { return CPURegisters[5].x64(); }
-		inline constexpr u64 &RBP() noexcept { return CPURegisters[6].x64(); }
-		inline constexpr u64 &RSP() noexcept { return CPURegisters[7].x64(); }
-		inline constexpr u64 &R8() noexcept { return CPURegisters[8].x64(); }
-		inline constexpr u64 &R9() noexcept { return CPURegisters[9].x64(); }
-		inline constexpr u64 &R10() noexcept { return CPURegisters[10].x64(); }
-		inline constexpr u64 &R11() noexcept { return CPURegisters[11].x64(); }
-		inline constexpr u64 &R12() noexcept { return CPURegisters[12].x64(); }
-		inline constexpr u64 &R13() noexcept { return CPURegisters[13].x64(); }
-		inline constexpr u64 &R14() noexcept { return CPURegisters[14].x64(); }
-		inline constexpr u64 &R15() noexcept { return CPURegisters[15].x64(); }
+		_REG_ACCESSOR(RAX, CPURegisters[0].x64())
+		_REG_ACCESSOR(RBX, CPURegisters[1].x64())
+		_REG_ACCESSOR(RCX, CPURegisters[2].x64())
+		_REG_ACCESSOR(RDX, CPURegisters[3].x64())
+		_REG_ACCESSOR(RSI, CPURegisters[4].x64())
+		_REG_ACCESSOR(RDI, CPURegisters[5].x64())
+		_REG_ACCESSOR(RBP, CPURegisters[6].x64())
+		_REG_ACCESSOR(RSP, CPURegisters[7].x64())
+		_REG_ACCESSOR(R8, CPURegisters[8].x64())
+		_REG_ACCESSOR(R9, CPURegisters[9].x64())
+		_REG_ACCESSOR(R10, CPURegisters[10].x64())
+		_REG_ACCESSOR(R11, CPURegisters[11].x64())
+		_REG_ACCESSOR(R12, CPURegisters[12].x64())
+		_REG_ACCESSOR(R13, CPURegisters[13].x64())
+		_REG_ACCESSOR(R14, CPURegisters[14].x64())
+		_REG_ACCESSOR(R15, CPURegisters[15].x64())
 
-		inline constexpr auto EAX() noexcept { return CPURegisters[0].x32(); }
-		inline constexpr auto EBX() noexcept { return CPURegisters[1].x32(); }
-		inline constexpr auto ECX() noexcept { return CPURegisters[2].x32(); }
-		inline constexpr auto EDX() noexcept { return CPURegisters[3].x32(); }
-		inline constexpr auto ESI() noexcept { return CPURegisters[4].x32(); }
-		inline constexpr auto EDI() noexcept { return CPURegisters[5].x32(); }
-		inline constexpr auto EBP() noexcept { return CPURegisters[6].x32(); }
-		inline constexpr auto ESP() noexcept { return CPURegisters[7].x32(); }
-		inline constexpr auto R8D() noexcept { return CPURegisters[8].x32(); }
-		inline constexpr auto R9D() noexcept { return CPURegisters[9].x32(); }
-		inline constexpr auto R10D() noexcept { return CPURegisters[10].x32(); }
-		inline constexpr auto R11D() noexcept { return CPURegisters[11].x32(); }
-		inline constexpr auto R12D() noexcept { return CPURegisters[12].x32(); }
-		inline constexpr auto R13D() noexcept { return CPURegisters[13].x32(); }
-		inline constexpr auto R14D() noexcept { return CPURegisters[14].x32(); }
-		inline constexpr auto R15D() noexcept { return CPURegisters[15].x32(); }
+		_REG_ACCESSOR_X(EAX, CPURegisters[0].x32(), auto, u32)
+		_REG_ACCESSOR_X(EBX, CPURegisters[1].x32(), auto, u32)
+		_REG_ACCESSOR_X(ECX, CPURegisters[2].x32(), auto, u32)
+		_REG_ACCESSOR_X(EDX, CPURegisters[3].x32(), auto, u32)
+		_REG_ACCESSOR_X(ESI, CPURegisters[4].x32(), auto, u32)
+		_REG_ACCESSOR_X(EDI, CPURegisters[5].x32(), auto, u32)
+		_REG_ACCESSOR_X(EBP, CPURegisters[6].x32(), auto, u32)
+		_REG_ACCESSOR_X(ESP, CPURegisters[7].x32(), auto, u32)
+		_REG_ACCESSOR_X(R8D, CPURegisters[8].x32(), auto, u32)
+		_REG_ACCESSOR_X(R9D, CPURegisters[9].x32(), auto, u32)
+		_REG_ACCESSOR_X(R10D, CPURegisters[10].x32(), auto, u32)
+		_REG_ACCESSOR_X(R11D, CPURegisters[11].x32(), auto, u32)
+		_REG_ACCESSOR_X(R12D, CPURegisters[12].x32(), auto, u32)
+		_REG_ACCESSOR_X(R13D, CPURegisters[13].x32(), auto, u32)
+		_REG_ACCESSOR_X(R14D, CPURegisters[14].x32(), auto, u32)
+		_REG_ACCESSOR_X(R15D, CPURegisters[15].x32(), auto, u32)
 
-		inline constexpr u16 &AX() noexcept { return CPURegisters[0].x16(); }
-		inline constexpr u16 &BX() noexcept { return CPURegisters[1].x16(); }
-		inline constexpr u16 &CX() noexcept { return CPURegisters[2].x16(); }
-		inline constexpr u16 &DX() noexcept { return CPURegisters[3].x16(); }
-		inline constexpr u16 &SI() noexcept { return CPURegisters[4].x16(); }
-		inline constexpr u16 &DI() noexcept { return CPURegisters[5].x16(); }
-		inline constexpr u16 &BP() noexcept { return CPURegisters[6].x16(); }
-		inline constexpr u16 &SP() noexcept { return CPURegisters[7].x16(); }
-		inline constexpr u16 &R8W() noexcept { return CPURegisters[8].x16(); }
-		inline constexpr u16 &R9W() noexcept { return CPURegisters[9].x16(); }
-		inline constexpr u16 &R10W() noexcept { return CPURegisters[10].x16(); }
-		inline constexpr u16 &R11W() noexcept { return CPURegisters[11].x16(); }
-		inline constexpr u16 &R12W() noexcept { return CPURegisters[12].x16(); }
-		inline constexpr u16 &R13W() noexcept { return CPURegisters[13].x16(); }
-		inline constexpr u16 &R14W() noexcept { return CPURegisters[14].x16(); }
-		inline constexpr u16 &R15W() noexcept { return CPURegisters[15].x16(); }
+		_REG_ACCESSOR(AX, CPURegisters[0].x16())
+		_REG_ACCESSOR(BX, CPURegisters[1].x16())
+		_REG_ACCESSOR(CX, CPURegisters[2].x16())
+		_REG_ACCESSOR(DX, CPURegisters[3].x16())
+		_REG_ACCESSOR(SI, CPURegisters[4].x16())
+		_REG_ACCESSOR(DI, CPURegisters[5].x16())
+		_REG_ACCESSOR(BP, CPURegisters[6].x16())
+		_REG_ACCESSOR(SP, CPURegisters[7].x16())
+		_REG_ACCESSOR(R8W, CPURegisters[8].x16())
+		_REG_ACCESSOR(R9W, CPURegisters[9].x16())
+		_REG_ACCESSOR(R10W, CPURegisters[10].x16())
+		_REG_ACCESSOR(R11W, CPURegisters[11].x16())
+		_REG_ACCESSOR(R12W, CPURegisters[12].x16())
+		_REG_ACCESSOR(R13W, CPURegisters[13].x16())
+		_REG_ACCESSOR(R14W, CPURegisters[14].x16())
+		_REG_ACCESSOR(R15W, CPURegisters[15].x16())
 
-		inline constexpr u8 &AL() noexcept { return CPURegisters[0].x8(); }
-		inline constexpr u8 &BL() noexcept { return CPURegisters[1].x8(); }
-		inline constexpr u8 &CL() noexcept { return CPURegisters[2].x8(); }
-		inline constexpr u8 &DL() noexcept { return CPURegisters[3].x8(); }
-		inline constexpr u8 &SIL() noexcept { return CPURegisters[4].x8(); }
-		inline constexpr u8 &DIL() noexcept { return CPURegisters[5].x8(); }
-		inline constexpr u8 &BPL() noexcept { return CPURegisters[6].x8(); }
-		inline constexpr u8 &SPL() noexcept { return CPURegisters[7].x8(); }
-		inline constexpr u8 &R8B() noexcept { return CPURegisters[8].x8(); }
-		inline constexpr u8 &R9B() noexcept { return CPURegisters[9].x8(); }
-		inline constexpr u8 &R10B() noexcept { return CPURegisters[10].x8(); }
-		inline constexpr u8 &R11B() noexcept { return CPURegisters[11].x8(); }
-		inline constexpr u8 &R12B() noexcept { return CPURegisters[12].x8(); }
-		inline constexpr u8 &R13B() noexcept { return CPURegisters[13].x8(); }
-		inline constexpr u8 &R14B() noexcept { return CPURegisters[14].x8(); }
-		inline constexpr u8 &R15B() noexcept { return CPURegisters[15].x8(); }
+		_REG_ACCESSOR(AL, CPURegisters[0].x8())
+		_REG_ACCESSOR(BL, CPURegisters[1].x8())
+		_REG_ACCESSOR(CL, CPURegisters[2].x8())
+		_REG_ACCESSOR(DL, CPURegisters[3].x8())
+		_REG_ACCESSOR(SIL, CPURegisters[4].x8())
+		_REG_ACCESSOR(DIL, CPURegisters[5].x8())
+		_REG_ACCESSOR(BPL, CPURegisters[6].x8())
+		_REG_ACCESSOR(SPL, CPURegisters[7].x8())
+		_REG_ACCESSOR(R8B, CPURegisters[8].x8())
+		_REG_ACCESSOR(R9B, CPURegisters[9].x8())
+		_REG_ACCESSOR(R10B, CPURegisters[10].x8())
+		_REG_ACCESSOR(R11B, CPURegisters[11].x8())
+		_REG_ACCESSOR(R12B, CPURegisters[12].x8())
+		_REG_ACCESSOR(R13B, CPURegisters[13].x8())
+		_REG_ACCESSOR(R14B, CPURegisters[14].x8())
+		_REG_ACCESSOR(R15B, CPURegisters[15].x8())
 
-		inline constexpr u8 &AH() noexcept { return CPURegisters[0].x8h(); }
-		inline constexpr u8 &BH() noexcept { return CPURegisters[1].x8h(); }
-		inline constexpr u8 &CH() noexcept { return CPURegisters[2].x8h(); }
-		inline constexpr u8 &DH() noexcept { return CPURegisters[3].x8h(); }
+		_REG_ACCESSOR(AH, CPURegisters[0].x8h())
+		_REG_ACCESSOR(BH, CPURegisters[1].x8h())
+		_REG_ACCESSOR(CH, CPURegisters[2].x8h())
+		_REG_ACCESSOR(DH, CPURegisters[3].x8h())
 
 		// source: https://en.wikipedia.org/wiki/FLAGS_register
 		// source: http://www.eecg.toronto.edu/~amza/www.mindsec.com/files/x86regs.html
 
-		inline constexpr FlagWrapper<u64, 0> CF() noexcept { return {_RFLAGS}; }
-		inline constexpr FlagWrapper<u64, 2> PF() noexcept { return {_RFLAGS}; }
-		inline constexpr FlagWrapper<u64, 4> AF() noexcept { return {_RFLAGS}; }
-		inline constexpr FlagWrapper<u64, 6> ZF() noexcept { return {_RFLAGS}; }
-		inline constexpr FlagWrapper<u64, 7> SF() noexcept { return {_RFLAGS}; }
-		inline constexpr FlagWrapper<u64, 8> TF() noexcept { return {_RFLAGS}; }
-		inline constexpr FlagWrapper<u64, 9> IF() noexcept { return {_RFLAGS}; }
-		inline constexpr FlagWrapper<u64, 10> DF() noexcept { return {_RFLAGS}; }
-		inline constexpr FlagWrapper<u64, 11> OF() noexcept { return {_RFLAGS}; }
-		inline constexpr BitfieldWrapper<u64, 12, 2> IOPL() noexcept { return {_RFLAGS}; }
-		inline constexpr FlagWrapper<u64, 14> NT() noexcept { return {_RFLAGS}; }
+		_FLAG_ACCESSOR(CF, _RFLAGS, 0)
+		_FLAG_ACCESSOR(PF, _RFLAGS, 2)
+		_FLAG_ACCESSOR(AF, _RFLAGS, 4)
+		_FLAG_ACCESSOR(ZF, _RFLAGS, 6)
+		_FLAG_ACCESSOR(SF, _RFLAGS, 7)
+		_FLAG_ACCESSOR(TF, _RFLAGS, 8)
+		_FLAG_ACCESSOR(IF, _RFLAGS, 9)
+		_FLAG_ACCESSOR(DF, _RFLAGS, 10)
+		_FLAG_ACCESSOR(OF, _RFLAGS, 11)
+		_BITFIELD_ACCESSOR(IOPL, _RFLAGS, 12, 2)
+		_FLAG_ACCESSOR(NT, _RFLAGS, 14)
 
-		inline constexpr FlagWrapper<u64, 16> RF() noexcept { return {_RFLAGS}; }
-		inline constexpr FlagWrapper<u64, 17> VM() noexcept { return {_RFLAGS}; }
-		inline constexpr FlagWrapper<u64, 18> AC() noexcept { return {_RFLAGS}; }
-		inline constexpr FlagWrapper<u64, 19> VIF() noexcept { return {_RFLAGS}; }
-		inline constexpr FlagWrapper<u64, 20> VIP() noexcept { return {_RFLAGS}; }
-		inline constexpr FlagWrapper<u64, 21> ID() noexcept { return {_RFLAGS}; }
+		_FLAG_ACCESSOR(RF, _RFLAGS, 16)
+		_FLAG_ACCESSOR(VM, _RFLAGS, 17)
+		_FLAG_ACCESSOR(AC, _RFLAGS, 18)
+		_FLAG_ACCESSOR(VIF, _RFLAGS, 19)
+		_FLAG_ACCESSOR(VIP, _RFLAGS, 20)
+		_FLAG_ACCESSOR(ID, _RFLAGS, 21)
 
 		// File System Flag - denotes if the client is allowed to perform potentially-dangerous file system syscalls (open, delete, mkdir, etc.)
-		inline constexpr FlagWrapper<u64, 32> FSF() noexcept { return {_RFLAGS}; }
+		_FLAG_ACCESSOR(FSF, _RFLAGS, 32)
 		// One-Tick-REP Flag - denotes if REP instructions are performed in a single tick (more efficient, but could result in expensive ticks)
-		inline constexpr FlagWrapper<u64, 33> OTRF() noexcept { return {_RFLAGS}; }
+		_FLAG_ACCESSOR(OTRF, _RFLAGS, 33)
 
-		inline constexpr bool cc_b() noexcept { return CF(); }
-		inline constexpr bool cc_be() noexcept { return CF() || ZF(); }
-		inline constexpr bool cc_a() noexcept { return !CF() && !ZF(); }
-		inline constexpr bool cc_ae() noexcept { return !CF(); }
+		inline constexpr bool cc_b() const noexcept { return CF(); }
+		inline constexpr bool cc_be() const noexcept { return CF() || ZF(); }
+		inline constexpr bool cc_a() const noexcept { return !CF() && !ZF(); }
+		inline constexpr bool cc_ae() const noexcept { return !CF(); }
 
-		inline constexpr bool cc_l() noexcept { return SF() != OF(); }
-		inline constexpr bool cc_le() noexcept { return ZF() || SF() != OF(); }
-		inline constexpr bool cc_g() noexcept { return !ZF() && SF() == OF(); }
-		inline constexpr bool cc_ge() noexcept { return SF() == OF(); }
+		inline constexpr bool cc_l() const noexcept { return SF() != OF(); }
+		inline constexpr bool cc_le() const noexcept { return ZF() || SF() != OF(); }
+		inline constexpr bool cc_g() const noexcept { return !ZF() && SF() == OF(); }
+		inline constexpr bool cc_ge() const noexcept { return SF() == OF(); }
 
 		// source : http://www.website.masmforum.com/tutorials/fptute/fpuchap1.htm
 
-		inline constexpr FlagWrapper<u16, 0> FPU_IM() noexcept { return {FPU_control}; }
-		inline constexpr FlagWrapper<u16, 1> FPU_DM() noexcept { return {FPU_control}; }
-		inline constexpr FlagWrapper<u16, 2> FPU_ZM() noexcept { return {FPU_control}; }
-		inline constexpr FlagWrapper<u16, 3> FPU_OM() noexcept { return {FPU_control}; }
-		inline constexpr FlagWrapper<u16, 4> FPU_UM() noexcept { return {FPU_control}; }
-		inline constexpr FlagWrapper<u16, 5> FPU_PM() noexcept { return {FPU_control}; }
-		inline constexpr FlagWrapper<u16, 7> FPU_IEM() noexcept { return {FPU_control}; }
-		inline constexpr BitfieldWrapper<u16, 8, 2> FPU_PC() noexcept { return {FPU_control}; }
-		inline constexpr BitfieldWrapper<u16, 10, 2> FPU_RC() noexcept { return {FPU_control}; }
-		inline constexpr FlagWrapper<u16, 12> FPU_IC() noexcept { return {FPU_control}; }
+		_FLAG_ACCESSOR(FPU_IM, FPU_control, 0)
+		_FLAG_ACCESSOR(FPU_DM, FPU_control, 1)
+		_FLAG_ACCESSOR(FPU_ZM, FPU_control, 2)
+		_FLAG_ACCESSOR(FPU_OM, FPU_control, 3)
+		_FLAG_ACCESSOR(FPU_UM, FPU_control, 4)
+		_FLAG_ACCESSOR(FPU_PM, FPU_control, 5)
+		_FLAG_ACCESSOR(FPU_IEM, FPU_control, 7)
+		_BITFIELD_ACCESSOR(FPU_PC, FPU_control, 8, 2)
+		_BITFIELD_ACCESSOR(FPU_RC, FPU_control, 10, 2)
+		_FLAG_ACCESSOR(FPU_IC, FPU_control, 12)
 
-		inline constexpr FlagWrapper<u16, 0> FPU_I() noexcept { return {FPU_status}; }
-		inline constexpr FlagWrapper<u16, 1> FPU_D() noexcept { return {FPU_status}; }
-		inline constexpr FlagWrapper<u16, 2> FPU_Z() noexcept { return {FPU_status}; }
-		inline constexpr FlagWrapper<u16, 3> FPU_O() noexcept { return {FPU_status}; }
-		inline constexpr FlagWrapper<u16, 4> FPU_U() noexcept { return {FPU_status}; }
-		inline constexpr FlagWrapper<u16, 5> FPU_P() noexcept { return {FPU_status}; }
-		inline constexpr FlagWrapper<u16, 6> FPU_SF() noexcept { return {FPU_status}; }
-		inline constexpr FlagWrapper<u16, 7> FPU_IR() noexcept { return {FPU_status}; }
-		inline constexpr FlagWrapper<u16, 8> FPU_C0() noexcept { return {FPU_status}; }
-		inline constexpr FlagWrapper<u16, 9> FPU_C1() noexcept { return {FPU_status}; }
-		inline constexpr FlagWrapper<u16, 10> FPU_C2() noexcept { return {FPU_status}; }
-		inline constexpr BitfieldWrapper<u16, 11, 3> FPU_TOP() noexcept { return {FPU_control}; }
-		inline constexpr FlagWrapper<u16, 14> FPU_C3() noexcept { return {FPU_status}; }
-		inline constexpr FlagWrapper<u16, 15> FPU_B() noexcept { return {FPU_status}; }
+		_FLAG_ACCESSOR(FPU_I, FPU_status, 0)
+		_FLAG_ACCESSOR(FPU_D, FPU_status, 1)
+		_FLAG_ACCESSOR(FPU_Z, FPU_status, 2)
+		_FLAG_ACCESSOR(FPU_O, FPU_status, 3)
+		_FLAG_ACCESSOR(FPU_U, FPU_status, 4)
+		_FLAG_ACCESSOR(FPU_P, FPU_status, 5)
+		_FLAG_ACCESSOR(FPU_SF, FPU_status, 6)
+		_FLAG_ACCESSOR(FPU_IR, FPU_status, 7)
+		_FLAG_ACCESSOR(FPU_C0, FPU_status, 8)
+		_FLAG_ACCESSOR(FPU_C1, FPU_status, 9)
+		_FLAG_ACCESSOR(FPU_C2, FPU_status, 10)
+		_BITFIELD_ACCESSOR(FPU_TOP, FPU_control, 11, 3)
+		_FLAG_ACCESSOR(FPU_C3, FPU_status, 14)
+		_FLAG_ACCESSOR(FPU_B, FPU_status, 15)
 
 		inline constexpr ST_Wrapper ST(u64 num) { return {*this, (u32)((FPU_TOP() + num) & 7)}; }
 
 		inline constexpr ZMMRegister &ZMM(u64 num) { return ZMMRegisters[num]; }
 
-		inline constexpr u32 &MXCSR() noexcept { return _MXCSR; }
+		_REG_ACCESSOR(MXCSR, _MXCSR)
 
-		inline constexpr FlagWrapper<u32, 0> MXCSR_IE() noexcept { return {_MXCSR}; }
-		inline constexpr FlagWrapper<u32, 1> MXCSR_DE() noexcept { return {_MXCSR}; }
-		inline constexpr FlagWrapper<u32, 2> MXCSR_ZE() noexcept { return {_MXCSR}; }
-		inline constexpr FlagWrapper<u32, 3> MXCSR_OE() noexcept { return {_MXCSR}; }
-		inline constexpr FlagWrapper<u32, 4> MXCSR_UE() noexcept { return {_MXCSR}; }
-		inline constexpr FlagWrapper<u32, 5> MXCSR_PE() noexcept { return {_MXCSR}; }
-		inline constexpr FlagWrapper<u32, 6> MXCSR_DAZ() noexcept { return {_MXCSR}; }
-		inline constexpr FlagWrapper<u32, 7> MXCSR_IM() noexcept { return {_MXCSR}; }
-		inline constexpr FlagWrapper<u32, 8> MXCSR_DM() noexcept { return {_MXCSR}; }
-		inline constexpr FlagWrapper<u32, 9> MXCSR_ZM() noexcept { return {_MXCSR}; }
-		inline constexpr FlagWrapper<u32, 10> MXCSR_OM() noexcept { return {_MXCSR}; }
-		inline constexpr FlagWrapper<u32, 11> MXCSR_UM() noexcept { return {_MXCSR}; }
-		inline constexpr FlagWrapper<u32, 12> MXCSR_PM() noexcept { return {_MXCSR}; }
-		inline constexpr BitfieldWrapper<u32, 13, 2> MXCSR_RC() noexcept { return {_MXCSR}; }
-		inline constexpr FlagWrapper<u32, 15> MXCSR_FTZ() noexcept { return {_MXCSR}; }
+		_FLAG_ACCESSOR(MXCSR_IE, _MXCSR, 0)
+		_FLAG_ACCESSOR(MXCSR_DE, _MXCSR, 1)
+		_FLAG_ACCESSOR(MXCSR_ZE, _MXCSR, 2)
+		_FLAG_ACCESSOR(MXCSR_OE, _MXCSR, 3)
+		_FLAG_ACCESSOR(MXCSR_UE, _MXCSR, 4)
+		_FLAG_ACCESSOR(MXCSR_PE, _MXCSR, 5)
+		_FLAG_ACCESSOR(MXCSR_DAZ, _MXCSR, 6)
+		_FLAG_ACCESSOR(MXCSR_IM, _MXCSR, 7)
+		_FLAG_ACCESSOR(MXCSR_DM, _MXCSR, 8)
+		_FLAG_ACCESSOR(MXCSR_ZM, _MXCSR, 9)
+		_FLAG_ACCESSOR(MXCSR_OM, _MXCSR, 10)
+		_FLAG_ACCESSOR(MXCSR_UM, _MXCSR, 11)
+		_FLAG_ACCESSOR(MXCSR_PM, _MXCSR, 12)
+		_BITFIELD_ACCESSOR(MXCSR_RC, _MXCSR, 13, 2)
+		_FLAG_ACCESSOR(MXCSR_FTZ, _MXCSR, 15)
 
 	private: // -- exe tables -- //
 
