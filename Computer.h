@@ -69,17 +69,22 @@ namespace CSX64
 	public: // -- special types -- //
 
 		// wraps a physical ST register's info into a more convenient package
-		struct ST_Wrapper
+		struct const_ST_Wrapper
 		{
 		private:
 
-			Computer &c;
-			u32 index; // physical index of ST register
+			const Computer &c;
+			const u32 index; // physical index of ST register
 
 			friend class Computer;
-			inline constexpr ST_Wrapper(Computer &_c, u32 _index) noexcept : c(_c), index(_index) {}
+			inline constexpr const_ST_Wrapper(const Computer &_c, u32 _index) noexcept : c(_c), index(_index) {}
 
 		public:
+
+			inline operator long double() const { return c.FPURegisters[index]; }
+			inline const_ST_Wrapper operator=(const_ST_Wrapper wrapper) = delete;
+
+			// ---------------------------------------- //
 
 			static constexpr u16 tag_normal = 0;
 			static constexpr u16 tag_zero = 1;
@@ -93,20 +98,52 @@ namespace CSX64
 				else return tag_normal;
 			}
 
-			// -------------------------------------
+			// ---------------------------------------- //
 
-			inline operator long double() { return c.FPURegisters[index]; }
+			// gets the tag for this ST register
+			inline constexpr u16 Tag() const { return (c.FPU_tag >> (index * 2)) & 3; }
+
+			inline constexpr bool Normal() const { return Tag() == tag_normal; }
+			inline constexpr bool Zero() const { return Tag() == tag_zero; }
+			inline constexpr bool Special() const { return Tag() == tag_special; }
+			inline constexpr bool Empty() const { return Tag() == tag_empty; }
+
+			// ---------------------------------------- //
+
+			friend std::ostream &operator<<(std::ostream &ostr, const const_ST_Wrapper &wrapper)
+			{
+				if (wrapper.Empty()) ostr << "Empty";
+				else
+				{
+					iosfrstor _frstor(ostr);
+					ostr << std::defaultfloat << std::setprecision(17) << (long double)wrapper;
+				}
+				return ostr;
+			}
+		};
+		struct ST_Wrapper : public const_ST_Wrapper
+		{
+		private:
+
+			// const_ST_Wrapper will store a const Computer&, but we need non-const.
+			// we'll therefore construct from a non-const (converted to const) and use const_cast to appease the compiler.
+
+			friend class Computer;
+			inline constexpr ST_Wrapper(Computer &_c, u32 _index) noexcept : const_ST_Wrapper(_c, _index) {}
+
+		public:
+
 			inline ST_Wrapper operator=(long double value)
 			{
 				// store value, accounting for precision control flag
 				switch (c.FPU_PC())
 				{
-				case 0: c.FPURegisters[index] = (float)value;
-				case 2: c.FPURegisters[index] = (double)value;
-				default: c.FPURegisters[index] = value;
+				case 0: value = (float)value;
+				case 2: value = (double)value;
 				}
 
-				c.FPU_tag = (c.FPU_tag & ~(3 << (index * 2))) | (ComputeFPUTag(value) << (index * 2));
+				const_cast<Computer&>(c).FPURegisters[index] = value;
+				const_cast<Computer&>(c).FPU_tag = (c.FPU_tag & ~(3 << (index * 2))) | (ComputeFPUTag(value) << (index * 2));
 
 				return *this;
 			}
@@ -123,31 +160,8 @@ namespace CSX64
 			inline ST_Wrapper operator*=(long double val) { *this = *this * val; return *this; }
 			inline ST_Wrapper operator/=(long double val) { *this = *this / val; return *this; }
 
-			// -------------------------------------
-
-			// gets the tag for this ST register
-			inline constexpr u16 Tag() const noexcept { return (c.FPU_tag >> (index * 2)) & 3; }
-
-			inline constexpr bool Normal() const noexcept { return Tag() == tag_normal; }
-			inline constexpr bool Zero() const noexcept { return Tag() == tag_zero; }
-			inline constexpr bool Special() const noexcept { return Tag() == tag_special; }
-			inline constexpr bool Empty() const noexcept { return Tag() == tag_empty; }
-
 			// marks the ST register as empty
-			inline constexpr void Free() noexcept { c.FPU_tag |= 3 << (index * 2); }
-
-			// -------------------------------------
-
-			friend std::ostream &operator<<(std::ostream &ostr, ST_Wrapper wrapper)
-			{
-				if (wrapper.Empty()) ostr << "Empty";
-				else
-				{
-					iosfrstor _frstor(ostr);
-					ostr << std::defaultfloat << std::setprecision(17) << (long double)wrapper;
-				}
-				return ostr;
-			}
+			inline constexpr void Free() noexcept { const_cast<Computer&>(c).FPU_tag |= 3 << (index * 2); }
 		};
 
 	private: // -- data -- //
@@ -795,7 +809,8 @@ namespace CSX64
 		_FLAG_ACCESSOR(FPU_C3, FPU_status, 14)
 		_FLAG_ACCESSOR(FPU_B, FPU_status, 15)
 
-		inline constexpr ST_Wrapper ST(u64 num) { return {*this, (u32)((FPU_TOP() + num) & 7)}; }
+		inline constexpr const_ST_Wrapper ST(u64 num) const { return {*this, (u32)((FPU_TOP() + num) & 7)}; }
+		inline constexpr ST_Wrapper /* */ ST(u64 num) /* */ { return {*this, (u32)((FPU_TOP() + num) & 7)}; }
 
 		inline constexpr ZMMRegister &ZMM(u64 num) { return ZMMRegisters[num]; }
 
