@@ -812,7 +812,8 @@ namespace CSX64
 		inline constexpr const_ST_Wrapper ST(u64 num) const { return {*this, (u32)((FPU_TOP() + num) & 7)}; }
 		inline constexpr ST_Wrapper /* */ ST(u64 num) /* */ { return {*this, (u32)((FPU_TOP() + num) & 7)}; }
 
-		inline constexpr ZMMRegister &ZMM(u64 num) { return ZMMRegisters[num]; }
+		inline constexpr /* */ ZMMRegister &ZMM(u64 num) /* */ { return ZMMRegisters[num]; }
+		inline constexpr const ZMMRegister &ZMM(u64 num) const { return ZMMRegisters[num]; }
 
 		_REG_ACCESSOR(MXCSR, _MXCSR)
 

@@ -154,6 +154,18 @@ namespace CSX64
 
 		// Gets/sets the register partition with the specified size code
 		inline CPURegister_sizecode_wrapper operator[](u64 sizecode);
+		inline u64 operator[](u64 sizecode) const
+		{
+			switch (sizecode)
+			{
+			case 0: return x8();
+			case 1: return x16();
+			case 2: return x32();
+			case 3: return x64();
+
+			default: throw std::invalid_argument("sizecode must be on range [0,3]");
+			}
+		}
 	};
 	struct CPURegister_sizecode_wrapper
 	{
@@ -204,22 +216,56 @@ namespace CSX64
 
 		// -- index access utilities -- //
 
-		inline u64 &uint64(u64 index) { return ((u64*)data)[index]; }
-		inline u32 &uint32(u64 index) { return ((u32*)data)[index]; }
-		inline u16 &uint16(u64 index) { return ((u16*)data)[index]; }
-		inline u8 &uint8(u64 index) { return ((u8*)data)[index]; }
+		inline u64 &uint64(u64 index) /**/ { return ((u64*)data)[index]; }
+		inline u64 uint64(u64 index) const { return ((u64*)data)[index]; }
 
-		inline u64 &int64(u64 index) { return ((u64*)data)[index]; }
-		inline u32 &int32(u64 index) { return ((u32*)data)[index]; }
-		inline u16 &int16(u64 index) { return ((u16*)data)[index]; }
-		inline u8 &int8(u64 index) { return ((u8*)data)[index]; }
+		inline u32 &uint32(u64 index) /**/ { return ((u32*)data)[index]; }
+		inline u32 uint32(u64 index) const { return ((u32*)data)[index]; }
 
-		inline double &fp64(u64 index) { return ((double*)data)[index]; }
-		inline float &fp32(u64 index) { return ((float*)data)[index]; }
+		inline u16 &uint16(u64 index) /**/ { return ((u16*)data)[index]; }
+		inline u16 uint16(u64 index) const { return ((u16*)data)[index]; }
+
+		inline u8 &uint8(u64 index) /**/ { return ((u8*)data)[index]; }
+		inline u8 uint8(u64 index) const { return ((u8*)data)[index]; }
+
+		// ---------------------------- //
+
+		inline i64 &int64(u64 index) /**/ { return ((i64*)data)[index]; }
+		inline i64 int64(u64 index) const { return ((i64*)data)[index]; }
+
+		inline i32 &int32(u64 index) /**/ { return ((i32*)data)[index]; }
+		inline i32 int32(u64 index) const { return ((i32*)data)[index]; }
+
+		inline i16 &int16(u64 index) /**/ { return ((i16*)data)[index]; }
+		inline i16 int16(u64 index) const { return ((i16*)data)[index]; }
+
+		inline i8 &int8(u64 index) /**/ { return ((i8*)data)[index]; }
+		inline i8 int8(u64 index) const { return ((i8*)data)[index]; }
+
+		// ---------------------------- /
+
+		inline double &fp64(u64 index) /**/ { return ((double*)data)[index]; }
+		inline double fp64(u64 index) const { return ((double*)data)[index]; }
+
+		inline float &fp32(u64 index) /**/ { return ((float*)data)[index]; }
+		inline float fp32(u64 index) const { return ((float*)data)[index]; }
 
 		// -- sizecode access utilities -- //
 
+		// gets/sets the value with specified sizecode and index
 		inline ZMMRegister_sizecode_wrapper uint(u64 sizecode, u64 index);
+		inline u64 uint(u64 sizecode, u64 index) const
+		{
+			switch (sizecode)
+			{
+			case 0: return uint8(index);
+			case 1: return uint16(index);
+			case 2: return uint32(index);
+			case 3: return uint64(index);
+
+			default: throw std::invalid_argument("sizecode must be on range [0,3]");
+			}
+		}
 	};
 	struct ZMMRegister_sizecode_wrapper
 	{
