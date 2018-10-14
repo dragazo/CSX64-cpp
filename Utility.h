@@ -132,8 +132,8 @@ namespace CSX64
 	template<typename T>
 	bool TryGetValue(const std::unordered_set<T> &set, const T &value, T *&ptr)
 	{
-		auto iter = set.find(key);
-		return ptr = iter == map.set() ? nullptr : &*iter;
+		auto iter = set.find(value);
+		return ptr = iter == set.end() ? nullptr : &*iter;
 	}
 	// returns true if the set contains an entry with the specified value
 	template<typename T, typename U>

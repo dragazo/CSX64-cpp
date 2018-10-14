@@ -69,20 +69,25 @@ namespace CSX64
 	public: // -- special types -- //
 
 		// wraps a physical ST register's info into a more convenient package
-		struct const_ST_Wrapper
+		struct ST_Wrapper_common
 		{
+		protected:
+
+			// can't delete this type directly
+			~ST_Wrapper_common() = default;
+
 		private:
 
 			const Computer &c;
 			const u32 index; // physical index of ST register
 
 			friend class Computer;
-			inline constexpr const_ST_Wrapper(const Computer &_c, u32 _index) noexcept : c(_c), index(_index) {}
+			inline constexpr ST_Wrapper_common(const Computer &_c, u32 _index) noexcept : c(_c), index(_index) {}
 
 		public:
 
 			inline operator long double() const { return c.FPURegisters[index]; }
-			inline const_ST_Wrapper operator=(const_ST_Wrapper wrapper) = delete;
+			inline ST_Wrapper_common operator=(ST_Wrapper_common wrapper) = delete;
 
 			// ---------------------------------------- //
 
@@ -110,7 +115,7 @@ namespace CSX64
 
 			// ---------------------------------------- //
 
-			friend std::ostream &operator<<(std::ostream &ostr, const const_ST_Wrapper &wrapper)
+			friend std::ostream &operator<<(std::ostream &ostr, const ST_Wrapper_common &wrapper)
 			{
 				if (wrapper.Empty()) ostr << "Empty";
 				else
@@ -121,15 +126,15 @@ namespace CSX64
 				return ostr;
 			}
 		};
-		struct ST_Wrapper : public const_ST_Wrapper
+		struct ST_Wrapper : ST_Wrapper_common
 		{
 		private:
 
-			// const_ST_Wrapper will store a const Computer&, but we need non-const.
+			// ST_Wrapper_common will store a const Computer&, but we need non-const.
 			// we'll therefore construct from a non-const (converted to const) and use const_cast to appease the compiler.
 
 			friend class Computer;
-			inline constexpr ST_Wrapper(Computer &_c, u32 _index) noexcept : const_ST_Wrapper(_c, _index) {}
+			inline constexpr ST_Wrapper(Computer &_c, u32 _index) noexcept : ST_Wrapper_common(_c, _index) {}
 
 		public:
 
@@ -162,6 +167,20 @@ namespace CSX64
 
 			// marks the ST register as empty
 			inline constexpr void Free() noexcept { const_cast<Computer&>(c).FPU_tag |= 3 << (index * 2); }
+		};
+		struct const_ST_Wrapper : ST_Wrapper_common
+		{
+		private:
+
+			// ST_Wrapper_common is the impl for const_ST_Wrapper - the distinction only exists so that we don't require virtual destructors.
+
+			friend class Computer;
+			inline constexpr const_ST_Wrapper(const Computer &_c, u32 _index) noexcept : ST_Wrapper_common(_c, _index) {}
+
+		public:
+
+			// creates a const wrapper from a non-const wrapper
+			inline constexpr const_ST_Wrapper(ST_Wrapper wrap) noexcept : ST_Wrapper_common(wrap.c, wrap.index) {}
 		};
 
 	private: // -- data -- //
