@@ -411,6 +411,15 @@ namespace CSX64
 		else if (bits <= 64) return 8;
 		else throw std::invalid_argument("bit size must be in range [0,64]");
 	}
+	// as BitsToBytes() but returns a sizecode instead of a size
+	inline constexpr u64 BitsToSizecode(u64 bits)
+	{
+		if (bits <= 8) return 0;
+		else if (bits <= 16) return 1;
+		else if (bits <= 32) return 2;
+		else if (bits <= 64) return 3;
+		else throw std::invalid_argument("bit size must be in range [0,64]");
+	}
 
 	/// <summary>
 	/// Interprets a double as its raw bits

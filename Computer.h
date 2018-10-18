@@ -464,11 +464,11 @@ namespace CSX64
 	private: // -- exe memory utilities -- //
 
 		// Pushes a raw value onto the stack
-		bool PushRaw(u64 size, u64 val)
+		bool PushRaw_szc(u64 sizecode, u64 val)
 		{
-			RSP() -= size;
+			RSP() -= Size(sizecode);
 			if (RSP() < StackBarrier) { Terminate(ErrorCode::StackOverflow); return false; }
-			return SetMemRaw(RSP(), size, val);
+			return SetMemRaw_szc(RSP(), sizecode, val);
 		}
 		template<typename T>
 		bool PushRaw(u64 val)
@@ -479,11 +479,11 @@ namespace CSX64
 		}
 
 		// Pops a value from the stack
-		bool PopRaw(u64 size, u64 &val)
+		bool PopRaw_szc(u64 sizecode, u64 &val)
 		{
 			if (RSP() < StackBarrier) { Terminate(ErrorCode::StackOverflow); return false; }
-			if (!GetMemRaw(RSP(), size, val)) return false;
-			RSP() += size;
+			if (!GetMemRaw_szc(RSP(), sizecode, val)) return false;
+			RSP() += Size(sizecode);
 			return true;
 		}
 		template<typename T>
@@ -495,6 +495,7 @@ namespace CSX64
 			return true;
 		}
 
+		/*
 		// reads a raw value from memory. returns true on success
 		bool GetMemRaw(u64 pos, u64 size, u64 &res)
 		{
@@ -509,7 +510,8 @@ namespace CSX64
 
 			default: throw std::runtime_error("GetMemRaw size was non-standard");
 			}
-		}
+		}*/
+
 		template<typename T>
 		bool GetMemRaw(u64 pos, u64 &res)
 		{
@@ -541,6 +543,7 @@ namespace CSX64
 			}
 		}
 
+		/*
 		// writes a raw value to memory. returns true on success
 		bool SetMemRaw(u64 pos, u64 size, u64 val)
 		{
@@ -556,7 +559,8 @@ namespace CSX64
 
 			default: throw std::runtime_error("GetMemRaw size was non-standard");
 			}
-		}
+		}*/
+		
 		template<typename T>
 		bool SetMemRaw(u64 pos, u64 val)
 		{
@@ -592,12 +596,12 @@ namespace CSX64
 		}
 
 		// gets a value and advances the execution pointer. returns true on success
-		bool GetMemAdv(u64 size, u64 &res)
+		/*bool GetMemAdv(u64 size, u64 &res)
 		{
 			if (!GetMemRaw(RIP(), size, res)) return false;
 			RIP() += size;
 			return true;
-		}
+		}*/
 		template<typename T>
 		bool GetMemAdv(u64 &res)
 		{
@@ -647,7 +651,7 @@ namespace CSX64
 			#endif
 
 			// get the imm if applicable - store into res
-			if ((settings & 0x80) != 0 && !GetMemAdv(Size(sizecode), res)) return false;
+			if ((settings & 0x80) != 0 && !GetMemAdv_szc(sizecode, res)) return false;
 
 			// if r1 was used, add that pre-multiplied by the multiplier
 			if ((settings & 2) != 0) res += CPURegisters[regs >> 4][sizecode] << ((settings >> 4) & 3);
@@ -889,7 +893,7 @@ namespace CSX64
 			#endif
 
 			// get b (imm)
-			if (!GetMemAdv(Size(sizecode), b)) { a = 0; return false; }
+			if (!GetMemAdv_szc(sizecode, b)) { a = 0; return false; }
 
 			// get a (reg or mem)
 			if ((s & 1) == 0)
@@ -907,7 +911,7 @@ namespace CSX64
 				else a = CPURegisters[a & 15][sizecode];
 				return true;
 			}
-			else return GetAddressAdv(a) && GetMemRaw(a, Size(sizecode), a);
+			else return GetAddressAdv(a) && GetMemRaw_szc(a, sizecode, a);
 		}
 		inline bool StoreTernaryOPFormat(u64 s, u64 res)
 		{
@@ -1075,7 +1079,7 @@ namespace CSX64
 				return true;
 
 			case 1:
-				return GetAddressAdv(m) && (!get_a || GetMemRaw(m, Size(a_sizecode), a));
+				return GetAddressAdv(m) && (!get_a || GetMemRaw_szc(m, a_sizecode, a));
 
 			default: return true; // this should never happen but compiler is complainy
 			}
@@ -1093,7 +1097,7 @@ namespace CSX64
 				return true;
 
 			case 1:
-				return SetMemRaw(m, Size(sizecode), res);
+				return SetMemRaw_szc(m, sizecode, res);
 
 			default: return true; // this can't happen but compiler is stupid
 			}
@@ -1131,7 +1135,7 @@ namespace CSX64
 				return true;
 			}
 			// otherwise is memory value
-			else return GetAddressAdv(m) && GetMemRaw(m, Size(sizecode), val);
+			else return GetAddressAdv(m) && GetMemRaw_szc(m, sizecode, val);
 		}
 		inline bool StoreShiftOpFormat(u64 s, u64 m, u64 res)
 		{
@@ -1147,7 +1151,7 @@ namespace CSX64
 				return true;
 			}
 			// otherwise dest is memory
-			else return SetMemRaw(m, Size(sizecode), res);
+			else return SetMemRaw_szc(m, sizecode, res);
 		}
 
 		/*
@@ -1179,9 +1183,9 @@ namespace CSX64
 				a = CPURegisters[s >> 4].x8h();
 				return true;
 
-			case 2: return GetMemAdv(Size(a_sizecode), a);
+			case 2: return GetMemAdv_szc(a_sizecode, a);
 
-			case 3: return GetAddressAdv(a) && GetMemRaw(a, Size(a_sizecode), a);
+			case 3: return GetAddressAdv(a) && GetMemRaw_szc(a, a_sizecode, a);
 			}
 
 			return true;
@@ -1241,7 +1245,7 @@ namespace CSX64
 			// otherwise b is memory
 			else
 			{
-				if (!GetAddressAdv(b) || !GetMemRaw(b, Size(sizecode), b)) return false;
+				if (!GetAddressAdv(b) || !GetMemRaw_szc(b, sizecode, b)) return false;
 			}
 
 			return true;
@@ -1301,13 +1305,13 @@ namespace CSX64
 			case 0:
 			case 1: // VM and RF flags are cleared in the stored image
 			case 2:
-				return PushRaw(Size(ext + 1), RFLAGS() & ~0x30000ul);
+				return PushRaw_szc(ext + 1, RFLAGS() & ~0x30000ul);
 
 				// popf
 			case 3:
 			case 4: // can't modify reserved flags
 			case 5:
-				if (!PopRaw(Size(ext - 2), ext)) return false;
+				if (!PopRaw_szc(ext - 2, ext)) return false;
 				RFLAGS() = (RFLAGS() & ~ModifiableFlags) | (ext & ModifiableFlags);
 				return true;
 
@@ -1539,9 +1543,9 @@ namespace CSX64
 			else
 			{
 				// get mem value into temp_2 (address in b)
-				if (!GetAddressAdv(b) || !GetMemRaw(b, Size(sizecode), temp_2)) return false;
+				if (!GetAddressAdv(b) || !GetMemRaw_szc(b, sizecode, temp_2)) return false;
 				// store b result
-				if (!SetMemRaw(b, Size(sizecode), temp_1)) return false;
+				if (!SetMemRaw_szc(b, sizecode, temp_1)) return false;
 			}
 
 			// store a's result (b's was handled internally above)
@@ -1696,7 +1700,7 @@ namespace CSX64
 			if (sizecode == 0) { Terminate(ErrorCode::UndefinedBehavior); return false; }
 			#endif
 
-			return PushRaw(Size(sizecode), a);
+			return PushRaw_szc(sizecode, a);
 		}
 		/*
 		[4: dest][2: size][1:][1: mem]
@@ -1715,7 +1719,7 @@ namespace CSX64
 			#endif
 
 			// get the value
-			if (!PopRaw(Size(sizecode), val)) return false;
+			if (!PopRaw_szc(sizecode, val)) return false;
 
 			// if register
 			if ((s & 1) == 0)
@@ -1724,7 +1728,7 @@ namespace CSX64
 				return true;
 			}
 			// otherwise is memory
-			else return GetAddressAdv(s) && SetMemRaw(s, Size(sizecode), val);
+			else return GetAddressAdv(s) && SetMemRaw_szc(s, sizecode, val);
 		}
 
 		/*
@@ -2625,8 +2629,8 @@ namespace CSX64
 				if (!GetAddressAdv(src)) return false;
 				switch (s1 & 15)
 				{
-				case 0: case 1: case 2: case 4: case 6: case 8: if (!GetMemRaw(src, 1, src)) return false; break;
-				case 3: case 5: case 7: case 9: if (!GetMemRaw(src, 2, src)) return false; break;
+				case 0: case 1: case 2: case 4: case 6: case 8: if (!GetMemRaw_szc(src, 0, src)) return false; break;
+				case 3: case 5: case 7: case 9: if (!GetMemRaw_szc(src, 1, src)) return false; break;
 
 				default: Terminate(ErrorCode::UndefinedBehavior); return false;
 				}
@@ -2816,7 +2820,7 @@ namespace CSX64
 			u64 size = Size(sizecode);
 			u64 temp;
 
-			if (!GetMemRaw(RSI(), size, temp) || !SetMemRaw(RDI(), size, temp)) return false;
+			if (!GetMemRaw_szc(RSI(), sizecode, temp) || !SetMemRaw_szc(RDI(), sizecode, temp)) return false;
 
 			if (DF()) { RSI() -= size; RDI() -= size; }
 			else { RSI() += size; RDI() += size; }
@@ -2828,7 +2832,7 @@ namespace CSX64
 			u64 size = Size(sizecode);
 			u64 a, b;
 
-			if (!GetMemRaw(RSI(), size, a) || !GetMemRaw(RDI(), size, b)) return false;
+			if (!GetMemRaw_szc(RSI(), sizecode, a) || !GetMemRaw_szc(RDI(), sizecode, b)) return false;
 
 			if (DF()) { RSI() -= size; RDI() -= size; }
 			else { RSI() += size; RDI() += size; }
@@ -2848,7 +2852,7 @@ namespace CSX64
 			u64 size = Size(sizecode);
 			u64 temp;
 
-			if (!GetMemRaw(RSI(), size, temp)) return false;
+			if (!GetMemRaw_szc(RSI(), sizecode, temp)) return false;
 
 			if (DF()) RSI() -= size;
 			else RSI() += size;
@@ -2861,7 +2865,7 @@ namespace CSX64
 		{
 			u64 size = Size(sizecode);
 
-			if (!SetMemRaw(RDI(), size, CPURegisters[0][sizecode])) return false;
+			if (!SetMemRaw_szc(RDI(), sizecode, CPURegisters[0][sizecode])) return false;
 
 			if (DF()) RDI() -= size;
 			else RDI() += size;
@@ -2874,7 +2878,7 @@ namespace CSX64
 			u64 a = CPURegisters[0][sizecode];
 			u64 b;
 
-			if (!GetMemRaw(RDI(), size, b)) return false;
+			if (!GetMemRaw_szc(RDI(), sizecode, b)) return false;
 
 			u64 res = Truncate(a - b, sizecode);
 
@@ -3094,7 +3098,7 @@ namespace CSX64
 			// if src is mem
 			if (s & 64)
 			{
-				if (!GetAddressAdv(src) || !GetMemRaw(src, Size(sizecode), src)) return false;
+				if (!GetAddressAdv(src) || !GetMemRaw_szc(src, sizecode, src)) return false;
 			}
 			// otherwise src is reg
 			else
@@ -4086,7 +4090,7 @@ namespace CSX64
 
 			// get the mask (default of all 1's)
 			u64 mask = ~(u64)0;
-			if ((s2 & 0x80) != 0 && !GetMemAdv(BitsToBytes((u64)elem_count), mask)) return false;
+			if ((s2 & 0x80) != 0 && !GetMemAdv_szc(BitsToSizecode((u64)elem_count), mask)) return false;
 			// get the zmask flag
 			bool zmask = (s2 & 0x40) != 0;
 
@@ -4104,8 +4108,8 @@ namespace CSX64
 				src = (int)_src & 0x1f;
 
 				for (int i = 0; i < elem_count; ++i, mask >>= 1)
-					if ((mask & 1) != 0) ZMMRegisters[reg].uint((int)elem_sizecode, i) = ZMMRegisters[src].uint((int)elem_sizecode, i);
-					else if (zmask) ZMMRegisters[reg].uint((int)elem_sizecode, i) = 0;
+					if ((mask & 1) != 0) ZMMRegisters[reg].uint(elem_sizecode, i) = ZMMRegisters[src].uint(elem_sizecode, i);
+					else if (zmask) ZMMRegisters[reg].uint(elem_sizecode, i) = 0;
 
 					break;
 			case 1:
@@ -4116,10 +4120,10 @@ namespace CSX64
 				for (int i = 0; i < elem_count; ++i, mask >>= 1, m += Size(elem_sizecode))
 					if ((mask & 1) != 0)
 					{
-						if (!GetMemRaw(m, Size(elem_sizecode), temp)) return false;
-						ZMMRegisters[reg].uint((int)elem_sizecode, i) = temp;
+						if (!GetMemRaw_szc(m, elem_sizecode, temp)) return false;
+						ZMMRegisters[reg].uint(elem_sizecode, i) = temp;
 					}
-					else if (zmask) ZMMRegisters[reg].uint((int)elem_sizecode, i) = 0;
+					else if (zmask) ZMMRegisters[reg].uint(elem_sizecode, i) = 0;
 
 					break;
 			case 2:
@@ -4130,9 +4134,9 @@ namespace CSX64
 				for (int i = 0; i < elem_count; ++i, mask >>= 1, m += Size(elem_sizecode))
 					if ((mask & 1) != 0)
 					{
-						if (!SetMemRaw(m, Size(elem_sizecode), ZMMRegisters[reg].uint((int)elem_sizecode, i))) return false;
+						if (!SetMemRaw_szc(m, elem_sizecode, ZMMRegisters[reg].uint(elem_sizecode, i))) return false;
 					}
-					else if (zmask && !SetMemRaw(m, Size(elem_sizecode), 0)) return false;
+					else if (zmask && !SetMemRaw_szc(m, elem_sizecode, 0)) return false;
 
 					break;
 
@@ -4176,7 +4180,7 @@ namespace CSX64
 
 			// get the mask (default of all 1's)
 			u64 mask = ~(u64)0;
-			if ((s2 & 0x80) != 0 && !GetMemAdv(BitsToBytes((u64)elem_count), mask)) return false;
+			if ((s2 & 0x80) != 0 && !GetMemAdv_szc(BitsToSizecode((u64)elem_count), mask)) return false;
 			// get the zmask flag
 			bool zmask = (s2 & 0x40) != 0;
 
@@ -4221,7 +4225,7 @@ namespace CSX64
 				for (u64 i = 0; i < elem_count; ++i, mask >>= 1, m += Size(elem_sizecode))
 					if (mask & 1)
 					{
-						if (!GetMemRaw(m, Size(elem_sizecode), res)) return false;
+						if (!GetMemRaw_szc(m, elem_sizecode, res)) return false;
 
 						// hand over to the delegate for processing
 						if (!(this->*func)(elem_sizecode, res, ZMMRegisters[src1].uint(elem_sizecode, i), res, i)) return false;
@@ -4267,7 +4271,7 @@ namespace CSX64
 			
 			// get the mask (default of all 1's)
 			u64 mask = ~(u64)0;
-			if (s2 & 0x80 && !GetMemAdv(BitsToBytes((u64)elem_count), mask)) return false;
+			if (s2 & 0x80 && !GetMemAdv_szc(BitsToSizecode((u64)elem_count), mask)) return false;
 			// get the zmask flag
 			bool zmask = s2 & 0x40;
 
@@ -4302,7 +4306,7 @@ namespace CSX64
 				for (u64 i = 0; i < elem_count; ++i, mask >>= 1, m += Size(elem_sizecode))
 					if (mask & 1)
 					{
-						if (!GetMemRaw(m, Size(elem_sizecode), res)) return false;
+						if (!GetMemRaw_szc(m, elem_sizecode, res)) return false;
 						
 						// hand over to the delegate for processing
 						if (!(this->*func)(elem_sizecode, res, res, i)) return false;
@@ -4328,7 +4332,7 @@ namespace CSX64
 
 			// get the mask (default of all 1's)
 			u64 mask = 0xffffffffffffffff;
-			if (s & 2 && !GetMemAdv(BitsToBytes(elem_count), mask)) return false;
+			if (s & 2 && !GetMemAdv_szc(BitsToSizecode(elem_count), mask)) return false;
 			// get the zmask flag
 			bool zmask = s & 1;
 
@@ -4367,7 +4371,7 @@ namespace CSX64
 				{
 					if (mask & 1)
 					{
-						if (!GetMemRaw(m, Size(from_elem_sizecode), res)) return false;
+						if (!GetMemRaw_szc(m, from_elem_sizecode, res)) return false;
 
 						// hand over to the delegate for processing
 						if (!(this->*func)(res, res)) return false;
@@ -4427,7 +4431,7 @@ namespace CSX64
 			if (!GetMemAdv<u8>(s)) return false;
 
 			// get value to convert in temp
-			if (!GetAddressAdv(temp) || !GetMemRaw(temp, Size(from_elem_sizecode), temp)) return false;
+			if (!GetAddressAdv(temp) || !GetMemRaw_szc(temp, from_elem_sizecode, temp)) return false;
 
 			// perform the conversion
 			if (!(this->*func)(temp, temp)) return false;
@@ -4464,7 +4468,7 @@ namespace CSX64
 			if (!GetMemAdv<u8>(s)) return false;
 
 			// get value to convert in temp
-			if (!GetAddressAdv(temp) || !GetMemRaw(temp, Size(from_elem_sizecode), temp)) return false;
+			if (!GetAddressAdv(temp) || !GetMemRaw_szc(temp, from_elem_sizecode, temp)) return false;
 
 			// perform the conversion
 			if (!(this->*func)(temp, temp)) return false;
