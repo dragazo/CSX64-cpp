@@ -527,11 +527,19 @@ namespace CSX64
 			return true;
 		}
 
+		static bool _GetMemRaw_u8(u64 pos, void *mem, u64 &res) { res = *(u8*)((char*)mem + pos); return true; }
+		static bool _GetMemRaw_u16(u64 pos, void *mem, u64 &res) { res = *(u16*)((char*)mem + pos); return true; }
+		static bool _GetMemRaw_u32(u64 pos, void *mem, u64 &res) { res = *(u32*)((char*)mem + pos); return true; }
+		static bool _GetMemRaw_u64(u64 pos, void *mem, u64 &res) { res = *(u64*)((char*)mem + pos); return true; }
+
+		static constexpr bool(*_GetMemRaw_uxx[])(u64, void*, u64&) = {_GetMemRaw_u8, _GetMemRaw_u16, _GetMemRaw_u32, _GetMemRaw_u64};
+
 		// as GetMemRaw() but takes a sizecode instead of a size
 		bool GetMemRaw_szc(u64 pos, u64 sizecode, u64 &res)
 		{
 			if (pos >= mem_size || pos + Size(sizecode) > mem_size) { Terminate(ErrorCode::OutOfBounds); return false; }
-
+			return _GetMemRaw_uxx[sizecode](pos, mem, res);
+			/*
 			switch (sizecode)
 			{
 			case 0: res = *(u8*)((char*)mem + pos); return true;
@@ -540,7 +548,7 @@ namespace CSX64
 			case 3: res = *(u64*)((char*)mem + pos); return true;
 
 			default: throw std::runtime_error("GetMemRaw size was non-standard");
-			}
+			}*/
 		}
 
 		/*
@@ -2629,8 +2637,8 @@ namespace CSX64
 				if (!GetAddressAdv(src)) return false;
 				switch (s1 & 15)
 				{
-				case 0: case 1: case 2: case 4: case 6: case 8: if (!GetMemRaw_szc(src, 0, src)) return false; break;
-				case 3: case 5: case 7: case 9: if (!GetMemRaw_szc(src, 1, src)) return false; break;
+				case 0: case 1: case 2: case 4: case 6: case 8: if (!GetMemRaw<u8>(src, src)) return false; break;
+				case 3: case 5: case 7: case 9: if (!GetMemRaw<u16>(src, src)) return false; break;
 
 				default: Terminate(ErrorCode::UndefinedBehavior); return false;
 				}
@@ -2640,15 +2648,15 @@ namespace CSX64
 			switch (s1 & 15)
 			{
 			case 0: CPURegisters[s1 >> 4].x16() = (u16)src; break;
-			case 1: CPURegisters[s1 >> 4].x16() = (u16)SignExtend(src, 0); break;
+			case 1: CPURegisters[s1 >> 4].x16() = (u16)(i8)src; break;
 
 			case 2: case 3: CPURegisters[s1 >> 4].x32() = (u32)src; break;
-			case 4: CPURegisters[s1 >> 4].x32() = (u32)SignExtend(src, 0); break;
-			case 5: CPURegisters[s1 >> 4].x32() = (u32)SignExtend(src, 1); break;
+			case 4: CPURegisters[s1 >> 4].x32() = (u32)(i8)src; break;
+			case 5: CPURegisters[s1 >> 4].x32() = (u32)(i16)src; break;
 
 			case 6: case 7: CPURegisters[s1 >> 4].x64() = src; break;
-			case 8: CPURegisters[s1 >> 4].x64() = SignExtend(src, 0); break;
-			case 9: CPURegisters[s1 >> 4].x64() = SignExtend(src, 1); break;
+			case 8: CPURegisters[s1 >> 4].x64() = (u64)(i8)src; break;
+			case 9: CPURegisters[s1 >> 4].x64() = (u64)(i16)src; break;
 			}
 
 			return true;
