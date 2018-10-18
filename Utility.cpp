@@ -18,6 +18,7 @@
 
 #include "Utility.h"
 #include "BiggerInts/BiggerInts.h"
+#include "ios-frstor/iosfrstor.h"
 
 namespace CSX64
 {
@@ -335,13 +336,16 @@ namespace CSX64
 	/// Gets the numeric value of a hexadecimal digit. returns true if the character was in the hex range.
 	/// </summary>
 	/// <param name="ch">the character to test</param>
-	/// <param name="val">the character's value [0-15]</param>
+	/// <param name="val">the character's value [0-15] - undefined on faiure</param>
 	bool GetHexValue(char ch, int &val)
 	{
 		if (ch >= '0' && ch <= '9') val = ch - '0';
-		else if (ch >= 'a' && ch <= 'f') val = ch - 'a' + 10;
-		else if (ch >= 'A' && ch <= 'F') val = ch - 'A' + 10;
-		else { val = 0; return false; }
+		else
+		{
+			ch |= 32;
+			if (ch >= 'a' && ch <= 'f') val = ch - 'a' + 10;
+			else { return false; }
+		}
 
 		return true;
 	}
@@ -354,7 +358,7 @@ namespace CSX64
 	bool TryParseUInt64(const std::string &str, u64 &val, unsigned int radix)
 	{
 		// ensure radix is in range
-		if (radix < 2 || radix > 36) throw std::runtime_error("radix must be in range 0-36");
+		if (radix < 2 || radix > 36) throw std::runtime_error("radix must be in range 2-36");
 
 		val = 0;          // initialize to zero
 		unsigned int add; // amount to add
@@ -363,16 +367,20 @@ namespace CSX64
 		if (str.empty()) return false;
 
 		// for each character
-		for (std::size_t i = 0; i < str.size(); ++i)
+		for (char ch : str)
 		{
 			val *= radix; // shift val
 
 			// if it's a digit, add directly
-			if (str[i] >= '0' && str[i] <= '9') add = str[i] - '0';
-			else if (str[i] >= 'a' && str[i] <= 'z') add = str[i] - 'a' + 10;
-			else if (str[i] >= 'A' && str[i] <= 'Z') add = str[i] - 'A' + 10;
-			// if it wasn't a known character, fail
-			else return false;
+			if (ch >= '0' && ch <= '9') add = ch - '0';
+			else
+			{
+				// if it's a letter, add it + 10
+				ch |= 32;
+				if (ch >= 'a' && ch <= 'z') add = ch - 'a' + 10;
+				// otherwise we don't recognize it
+				else return false;
+			}
 
 			// if add value was out of range, fail
 			if (add >= radix) return false;
@@ -445,6 +453,10 @@ namespace CSX64
 	/// <param name="count">the number of bytes to write</param>
 	std::ostream &Dump(std::ostream &dump, void *data, u64 start, u64 count)
 	{
+		// clear the width field and set up a format restore point
+		dump.width(0);
+		iosfrstor _rstor(dump);
+
 		// make a header
 		dump << "           ";
 		for (int i = 0; i < 16; ++i) dump << ' ' << std::hex << i << ' ';

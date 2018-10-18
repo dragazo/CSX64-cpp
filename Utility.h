@@ -327,16 +327,23 @@ namespace CSX64
 	/// <param name="b">the second (smaller) power of 2</param>
 	bool Extract2PowersOf2(u64 val, u64 &a, u64 &b);
 
+	constexpr u64  _SignMasks[] = {0x80, 0x8000, 0x80000000, 0x8000000000000000};
+	constexpr u64 _TruncMasks[] = {0xff, 0xffff, 0xffffffff, 0xffffffffffffffff};
+	constexpr u64 _ExtendMasks[] = {0xffffffffffffff00, 0xffffffffffff0000, 0xffffffff00000000, 0x00};
+
+	constexpr u64     _Sizes[] = {1, 2, 4, 8};
+	constexpr u64 _SizesBits[] = {8, 16, 32, 64};
+
 	/// <summary>
-	/// Gets the bitmask for the sign bit of an integer with the specified sizecode
+	/// Gets the bitmask for the sign bit of an integer with the specified sizecode. sizecode must be [0,3]
 	/// </summary>
 	/// <param name="sizecode">the sizecode specifying the width of integer to examine</param>
-	inline constexpr u64 SignMask(u64 sizecode) { return (u64)1 << ((8 << sizecode) - 1); }
+	inline constexpr u64 SignMask(u64 sizecode) { return _SignMasks[sizecode]; }
 	/// <summary>
 	/// Gets the bitmask that includes the entire valid domain of an integer with the specified width
 	/// </summary>
 	/// <param name="sizecode">the sizecode specifying the width of integer to examine</param>
-	inline constexpr u64 TruncMask(u64 sizecode) { u64 res = SignMask(sizecode); return res | (res - 1); }
+	inline constexpr u64 TruncMask(u64 sizecode) { return _TruncMasks[sizecode]; }
 
 	/// <summary>
 	/// Returns if the value with specified size code is positive
@@ -356,7 +363,7 @@ namespace CSX64
 	/// </summary>
 	/// <param name="val">the value to sign extend</param>
 	/// <param name="sizecode">the current size code</param>
-	inline constexpr u64 SignExtend(u64 val, u64 sizecode) { return Positive(val, sizecode) ? val : val | ~TruncMask(sizecode); }
+	inline constexpr u64 SignExtend(u64 val, u64 sizecode) { return Positive(val, sizecode) ? val : val | _ExtendMasks[sizecode]; }
 	/// <summary>
 	/// Truncates the value to the specified size code (can also be used to zero extend a value)
 	/// </summary>
@@ -368,12 +375,12 @@ namespace CSX64
 	/// Parses a 2-bit size code into an actual size (in bytes) 0:1  1:2  2:4  3:8
 	/// </summary>
 	/// <param name="sizecode">the code to parse</param>
-	inline constexpr u64 Size(u64 sizecode) { return (u64)1 << sizecode; }
+	inline constexpr u64 Size(u64 sizecode) { return _Sizes[sizecode]; }
 	/// <summary>
 	/// Parses a 2-bit size code into an actual size (in bits) 0:8  1:16  2:32  3:64
 	/// </summary>
 	/// <param name="sizecode">the code to parse</param>
-	inline constexpr u64 SizeBits(u64 sizecode) { return (u64)8 << sizecode; }
+	inline constexpr u64 SizeBits(u64 sizecode) { return _SizesBits[sizecode]; }
 
 	/// <summary>
 	/// Gets the sizecode of the specified size. Throws <see cref="ArgumentException"/> if the size is not a power of 2
