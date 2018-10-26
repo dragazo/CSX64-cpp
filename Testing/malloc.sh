@@ -1,3 +1,3 @@
-./csx malloc.asm -a
-./csx malloc.o -lo malloc.exe
-./csx malloc.exe
+./csx.exe malloc.asm -a
+./csx.exe malloc.o -lo malloc.exe
+./csx.exe malloc.exe
