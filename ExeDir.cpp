@@ -1,46 +1,100 @@
-// !! ADD INCLUDES/LOGIC FOR GETTING EXE DIRECTORY ON VARIOUS PLATFORMS !! //
-
-// this file needs language extensions enabled (i.e. no /Za build option).
+// this file needs language extensions enabled in VisualStudio (i.e. no /Za build option).
 // language extension are disabled for all the other files so that they only use standard-conforming C++.
 // if you start getting mysterious compile errors from library code, make sure this file has them enabled.
 
-#ifdef _WIN32
+#if defined(_WIN32)
 
-#include <cstddef>
+// ------------- //
+
+// -- WINDOWS -- //
+
+// ------------- //
+
 #include <Windows.h>
 
 const char *exe_dir()
 {
-	// create a static instance of a helper type
 	static struct obj_t
 	{
-		// buffer for storing exe dir
-		char buf[MAX_PATH];
-
-		// constructor of this object gets the dir name
+        const char *res = nullptr; // the resulting path
+		char        buf[MAX_PATH]; // buffer for storing exe dir
+        
 		obj_t()
 		{
-			// get absolute path to ex e
-			std::size_t len = (std::size_t)GetModuleFileNameA(NULL, buf, sizeof(buf));
-
-			// slide back len to remove the file name
-			while (len > 0 && buf[len - 1] != '\\' && buf[len - 1] != '/') --len;
-
-			// place the terminator at the resulting len
-			buf[len] = 0;
+			// get absolute path to exe
+			auto len = GetModuleFileNameA(NULL, buf, sizeof(buf));
+            
+            // if that succeeded
+            if (len != 0)
+            {
+			    // slide back len to remove the file name
+			    while (len > 0 && buf[len - 1] != '\\' && buf[len - 1] != '/') --len;
+                
+			    // place the terminator at the resulting len
+			    buf[len] = 0;
+                
+                // point result at the buffer
+                res = buf;
+            }
 		}
 	} obj;
+    
+	return obj.res;
+}
 
-	// return our exe dir buffer
-	return obj.buf;
+// this handles all unix stuff
+#elif defined(unix) || defined(__unix__) || defined(__unix)
+
+// ---------- //
+
+// -- UNIX -- //
+
+// ---------- //
+
+#include <unistd.h>
+
+const char *exe_dir()
+{
+    static struct obj_t
+    {
+        const char *res = nullptr; // the resulting path
+        char        buf[1024];     // buffer for storing exe dir
+        
+        obj_t()
+        {
+            // get absolute path to exe
+            auto len = readlink("/proc/self/exe", buf, sizeof(buf));
+            
+            // if that succeeded
+            if (len != -1)
+            {
+                // slide back len to remove the file name
+			    while (len > 0 && buf[len - 1] != '\\' && buf[len - 1] != '/') --len;
+                
+			    // place the terminator at the resulting len
+			    buf[len] = 0;
+
+                // point result at the buffer
+                res = buf;
+            }
+        }
+    } obj;
+    
+    return obj.res;
 }
 
 #else
 
-// default implementation returns nullptr - we don't have localization for this platform
+// --------------------- //
+
+// -- NO LOCALIZATION -- //
+
+// --------------------- //
+
 const char *exe_dir()
 {
 	return nullptr;
 }
 
 #endif
+
