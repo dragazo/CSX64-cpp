@@ -9,7 +9,7 @@ namespace CSX64
 		BinWrite(writer, hole.Size);
 
 		BinWrite(writer, hole.Line);
-		Expr::WriteTo(writer, hole.Expr);
+		Expr::WriteTo(writer, hole.expr);
 
 		return writer;
 	}
@@ -19,7 +19,7 @@ namespace CSX64
 		BinRead(reader, hole.Size);
 
 		BinRead(reader, hole.Line);
-		Expr::ReadFrom(reader, hole.Expr);
+		Expr::ReadFrom(reader, hole.expr);
 
 		return reader;
 	}

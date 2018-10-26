@@ -154,7 +154,7 @@ bool AssembleArgs::TryAppendExpr(u64 size, Expr &&expr, std::vector<HoleData> &h
 	data.Address = segment.size();
 	data.Size = (decltype(data.Size))size;
 	data.Line = line;
-	data.Expr = std::move(expr);
+	data.expr = std::move(expr);
 
 	// write a dummy (all 1's for easy manual identification)
 	Append(segment, size, 0xffffffffffffffff);
@@ -993,9 +993,9 @@ bool AssembleArgs::VerifyIntegrity()
 	for (auto &entry : file.Symbols) if (!VerifyLegalExpression(entry.second)) return false;
 
 	// make sure all hole expressions were valid
-	for (HoleData &hole : file.TextHoles) if (!VerifyLegalExpression(hole.Expr)) return false;
-	for (HoleData &hole : file.RodataHoles) if (!VerifyLegalExpression(hole.Expr)) return false;
-	for (HoleData &hole : file.DataHoles) if (!VerifyLegalExpression(hole.Expr)) return false;
+	for (HoleData &hole : file.TextHoles) if (!VerifyLegalExpression(hole.expr)) return false;
+	for (HoleData &hole : file.RodataHoles) if (!VerifyLegalExpression(hole.expr)) return false;
+	for (HoleData &hole : file.DataHoles) if (!VerifyLegalExpression(hole.expr)) return false;
 
 	// the hood is good
 	return true;

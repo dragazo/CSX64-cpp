@@ -3,6 +3,7 @@
 
 #include <cstdint>
 #include <cstdlib>
+#include <cstring>
 #include <vector>
 #include <random>
 #include <string>
@@ -22,7 +23,7 @@
 #include "ios-frstor/iosfrstor.h"
 
 // macros for generating flag union expressions for use with a Computer object
-// __VA_ARGS__ was expanding non-standardly, which is why the below macro recursion doesn't use it
+// __VA_ARGS__ was expanding non-standardly in VS, which is why the below macro recursion doesn't use it
 #define MASK_UNION_0() (0)
 #define MASK_UNION_1(f) (decltype(((::CSX64::Computer*)nullptr)->f())::mask)
 #define MASK_UNION_2(a,b)                              (MASK_UNION_1(a) | MASK_UNION_1(b))
@@ -517,13 +518,6 @@ namespace CSX64
 			res = *(T*)((char*)mem + pos);
 			return true;
 		}
-		template<>
-		bool GetMemRaw<u8>(u64 pos, u64 &res)
-		{
-			if (pos >= mem_size) { Terminate(ErrorCode::OutOfBounds); return false; }
-			res = *((u8*)mem + pos);
-			return true;
-		}
 
 		// as GetMemRaw() but takes a sizecode instead of a size
 		bool GetMemRaw_szc(u64 pos, u64 sizecode, u64 &res)
@@ -565,14 +559,6 @@ namespace CSX64
 			*(T*)((char*)mem + pos) = (T)val;
 			return true;
 		}
-		template<>
-		bool SetMemRaw<u8>(u64 pos, u64 val)
-		{
-			if (pos >= mem_size) { Terminate(ErrorCode::OutOfBounds); return false; }
-			if (pos < ReadonlyBarrier) { Terminate(ErrorCode::AccessViolation); return false; }
-			*((u8*)mem + pos) = (u8)val;
-			return true;
-		}
 
 		// as SetMemRaw() but takes a sizecode instead of a size
 		bool SetMemRaw_szc(u64 pos, u64 sizecode, u64 val)
@@ -604,11 +590,6 @@ namespace CSX64
 			if (!GetMemRaw<T>(RIP(), res)) return false;
 			RIP() += sizeof(T);
 			return true;
-		}
-		template<>
-		bool GetMemAdv<u8>(u64 &res)
-		{
-			return GetMemRaw<u8>(RIP()++, res);
 		}
 
 		// as GetMemAdv() but takes a sizecode instead of a size
@@ -3653,7 +3634,7 @@ namespace CSX64
 			// val must be in range [-1, 1]
 			if (val < -1 || val > 1) { Terminate(ErrorCode::FPUError); return false; }
 
-			ST(0) = std::powl(2, val) - 1;
+			ST(0) = std::pow(2, val) - 1;
 
 			FPU_status ^= Rand() & MASK_UNION_4(FPU_C0, FPU_C1, FPU_C2, FPU_C3);
 
@@ -3663,7 +3644,7 @@ namespace CSX64
 		{
 			if (ST(0).Empty()) { Terminate(ErrorCode::FPUAccessViolation); return false; }
 
-			ST(0) = std::fabsl(ST(0));
+			ST(0) = std::fabs(ST(0));
 
 			FPU_status ^= Rand() & MASK_UNION_3(FPU_C0, FPU_C2, FPU_C3);
 			FPU_C1() = false;
@@ -3747,7 +3728,7 @@ namespace CSX64
 		{
 			if (ST(0).Empty()) { Terminate(ErrorCode::FPUAccessViolation); return false; }
 
-			ST(0) = std::sqrtl(ST(0));
+			ST(0) = std::sqrt(ST(0));
 
 			FPU_status ^= Rand() & MASK_UNION_4(FPU_C0, FPU_C1, FPU_C2, FPU_C3);
 
@@ -3952,7 +3933,7 @@ namespace CSX64
 		{
 			if (ST(0).Empty()) { Terminate(ErrorCode::FPUAccessViolation); return false; }
 
-			ST(0) = std::sinl(ST(0));
+			ST(0) = std::sin(ST(0));
 
 			FPU_status ^= Rand() & MASK_UNION_3(FPU_C0, FPU_C1, FPU_C3);
 			FPU_C2() = false;
@@ -3963,7 +3944,7 @@ namespace CSX64
 		{
 			if (ST(0).Empty()) { Terminate(ErrorCode::FPUAccessViolation); return false; }
 
-			ST(0) = std::cosl(ST(0));
+			ST(0) = std::cos(ST(0));
 
 			FPU_status ^= Rand() & MASK_UNION_3(FPU_C0, FPU_C1, FPU_C3);
 			FPU_C2() = false;
@@ -3981,14 +3962,14 @@ namespace CSX64
 			long double val = ST(0);
 
 			// st(0) <- sin, push cos
-			ST(0) = std::sinl(val);
-			return PushFPU(std::cosl(val));
+			ST(0) = std::sin(val);
+			return PushFPU(std::cos(val));
 		}
 		bool ProcessFPTAN()
 		{
 			if (ST(0).Empty()) { Terminate(ErrorCode::FPUAccessViolation); return false; }
 
-			ST(0) = std::tanl(ST(0));
+			ST(0) = std::tan(ST(0));
 
 			FPU_status ^= Rand() & MASK_UNION_3(FPU_C0, FPU_C1, FPU_C3);
 			FPU_C2() = false;
@@ -4004,7 +3985,7 @@ namespace CSX64
 			long double b = ST(1);
 
 			PopFPU(); // pop stack and place in new st(0)
-			ST(0) = std::atan2l(b, a);
+			ST(0) = std::atan2(b, a);
 
 			FPU_status ^= Rand() & MASK_UNION_3(FPU_C0, FPU_C1, FPU_C3);
 			FPU_C2() = false;

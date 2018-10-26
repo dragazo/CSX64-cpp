@@ -23,7 +23,7 @@ namespace CSX64
 		// The line where this hole was created
 		int Line;
 		// The expression that represents this hole's value
-		Expr Expr;
+		Expr expr;
 
 	public: // -- IO -- //
 

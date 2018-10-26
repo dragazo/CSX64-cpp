@@ -9,6 +9,7 @@
 #include <sstream>
 #include <iomanip>
 #include <vector>
+#include <list>
 #include <exception>
 #include <cctype>
 #include <iostream>

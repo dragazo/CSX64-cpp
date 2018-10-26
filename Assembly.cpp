@@ -3,6 +3,7 @@
 #include <cmath>
 #include <utility>
 #include <cstdlib>
+#include <cstring>
 #include <vector>
 #include <list>
 #include <stack>
@@ -154,9 +155,9 @@ namespace CSX64
 		for(auto &entry : file.Symbols) entry.second.Resolve(from, to);
 
 		// find and replace in hole expressions
-		for(auto &entry : file.TextHoles) entry.Expr.Resolve(from, to);
-		for (auto &entry : file.RodataHoles) entry.Expr.Resolve(from, to);
-		for (auto &entry : file.DataHoles) entry.Expr.Resolve(from, to);
+		for(auto &entry : file.TextHoles) entry.expr.Resolve(from, to);
+		for (auto &entry : file.RodataHoles) entry.expr.Resolve(from, to);
+		for (auto &entry : file.DataHoles) entry.expr.Resolve(from, to);
 	}
 	
 	// helper for imm parser
@@ -263,7 +264,7 @@ namespace CSX64
 		// if we can fill it immediately, do so
 		u64 val;
 		bool floating;
-		if (data.Expr.Evaluate(symbols, val, floating, err))
+		if (data.expr.Evaluate(symbols, val, floating, err))
 		{
 			// if it's floating-point
 			if (floating)
