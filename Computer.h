@@ -211,7 +211,7 @@ namespace CSX64
 		ZMMRegister ZMMRegisters[32];
 		u32 _MXCSR;
 
-		FileDescriptor FileDescriptors[FDCount];
+		std::unique_ptr<IFileWrapper> FileDescriptors[FDCount];
 
 		FastRNG Rand;
 
@@ -237,10 +237,11 @@ namespace CSX64
 	public: // -- ctor/dtor -- //
 
 		// Validates the machine for operation, but does not prepare it for execute (see Initialize)
-		inline Computer() :
+		Computer() :
 			mem(nullptr), mem_size(0), mem_cap(0),
 			running(false), error(ErrorCode::None), max_mem_size((u64)8 * 1024 * 1024 * 1024),
-			Rand((unsigned int)std::time(nullptr)) {}
+			Rand((unsigned int)std::time(nullptr))
+		{}
 		virtual ~Computer() { CSX64::aligned_free(mem); }
 		
 		Computer(const Computer&) = delete;
@@ -291,8 +292,7 @@ namespace CSX64
 		void CloseFiles()
 		{
 			// close all files
-			for (int i = 0; i < FDCount; ++i)
-				FileDescriptors[i].Close();
+			for (auto &fd : FileDescriptors) fd = nullptr;
 		}
 
 		/// <summary>
@@ -341,23 +341,18 @@ namespace CSX64
 		// Unsets the suspended read state
 		void ResumeSuspendedRead() { if (running) suspended_read = false; }
 
-		// Gets the file descriptor at the specified index. (no bounds checking - see FDCount)
-		FileDescriptor &GetFD(int index) { return FileDescriptors[index]; }
-		/// <summary>
-		/// Finds the first available file descriptor, or null if there are none available
-		/// </summary>
-		/// <param name="index">the index of the result - only modified on success - null is ignored</param>
-		FileDescriptor *FindAvailableFD(int *index)
+		// gets the wrapper object for the specified file descriptor. (no bounds checking - see FDCount)
+		// this value is null iff the specified file descriptor is not in use.
+		// this can be reassigned at will, which automatically cleans up its resources.
+		std::unique_ptr<IFileWrapper> &GetFD(int index) { return FileDescriptors[index]; }
+		// returns the lowest-index available file descriptor.
+		// if there are no available file descriptors, returns -1.
+		int FindAvailableFD()
 		{
-			// get the first available file descriptor
 			for (int i = 0; i < FDCount; ++i)
-				if (!FileDescriptors[i].InUse())
-				{
-					if (index) *index = i;
-					return &FileDescriptors[i];
-				}
+				if (FileDescriptors[i] == nullptr) return i;
 
-			return nullptr;
+			return -1;
 		}
 
 		// Writes a string containing all non-vpu register/flag states"/>

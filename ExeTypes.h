@@ -5,7 +5,11 @@
 #include <iostream>
 #include <fstream>
 #include <exception>
+#include <stdexcept>
 #include <algorithm>
+#include <memory>
+#include <cstring>
+#include <string>
 
 #include "CoreTypes.h"
 
@@ -16,7 +20,7 @@ namespace CSX64
 		None, OutOfBounds, UnhandledSyscall, UndefinedBehavior, ArithmeticError, Abort,
 		IOFailure, FSDisabled, AccessViolation, InsufficientFDs, FDNotInUse, NotImplemented, StackOverflow,
 		FPUStackOverflow, FPUStackUnderflow, FPUError, FPUAccessViolation,
-		AlignmentViolation, UnknownOp,
+		AlignmentViolation, UnknownOp, FilePermissions,
 	};
 	enum class SyscallCode
 	{
@@ -301,97 +305,113 @@ namespace CSX64
 	};
 	ZMMRegister_sizecode_wrapper ZMMRegister::uint(u64 sizecode, u64 index) { return {*this, (u8)index, (u8)sizecode}; }
 
-	/// <summary>
-	/// Represents a file descriptor used by the <see cref="CSX64"/> processor
-	/// </summary>
-	class FileDescriptor
+	// -------- //
+
+	// -- io -- //
+
+	// -------- //
+
+	// exception type thrown when IFileWrapper permissions are violated
+	struct FileWrapperPermissionsException : std::runtime_error
 	{
-	private:
+		using std::runtime_error::runtime_error;
+		using std::runtime_error::what;
+	};
 
-		std::iostream *stream;
+	// the interface used by CSX64 file descriptors to reference files.
+	struct IFileWrapper
+	{
+		virtual ~IFileWrapper() = 0 {}
 
-		bool managed;
-		bool interactive;
+		// returns true iff this stream is interactive (see CSX64 documentation)
+		virtual bool IsInteractive() const = 0;
 
-	public:
-		// gets if this file is managed (i.e. stream will be deleted on close)
-		inline bool Managed() const noexcept { return managed; }
-		// gets if this file is interactive (i.e. Computer object reading past eof sets SuspendedRead state).
-		inline bool Interactive() const noexcept { return interactive; }
+		// returns true iff this stream can read
+		virtual bool CanRead() const = 0;
+		// returns true iff this stream can write
+		virtual bool CanWrite() const = 0;
 
-		// gets a pointer to the currently-opened stream (nullptr if not in use).
-		inline std::iostream *Stream() const noexcept { return stream; }
-		// gets if this file descriptor is currently bound to a stream.
-		inline bool InUse() const noexcept { return stream; }
+		// returns true iff this stream can seek
+		virtual bool CanSeek() const = 0;
 
-		// ----------------------------
+		// reads at most <cap> bytes into buf. no null terminator is appended.
+		// returns the number of bytes read.
+		// throws FileWrapperPermissionsException if the file cannot read.
+		virtual i64 Read(void *buf, i64 cap) = 0;
+		// writes <len> bytes from buf.
+		// returns the number of bytes written (may be less than <len> due to an io error).
+		// throws FileWrapperPermissionsException if the file cannot write.
+		virtual i64 Write(void *buf, i64 len) = 0;
 
-		constexpr FileDescriptor() : stream(nullptr), managed(false), interactive(false) {}
-		~FileDescriptor() { Close(); }
+		// sets the current position in the file based on an offset <off> and an origin <dir>.
+		// returns the resulting position (offset from beginning).
+		// throws FileWrapperPermissionsException if the file cannot seek.
+		virtual i64 Seek(i64 off, std::ios::seekdir dir) = 0;
+	};
 
-		FileDescriptor(const FileDescriptor&) = delete;
-		FileDescriptor(FileDescriptor &&other) : stream(other.stream), managed(other.managed), interactive(other.interactive)
+	class BasicFileWrapper : public IFileWrapper
+	{
+	private: // -- data -- //
+
+		std::fstream *f;
+		bool _managed;
+		bool _interactive;
+
+		bool _CanRead;
+		bool _CanWrite;
+
+		bool _CanSeek;
+
+	public: // -- ctor / dtor / asgn -- //
+
+		// constructs a new BasicFileWrapper from the given file (which cannot be null).
+		// if <managed> is true, the stream is closed and deleted when this object is destroyed.
+		// throws std::invalid_argument if <file> is null.
+		BasicFileWrapper(std::fstream *file, bool managed, bool interactive, bool canRead, bool canWrite, bool canSeek)
+			: f(file), _managed(managed), _interactive(interactive), _CanRead(canRead), _CanWrite(canWrite), _CanSeek(canSeek)
 		{
-			other.stream = nullptr;
+			// the file must not be null
+			if (file == nullptr) throw std::invalid_argument("file cannot be null");
 		}
 
-		FileDescriptor &operator=(const FileDescriptor&) = delete;
-		FileDescriptor &operator=(FileDescriptor &&other)
+		virtual ~BasicFileWrapper()
 		{
-			// make sure we close our stream before we steal other's
-			Close();
-
-			// steal other's stuff
-			stream = other.stream;
-			managed = other.managed;
-			interactive = other.interactive;
-
-			// empty other
-			other.stream = nullptr;
-
-			return *this;
+			// if we're managing the file, delete it
+			if (_managed) delete f;
 		}
 
-		friend void swap(FileDescriptor &a, FileDescriptor &b)
-		{
-			using std::swap;
+		BasicFileWrapper(const BasicFileWrapper&) = delete;
+		BasicFileWrapper &operator=(const BasicFileWrapper&) = delete;
 
-			swap(a.managed, b.managed);
-			swap(a.interactive, b.interactive);
-			swap(a.stream, b.stream);
+		BasicFileWrapper(BasicFileWrapper &&other) = delete;
+		BasicFileWrapper &operator=(BasicFileWrapper &&other) = delete;
+
+	public: // -- interface -- //
+
+		virtual bool IsInteractive() const override { return _interactive; }
+
+		virtual bool CanRead() const override { return _CanRead; }
+		virtual bool CanWrite() const override { return _CanWrite; }
+
+		virtual bool CanSeek() const override { return _CanSeek; }
+
+		virtual i64 Read(void *buf, i64 cap) override
+		{
+			if (!CanRead()) throw FileWrapperPermissionsException("FileWrapper not flagged for reading");
+			return (i64)f->read((char*)buf, (std::streamsize)cap).gcount();
+		}
+		virtual i64 Write(void *buf, i64 len) override
+		{
+			if (!CanWrite()) throw FileWrapperPermissionsException("FileWrapper not flagged for writing");
+			f->write((char*)buf, (std::streamsize)len);
+			return len;
 		}
 
-		// ----------------------------
-
-		/// <summary>
-		/// Assigns the given stream to this file descriptor. Throws <see cref="std::runtime_error"/> if already in use.
-		/// On success, is usable. On failure, is not modified.
-		/// </summary>
-		/// <param name="stream">the stream source</param>
-		/// <param name="managed">marks that this stream is considered "managed". see CSX64 manual for more information</param>
-		/// <param name="interactive">marks that this stream is considered "interactive" see CSX64 manual for more information</param>
-		/// <exception cref="std::runtime_error"></exception>
-		void Open(std::iostream *stream, bool managed, bool interactive)
+		virtual i64 Seek(i64 off, std::ios::seekdir dir) override
 		{
-			if (InUse()) throw std::runtime_error("Attempt to assign to a FileDescriptor that was currently in use");
-
-			this->stream = stream;
-			this->managed = managed;
-			this->interactive = interactive;
-		}
-		/// <summary>
-		/// Unlinks the stream and makes this file descriptor unused. If managed, first closes the stream.
-		/// If not currenty in use, does nothing. Returns true if successful (no errors).
-		/// </summary>
-		bool Close()
-		{
-			// delete the stream if we were asked to manage it
-			if (managed) delete stream;
-
-			// unlink it in either case
-			stream = nullptr;
-
-			return true;
+			if (!CanSeek()) throw FileWrapperPermissionsException("FileWrapper not flagged for seeking");
+			f->seekg((std::streamoff)off, dir); // fstream uses a single pointer for get/put
+			return (i64)f->tellg();
 		}
 	};
 }

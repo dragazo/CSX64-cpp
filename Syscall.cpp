@@ -19,8 +19,11 @@ namespace CSX64
 		if (fd_index >= FDCount) { Terminate(ErrorCode::OutOfBounds); return false; }
 
 		// get fd
-		FileDescriptor &fd = FileDescriptors[fd_index];
-		if (!fd.InUse()) { Terminate(ErrorCode::FDNotInUse); return false; }
+		IFileWrapper *const fd = FileDescriptors[fd_index].get();
+		if (fd == nullptr) { Terminate(ErrorCode::FDNotInUse); return false; }
+
+		// make sure we can read from it
+		if (!fd->CanRead()) { Terminate(ErrorCode::FilePermissions); return false; }
 
 		// make sure we're in bounds
 		if (RCX() >= mem_size || RDX() >= mem_size || RCX() + RDX() > mem_size) { Terminate(ErrorCode::OutOfBounds); return false; }
@@ -30,18 +33,16 @@ namespace CSX64
 		// read from the file
 		try
 		{
-			u64 n = smart_readsome(*fd.Stream(), (char*)mem + RCX(), RDX());
+			i64 n = fd->Read((char*)mem + RCX(), (i64)RDX());
 
-			// if stream is bad now, return -1
-			if (!*fd.Stream()) RAX() = ~(u64)0;
-			// if we got nothing but it's interactive
-			else if (n == 0 && fd.Interactive())
+			// if we got nothing but the wrapper is interactive
+			if (n == 0 && fd->IsInteractive())
 			{
-				--RIP();              // await further data by repeating the syscall
+				--RIP();               // await further data by repeating the syscall
 				suspended_read = true; // suspend execution until there's more data
 			}
 			// otherwise success - return num chars read from file
-			else RAX() = n;
+			else RAX() = (u64)n;
 		}
 		// errors are failures - return -1
 		catch (...) { RAX() = ~(u64)0; }
@@ -55,14 +56,14 @@ namespace CSX64
 		if (fd_index >= FDCount) { Terminate(ErrorCode::OutOfBounds); return false; }
 
 		// get fd
-		FileDescriptor &fd = FileDescriptors[fd_index];
-		if (!fd.InUse()) { Terminate(ErrorCode::FDNotInUse); return false; }
+		IFileWrapper *const fd = FileDescriptors[fd_index].get();
+		if (fd == nullptr) { Terminate(ErrorCode::FDNotInUse); return false; }
 
 		// make sure we're in bounds
 		if (RCX() >= mem_size || RDX() >= mem_size || RCX() + RDX() > mem_size) { Terminate(ErrorCode::OutOfBounds); return false; }
 
 		// attempt to write from memory to the file - success = num written, fail = -1
-		try { RAX() = fd.Stream()->write((char*)mem + RCX(), RDX()) ? RDX() : ~(u64)0; }
+		try { RAX() = (u64)fd->Write((char*)mem + RCX(), (i64)RDX()) ? RDX() : ~(u64)0; }
 		catch (...) { RAX() = ~(u64)0; }
 
 		return true;
@@ -74,22 +75,27 @@ namespace CSX64
 		if (!FSF()) { Terminate(ErrorCode::FSDisabled); return false; }
 
 		// get an available file descriptor
-		int fd_index;
-		FileDescriptor *fd = FindAvailableFD(&fd_index);
-
+		int fd_index = FindAvailableFD();
 		// if we couldn't get one, return -1
-		if (fd == nullptr) { RAX() = ~(u64)0; return true; }
+		if (fd_index < 0) { RAX() = ~(u64)0; return true; }
+
+		// get the file descriptor handle
+		std::unique_ptr<IFileWrapper> &fd = FileDescriptors[fd_index];
 
 		// get path
 		std::string path;
 		if (!GetCString(RBX(), path)) return false;
 
 		int                raw_flags = (int)RCX();       // flags provided by user
-		std::ios::openmode cpp_flags = std::ios::binary; // flags to provide to C++
+		std::ios::openmode cpp_flags = std::ios::binary; // flags to provide to C++ (always open in binary mode)
 		
+		// alias permissions flags for convenience
+		bool can_read = raw_flags & (int)OpenFlags::read;
+		bool can_write = raw_flags & (int)OpenFlags::write;
+
 		// process raw flags
-		if (raw_flags & (int)OpenFlags::read) cpp_flags |= std::ios::in;
-		if (raw_flags & (int)OpenFlags::write) cpp_flags |= std::ios::out;
+		if (can_read) cpp_flags |= std::ios::in;
+		if (can_write) cpp_flags |= std::ios::out;
 
 		if (raw_flags & (int)OpenFlags::trunc) cpp_flags |= std::ios::trunc;
 		
@@ -128,7 +134,7 @@ namespace CSX64
 			}
 		}
 
-		// open the file - held by smart pointer for convenience
+		// open the file
 		std::unique_ptr<std::fstream> f = std::make_unique<std::fstream>();
 		try { f->open(path, cpp_flags); }
 		catch (...) { RAX() = ~(u64)0; return true; }
@@ -137,8 +143,8 @@ namespace CSX64
 		if (!*f) { RAX() = ~(u64)0; return true; }
 
 		// store in the file descriptor
-		fd->Open(f.get(), true, false); // provide fd->Open() with the stream pointer
-		f.release(); // only if it succeeded should we release the unique_ptr
+		fd = std::make_unique<BasicFileWrapper>(f.get(), true, false, can_read, can_write, true); // provide the wrapper with the file pointer
+		f.release(); // only if it succeeded should we release the unique_ptr on said file
 		RAX() = fd_index;
 
 		return true;
@@ -150,10 +156,11 @@ namespace CSX64
 		if (fd_index >= FDCount) { Terminate(ErrorCode::OutOfBounds); return false; }
 
 		// get fd
-		FileDescriptor &fd = FileDescriptors[fd_index];
+		std::unique_ptr<IFileWrapper> &fd = FileDescriptors[fd_index];
 
 		// close the file - success = 0, fail = -1
-		RAX() = fd.Close() ? (u64)0 : ~(u64)0;
+		fd = nullptr;
+		RAX() = 0;
 		return true;
 	}
 
@@ -164,8 +171,11 @@ namespace CSX64
 		if (fd_index >= FDCount) { Terminate(ErrorCode::OutOfBounds); return false; }
 
 		// get fd
-		FileDescriptor &fd = FileDescriptors[fd_index];
-		if (!fd.InUse()) { Terminate(ErrorCode::FDNotInUse); return false; }
+		IFileWrapper *const fd = FileDescriptors[fd_index].get();
+		if (fd == nullptr) { Terminate(ErrorCode::FDNotInUse); return false; }
+
+		// make sure it can seek
+		if (!fd->CanSeek()) { Terminate(ErrorCode::FilePermissions); return false; }
 
 		int               raw_mode = (int)RDX();
 		std::ios::seekdir cpp_mode;
@@ -178,15 +188,7 @@ namespace CSX64
 		else { RAX() = ~(u64)0; return true; }
 
 		// attempt the seek
-		try
-		{
-			// seek on both pointers (may be different depending on object)
-			fd.Stream()->seekg((i64)RCX(), cpp_mode);
-			fd.Stream()->seekp((i64)RCX(), cpp_mode);
-
-			// return position (we return the get pointer) - because the underlying stream can be modified from multiple sources, we can't be sure which to use
-			RAX() = fd.Stream()->tellg();
-		}
+		try { RAX() = (u64)fd->Seek((i64)RCX(), cpp_mode); }
 		catch (...) { RAX() = ~(u64)0; }
 		
 		return true;
