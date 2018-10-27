@@ -641,197 +641,321 @@ namespace CSX64
 
 	public: // -- register access -- //
 
-		// helper for creating register accessor functions (non-const returns T&, const returns T)
-		#define _REG_ACCESSOR(name, src) \
-			inline constexpr std::remove_reference_t<decltype(src)>& name()       noexcept { return src; } \
-			inline constexpr std::remove_reference_t<decltype(src)>  name() const noexcept { return src; }
-		// helper for creating register accessor functions with non-standard typing for const/non-const
-		#define _REG_ACCESSOR_X(name, src, mutable_t, const_t) \
-			inline constexpr mutable_t name()       noexcept { return src; } \
-			inline constexpr const_t   name() const noexcept { return src; }
+		u64 &RFLAGS() { return _RFLAGS; }
+		u32 &EFLAGS() { return *(u32*)&_RFLAGS; }
+		u16 &FLAGS() { return *(u16*)&_RFLAGS; }
+		
+		u64 RFLAGS() const { return _RFLAGS; }
+		u32 EFLAGS() const { return *(u32*)&_RFLAGS; }
+		u16 FLAGS() const { return *(u16*)&_RFLAGS; }
 
-		// helper for creating flag accessor functions
-		#define _FLAG_ACCESSOR(name, src, pos) \
-			inline constexpr FlagWrapper<decltype(src), pos> name()       noexcept { return {src};                                       } \
-			inline constexpr bool                            name() const noexcept { return src & FlagWrapper<decltype(src), pos>::mask; }
-		// helper for creating bitfield accessor functions
-		#define _BITFIELD_ACCESSOR(name, src, pos, len) \
-			inline constexpr BitfieldWrapper<decltype(src), pos, len> name()       noexcept { return {src}; } \
-			inline constexpr decltype(src)                            name() const noexcept { return (src & BitfieldWrapper<decltype(src), pos, len>::mask) >> pos; }
+		u64                      &RIP() { return _RIP; }
+		ReferenceRouter<u32, u64> EIP() { return {_RIP}; }
+		ReferenceRouter<u16, u64> IP() { return {_RIP}; }
 
-		_REG_ACCESSOR(RFLAGS, _RFLAGS)
-		_REG_ACCESSOR(EFLAGS, *(u32*)&_RFLAGS)
-		_REG_ACCESSOR(FLAGS,  *(u16*)&_RFLAGS)
+		u64 RIP() const { return _RIP; }
+		u32 EIP() const { return (u32)_RIP; }
+		u16 IP() const { return (u16)_RIP; }
 
-		_REG_ACCESSOR(RIP, _RIP)
+		u64 &RAX() { return CPURegisters[0].x64(); }
+		u64 &RBX() { return CPURegisters[1].x64(); }
+		u64 &RCX() { return CPURegisters[2].x64(); }
+		u64 &RDX() { return CPURegisters[3].x64(); }
+		u64 &RSI() { return CPURegisters[4].x64(); }
+		u64 &RDI() { return CPURegisters[5].x64(); }
+		u64 &RBP() { return CPURegisters[6].x64(); }
+		u64 &RSP() { return CPURegisters[7].x64(); }
+		u64 &R8() { return CPURegisters[8].x64(); }
+		u64 &R9() { return CPURegisters[9].x64(); }
+		u64 &R10() { return CPURegisters[10].x64(); }
+		u64 &R11() { return CPURegisters[11].x64(); }
+		u64 &R12() { return CPURegisters[12].x64(); }
+		u64 &R13() { return CPURegisters[13].x64(); }
+		u64 &R14() { return CPURegisters[14].x64(); }
+		u64 &R15() { return CPURegisters[15].x64(); }
 
-		inline constexpr ReferenceRouter<u32, u64> EIP() noexcept { return {_RIP}; }
-		inline constexpr u32 EIP() const noexcept { return (u32)_RIP; }
+		ReferenceRouter<u32, u64> EAX() { return {CPURegisters[0].x32()}; }
+		ReferenceRouter<u32, u64> EBX() { return {CPURegisters[1].x32()}; }
+		ReferenceRouter<u32, u64> ECX() { return {CPURegisters[2].x32()}; }
+		ReferenceRouter<u32, u64> EDX() { return {CPURegisters[3].x32()}; }
+		ReferenceRouter<u32, u64> ESI() { return {CPURegisters[4].x32()}; }
+		ReferenceRouter<u32, u64> EDI() { return {CPURegisters[5].x32()}; }
+		ReferenceRouter<u32, u64> EBP() { return {CPURegisters[6].x32()}; }
+		ReferenceRouter<u32, u64> ESP() { return {CPURegisters[7].x32()}; }
+		ReferenceRouter<u32, u64> R8D() { return {CPURegisters[8].x32()}; }
+		ReferenceRouter<u32, u64> R9D() { return {CPURegisters[9].x32()}; }
+		ReferenceRouter<u32, u64> R10D() { return {CPURegisters[10].x32()}; }
+		ReferenceRouter<u32, u64> R11D() { return {CPURegisters[11].x32()}; }
+		ReferenceRouter<u32, u64> R12D() { return {CPURegisters[12].x32()}; }
+		ReferenceRouter<u32, u64> R13D() { return {CPURegisters[13].x32()}; }
+		ReferenceRouter<u32, u64> R14D() { return {CPURegisters[14].x32()}; }
+		ReferenceRouter<u32, u64> R15D() { return {CPURegisters[15].x32()}; }
 
-		inline constexpr ReferenceRouter<u16, u64> IP() noexcept { return {_RIP}; }
-		inline constexpr u16 IP() const noexcept { return (u16)_RIP; }
+		u16 &AX() { return CPURegisters[0].x16(); }
+		u16 &BX() { return CPURegisters[1].x16(); }
+		u16 &CX() { return CPURegisters[2].x16(); }
+		u16 &DX() { return CPURegisters[3].x16(); }
+		u16 &SI() { return CPURegisters[4].x16(); }
+		u16 &DI() { return CPURegisters[5].x16(); }
+		u16 &BP() { return CPURegisters[6].x16(); }
+		u16 &SP() { return CPURegisters[7].x16(); }
+		u16 &R8W() { return CPURegisters[8].x16(); }
+		u16 &R9W() { return CPURegisters[9].x16(); }
+		u16 &R10W() { return CPURegisters[10].x16(); }
+		u16 &R11W() { return CPURegisters[11].x16(); }
+		u16 &R12W() { return CPURegisters[12].x16(); }
+		u16 &R13W() { return CPURegisters[13].x16(); }
+		u16 &R14W() { return CPURegisters[14].x16(); }
+		u16 &R15W() { return CPURegisters[15].x16(); }
 
-		_REG_ACCESSOR(RAX, CPURegisters[0].x64())
-		_REG_ACCESSOR(RBX, CPURegisters[1].x64())
-		_REG_ACCESSOR(RCX, CPURegisters[2].x64())
-		_REG_ACCESSOR(RDX, CPURegisters[3].x64())
-		_REG_ACCESSOR(RSI, CPURegisters[4].x64())
-		_REG_ACCESSOR(RDI, CPURegisters[5].x64())
-		_REG_ACCESSOR(RBP, CPURegisters[6].x64())
-		_REG_ACCESSOR(RSP, CPURegisters[7].x64())
-		_REG_ACCESSOR(R8, CPURegisters[8].x64())
-		_REG_ACCESSOR(R9, CPURegisters[9].x64())
-		_REG_ACCESSOR(R10, CPURegisters[10].x64())
-		_REG_ACCESSOR(R11, CPURegisters[11].x64())
-		_REG_ACCESSOR(R12, CPURegisters[12].x64())
-		_REG_ACCESSOR(R13, CPURegisters[13].x64())
-		_REG_ACCESSOR(R14, CPURegisters[14].x64())
-		_REG_ACCESSOR(R15, CPURegisters[15].x64())
+		u8 &AL() { return CPURegisters[0].x8(); }
+		u8 &BL() { return CPURegisters[1].x8(); }
+		u8 &CL() { return CPURegisters[2].x8(); }
+		u8 &DL() { return CPURegisters[3].x8(); }
+		u8 &SIL() { return CPURegisters[4].x8(); }
+		u8 &DIL() { return CPURegisters[5].x8(); }
+		u8 &BPL() { return CPURegisters[6].x8(); }
+		u8 &SPL() { return CPURegisters[7].x8(); }
+		u8 &R8B() { return CPURegisters[8].x8(); }
+		u8 &R9B() { return CPURegisters[9].x8(); }
+		u8 &R10B() { return CPURegisters[10].x8(); }
+		u8 &R11B() { return CPURegisters[11].x8(); }
+		u8 &R12B() { return CPURegisters[12].x8(); }
+		u8 &R13B() { return CPURegisters[13].x8(); }
+		u8 &R14B() { return CPURegisters[14].x8(); }
+		u8 &R15B() { return CPURegisters[15].x8(); }
 
-		_REG_ACCESSOR_X(EAX, CPURegisters[0].x32(), auto, u32)
-		_REG_ACCESSOR_X(EBX, CPURegisters[1].x32(), auto, u32)
-		_REG_ACCESSOR_X(ECX, CPURegisters[2].x32(), auto, u32)
-		_REG_ACCESSOR_X(EDX, CPURegisters[3].x32(), auto, u32)
-		_REG_ACCESSOR_X(ESI, CPURegisters[4].x32(), auto, u32)
-		_REG_ACCESSOR_X(EDI, CPURegisters[5].x32(), auto, u32)
-		_REG_ACCESSOR_X(EBP, CPURegisters[6].x32(), auto, u32)
-		_REG_ACCESSOR_X(ESP, CPURegisters[7].x32(), auto, u32)
-		_REG_ACCESSOR_X(R8D, CPURegisters[8].x32(), auto, u32)
-		_REG_ACCESSOR_X(R9D, CPURegisters[9].x32(), auto, u32)
-		_REG_ACCESSOR_X(R10D, CPURegisters[10].x32(), auto, u32)
-		_REG_ACCESSOR_X(R11D, CPURegisters[11].x32(), auto, u32)
-		_REG_ACCESSOR_X(R12D, CPURegisters[12].x32(), auto, u32)
-		_REG_ACCESSOR_X(R13D, CPURegisters[13].x32(), auto, u32)
-		_REG_ACCESSOR_X(R14D, CPURegisters[14].x32(), auto, u32)
-		_REG_ACCESSOR_X(R15D, CPURegisters[15].x32(), auto, u32)
+		u8 &AH() { return CPURegisters[0].x8h(); }
+		u8 &BH() { return CPURegisters[1].x8h(); }
+		u8 &CH() { return CPURegisters[2].x8h(); }
+		u8 &DH() { return CPURegisters[3].x8h(); }
 
-		_REG_ACCESSOR(AX, CPURegisters[0].x16())
-		_REG_ACCESSOR(BX, CPURegisters[1].x16())
-		_REG_ACCESSOR(CX, CPURegisters[2].x16())
-		_REG_ACCESSOR(DX, CPURegisters[3].x16())
-		_REG_ACCESSOR(SI, CPURegisters[4].x16())
-		_REG_ACCESSOR(DI, CPURegisters[5].x16())
-		_REG_ACCESSOR(BP, CPURegisters[6].x16())
-		_REG_ACCESSOR(SP, CPURegisters[7].x16())
-		_REG_ACCESSOR(R8W, CPURegisters[8].x16())
-		_REG_ACCESSOR(R9W, CPURegisters[9].x16())
-		_REG_ACCESSOR(R10W, CPURegisters[10].x16())
-		_REG_ACCESSOR(R11W, CPURegisters[11].x16())
-		_REG_ACCESSOR(R12W, CPURegisters[12].x16())
-		_REG_ACCESSOR(R13W, CPURegisters[13].x16())
-		_REG_ACCESSOR(R14W, CPURegisters[14].x16())
-		_REG_ACCESSOR(R15W, CPURegisters[15].x16())
+		u64 RAX() const { return CPURegisters[0].x64(); }
+		u64 RBX() const { return CPURegisters[1].x64(); }
+		u64 RCX() const { return CPURegisters[2].x64(); }
+		u64 RDX() const { return CPURegisters[3].x64(); }
+		u64 RSI() const { return CPURegisters[4].x64(); }
+		u64 RDI() const { return CPURegisters[5].x64(); }
+		u64 RBP() const { return CPURegisters[6].x64(); }
+		u64 RSP() const { return CPURegisters[7].x64(); }
+		u64 R8() const { return CPURegisters[8].x64(); }
+		u64 R9() const { return CPURegisters[9].x64(); }
+		u64 R10() const { return CPURegisters[10].x64(); }
+		u64 R11() const { return CPURegisters[11].x64(); }
+		u64 R12() const { return CPURegisters[12].x64(); }
+		u64 R13() const { return CPURegisters[13].x64(); }
+		u64 R14() const { return CPURegisters[14].x64(); }
+		u64 R15() const { return CPURegisters[15].x64(); }
 
-		_REG_ACCESSOR(AL, CPURegisters[0].x8())
-		_REG_ACCESSOR(BL, CPURegisters[1].x8())
-		_REG_ACCESSOR(CL, CPURegisters[2].x8())
-		_REG_ACCESSOR(DL, CPURegisters[3].x8())
-		_REG_ACCESSOR(SIL, CPURegisters[4].x8())
-		_REG_ACCESSOR(DIL, CPURegisters[5].x8())
-		_REG_ACCESSOR(BPL, CPURegisters[6].x8())
-		_REG_ACCESSOR(SPL, CPURegisters[7].x8())
-		_REG_ACCESSOR(R8B, CPURegisters[8].x8())
-		_REG_ACCESSOR(R9B, CPURegisters[9].x8())
-		_REG_ACCESSOR(R10B, CPURegisters[10].x8())
-		_REG_ACCESSOR(R11B, CPURegisters[11].x8())
-		_REG_ACCESSOR(R12B, CPURegisters[12].x8())
-		_REG_ACCESSOR(R13B, CPURegisters[13].x8())
-		_REG_ACCESSOR(R14B, CPURegisters[14].x8())
-		_REG_ACCESSOR(R15B, CPURegisters[15].x8())
+		u32 EAX() const { return CPURegisters[0].x32(); }
+		u32 EBX() const { return CPURegisters[1].x32(); }
+		u32 ECX() const { return CPURegisters[2].x32(); }
+		u32 EDX() const { return CPURegisters[3].x32(); }
+		u32 ESI() const { return CPURegisters[4].x32(); }
+		u32 EDI() const { return CPURegisters[5].x32(); }
+		u32 EBP() const { return CPURegisters[6].x32(); }
+		u32 ESP() const { return CPURegisters[7].x32(); }
+		u32 R8D() const { return CPURegisters[8].x32(); }
+		u32 R9D() const { return CPURegisters[9].x32(); }
+		u32 R10D() const { return CPURegisters[10].x32(); }
+		u32 R11D() const { return CPURegisters[11].x32(); }
+		u32 R12D() const { return CPURegisters[12].x32(); }
+		u32 R13D() const { return CPURegisters[13].x32(); }
+		u32 R14D() const { return CPURegisters[14].x32(); }
+		u32 R15D() const { return CPURegisters[15].x32(); }
 
-		_REG_ACCESSOR(AH, CPURegisters[0].x8h())
-		_REG_ACCESSOR(BH, CPURegisters[1].x8h())
-		_REG_ACCESSOR(CH, CPURegisters[2].x8h())
-		_REG_ACCESSOR(DH, CPURegisters[3].x8h())
+		u16 AX() const { return CPURegisters[0].x16(); }
+		u16 BX() const { return CPURegisters[1].x16(); }
+		u16 CX() const { return CPURegisters[2].x16(); }
+		u16 DX() const { return CPURegisters[3].x16(); }
+		u16 SI() const { return CPURegisters[4].x16(); }
+		u16 DI() const { return CPURegisters[5].x16(); }
+		u16 BP() const { return CPURegisters[6].x16(); }
+		u16 SP() const { return CPURegisters[7].x16(); }
+		u16 R8W() const { return CPURegisters[8].x16(); }
+		u16 R9W() const { return CPURegisters[9].x16(); }
+		u16 R10W() const { return CPURegisters[10].x16(); }
+		u16 R11W() const { return CPURegisters[11].x16(); }
+		u16 R12W() const { return CPURegisters[12].x16(); }
+		u16 R13W() const { return CPURegisters[13].x16(); }
+		u16 R14W() const { return CPURegisters[14].x16(); }
+		u16 R15W() const { return CPURegisters[15].x16(); }
+
+		u8 AL() const { return CPURegisters[0].x8(); }
+		u8 BL() const { return CPURegisters[1].x8(); }
+		u8 CL() const { return CPURegisters[2].x8(); }
+		u8 DL() const { return CPURegisters[3].x8(); }
+		u8 SIL() const { return CPURegisters[4].x8(); }
+		u8 DIL() const { return CPURegisters[5].x8(); }
+		u8 BPL() const { return CPURegisters[6].x8(); }
+		u8 SPL() const { return CPURegisters[7].x8(); }
+		u8 R8B() const { return CPURegisters[8].x8(); }
+		u8 R9B() const { return CPURegisters[9].x8(); }
+		u8 R10B() const { return CPURegisters[10].x8(); }
+		u8 R11B() const { return CPURegisters[11].x8(); }
+		u8 R12B() const { return CPURegisters[12].x8(); }
+		u8 R13B() const { return CPURegisters[13].x8(); }
+		u8 R14B() const { return CPURegisters[14].x8(); }
+		u8 R15B() const { return CPURegisters[15].x8(); }
+
+		u8 AH() const { return CPURegisters[0].x8h(); }
+		u8 BH() const { return CPURegisters[1].x8h(); }
+		u8 CH() const { return CPURegisters[2].x8h(); }
+		u8 DH() const { return CPURegisters[3].x8h(); }
 
 		// source: https://en.wikipedia.org/wiki/FLAGS_register
 		// source: http://www.eecg.toronto.edu/~amza/www.mindsec.com/files/x86regs.html
 
-		_FLAG_ACCESSOR(CF, _RFLAGS, 0)
-		_FLAG_ACCESSOR(PF, _RFLAGS, 2)
-		_FLAG_ACCESSOR(AF, _RFLAGS, 4)
-		_FLAG_ACCESSOR(ZF, _RFLAGS, 6)
-		_FLAG_ACCESSOR(SF, _RFLAGS, 7)
-		_FLAG_ACCESSOR(TF, _RFLAGS, 8)
-		_FLAG_ACCESSOR(IF, _RFLAGS, 9)
-		_FLAG_ACCESSOR(DF, _RFLAGS, 10)
-		_FLAG_ACCESSOR(OF, _RFLAGS, 11)
-		_BITFIELD_ACCESSOR(IOPL, _RFLAGS, 12, 2)
-		_FLAG_ACCESSOR(NT, _RFLAGS, 14)
+		FlagWrapper<u64, 0>         CF() { return {_RFLAGS}; }
+		FlagWrapper<u64, 2>         PF() { return {_RFLAGS}; }
+		FlagWrapper<u64, 4>         AF() { return {_RFLAGS}; }
+		FlagWrapper<u64, 6>         ZF() { return {_RFLAGS}; }
+		FlagWrapper<u64, 7>         SF() { return {_RFLAGS}; }
+		FlagWrapper<u64, 8>         TF() { return {_RFLAGS}; }
+		FlagWrapper<u64, 9>         IF() { return {_RFLAGS}; }
+		FlagWrapper<u64, 10>        DF() { return {_RFLAGS}; }
+		FlagWrapper<u64, 11>        OF() { return {_RFLAGS}; }
+		BitfieldWrapper<u64, 12, 2> IOPL() { return {_RFLAGS}; }
+		FlagWrapper<u64, 14>        NT() { return {_RFLAGS}; }
 
-		_FLAG_ACCESSOR(RF, _RFLAGS, 16)
-		_FLAG_ACCESSOR(VM, _RFLAGS, 17)
-		_FLAG_ACCESSOR(AC, _RFLAGS, 18)
-		_FLAG_ACCESSOR(VIF, _RFLAGS, 19)
-		_FLAG_ACCESSOR(VIP, _RFLAGS, 20)
-		_FLAG_ACCESSOR(ID, _RFLAGS, 21)
+		FlagWrapper<u64, 16> RF() { return {_RFLAGS}; }
+		FlagWrapper<u64, 17> VM() { return {_RFLAGS}; }
+		FlagWrapper<u64, 18> AC() { return {_RFLAGS}; }
+		FlagWrapper<u64, 19> VIF() { return {_RFLAGS}; }
+		FlagWrapper<u64, 20> VIP() { return {_RFLAGS}; }
+		FlagWrapper<u64, 21> ID() { return {_RFLAGS}; }
+
+		bool CF() const { return _RFLAGS & FlagWrapper<u64, 0>::mask; }
+		bool PF() const { return _RFLAGS & FlagWrapper<u64, 2>::mask; }
+		bool AF() const { return _RFLAGS & FlagWrapper<u64, 4>::mask; }
+		bool ZF() const { return _RFLAGS & FlagWrapper<u64, 6>::mask; }
+		bool SF() const { return _RFLAGS & FlagWrapper<u64, 7>::mask; }
+		bool TF() const { return _RFLAGS & FlagWrapper<u64, 8>::mask; }
+		bool IF() const { return _RFLAGS & FlagWrapper<u64, 9>::mask; }
+		bool DF() const { return _RFLAGS & FlagWrapper<u64, 10>::mask; }
+		bool OF() const { return _RFLAGS & FlagWrapper<u64, 11>::mask; }
+		u64 IOPL() const { return (_RFLAGS & BitfieldWrapper<u64, 12, 2>::mask) >> 12; }
+		bool NT() const { return _RFLAGS & FlagWrapper<u64, 14>::mask; }
+
+		bool RF() const { return _RFLAGS & FlagWrapper<u64, 16>::mask; }
+		bool VM() const { return _RFLAGS & FlagWrapper<u64, 17>::mask; }
+		bool AC() const { return _RFLAGS & FlagWrapper<u64, 18>::mask; }
+		bool VIF() const { return _RFLAGS & FlagWrapper<u64, 19>::mask; }
+		bool VIP() const { return _RFLAGS & FlagWrapper<u64, 20>::mask; }
+		bool ID() const { return _RFLAGS & FlagWrapper<u64, 21>::mask; }
 
 		// File System Flag - denotes if the client is allowed to perform potentially-dangerous file system syscalls (open, delete, mkdir, etc.)
-		_FLAG_ACCESSOR(FSF, _RFLAGS, 32)
+		FlagWrapper<u64, 32> FSF() { return {_RFLAGS}; }
+		bool                 FSF() const { return _RFLAGS & FlagWrapper<u64, 32>::mask; }
+
 		// One-Tick-REP Flag - denotes if REP instructions are performed in a single tick (more efficient, but could result in expensive ticks)
-		_FLAG_ACCESSOR(OTRF, _RFLAGS, 33)
+		FlagWrapper<u64, 33> OTRF() { return {_RFLAGS}; }
+		bool                 OTRF() const { return _RFLAGS & FlagWrapper<u64, 33>::mask; }
 
-		inline constexpr bool cc_b() const noexcept { return CF(); }
-		inline constexpr bool cc_be() const noexcept { return CF() || ZF(); }
-		inline constexpr bool cc_a() const noexcept { return !CF() && !ZF(); }
-		inline constexpr bool cc_ae() const noexcept { return !CF(); }
+		bool cc_b() const { return CF(); }
+		bool cc_be() const { return CF() || ZF(); }
+		bool cc_a() const { return !CF() && !ZF(); }
+		bool cc_ae() const { return !CF(); }
 
-		inline constexpr bool cc_l() const noexcept { return SF() != OF(); }
-		inline constexpr bool cc_le() const noexcept { return ZF() || SF() != OF(); }
-		inline constexpr bool cc_g() const noexcept { return !ZF() && SF() == OF(); }
-		inline constexpr bool cc_ge() const noexcept { return SF() == OF(); }
+		bool cc_l() const { return SF() != OF(); }
+		bool cc_le() const { return ZF() || SF() != OF(); }
+		bool cc_g() const { return !ZF() && SF() == OF(); }
+		bool cc_ge() const { return SF() == OF(); }
 
 		// source : http://www.website.masmforum.com/tutorials/fptute/fpuchap1.htm
 
-		_FLAG_ACCESSOR(FPU_IM, FPU_control, 0)
-		_FLAG_ACCESSOR(FPU_DM, FPU_control, 1)
-		_FLAG_ACCESSOR(FPU_ZM, FPU_control, 2)
-		_FLAG_ACCESSOR(FPU_OM, FPU_control, 3)
-		_FLAG_ACCESSOR(FPU_UM, FPU_control, 4)
-		_FLAG_ACCESSOR(FPU_PM, FPU_control, 5)
-		_FLAG_ACCESSOR(FPU_IEM, FPU_control, 7)
-		_BITFIELD_ACCESSOR(FPU_PC, FPU_control, 8, 2)
-		_BITFIELD_ACCESSOR(FPU_RC, FPU_control, 10, 2)
-		_FLAG_ACCESSOR(FPU_IC, FPU_control, 12)
+		FlagWrapper<u16, 0> FPU_IM() { return {FPU_control}; }
+		FlagWrapper<u16, 1> FPU_DM() { return {FPU_control}; }
+		FlagWrapper<u16, 2> FPU_ZM() { return {FPU_control}; }
+		FlagWrapper<u16, 3> FPU_OM() { return {FPU_control}; }
+		FlagWrapper<u16, 4> FPU_UM() { return {FPU_control}; }
+		FlagWrapper<u16, 5> FPU_PM() { return {FPU_control}; }
+		FlagWrapper<u16, 7> FPU_IEM() { return {FPU_control}; }
+		BitfieldWrapper<u16, 8, 2> FPU_PC() { return {FPU_control}; }
+		BitfieldWrapper<u16, 10, 2> FPU_RC() { return {FPU_control}; }
+		FlagWrapper<u16, 12> FPU_IC() { return {FPU_control}; }
 
-		_FLAG_ACCESSOR(FPU_I, FPU_status, 0)
-		_FLAG_ACCESSOR(FPU_D, FPU_status, 1)
-		_FLAG_ACCESSOR(FPU_Z, FPU_status, 2)
-		_FLAG_ACCESSOR(FPU_O, FPU_status, 3)
-		_FLAG_ACCESSOR(FPU_U, FPU_status, 4)
-		_FLAG_ACCESSOR(FPU_P, FPU_status, 5)
-		_FLAG_ACCESSOR(FPU_SF, FPU_status, 6)
-		_FLAG_ACCESSOR(FPU_IR, FPU_status, 7)
-		_FLAG_ACCESSOR(FPU_C0, FPU_status, 8)
-		_FLAG_ACCESSOR(FPU_C1, FPU_status, 9)
-		_FLAG_ACCESSOR(FPU_C2, FPU_status, 10)
-		_BITFIELD_ACCESSOR(FPU_TOP, FPU_control, 11, 3)
-		_FLAG_ACCESSOR(FPU_C3, FPU_status, 14)
-		_FLAG_ACCESSOR(FPU_B, FPU_status, 15)
+		FlagWrapper<u16, 0> FPU_I() { return {FPU_status}; }
+		FlagWrapper<u16, 1> FPU_D() { return {FPU_status}; }
+		FlagWrapper<u16, 2> FPU_Z() { return {FPU_status}; }
+		FlagWrapper<u16, 3> FPU_O() { return {FPU_status}; }
+		FlagWrapper<u16, 4> FPU_U() { return {FPU_status}; }
+		FlagWrapper<u16, 5> FPU_P() { return {FPU_status}; }
+		FlagWrapper<u16, 6> FPU_SF() { return {FPU_status}; }
+		FlagWrapper<u16, 7> FPU_IR() { return {FPU_status}; }
+		FlagWrapper<u16, 8> FPU_C0() { return {FPU_status}; }
+		FlagWrapper<u16, 9> FPU_C1() { return {FPU_status}; }
+		FlagWrapper<u16, 10> FPU_C2() { return {FPU_status}; }
+		BitfieldWrapper<u16, 11, 3> FPU_TOP() { return {FPU_control}; }
+		FlagWrapper<u16, 14> FPU_C3() { return {FPU_status}; }
+		FlagWrapper<u16, 15> FPU_B() { return {FPU_status}; }
 
-		inline constexpr const_ST_Wrapper ST(u64 num) const { return {*this, (u32)((FPU_TOP() + num) & 7)}; }
-		inline constexpr ST_Wrapper /* */ ST(u64 num) /* */ { return {*this, (u32)((FPU_TOP() + num) & 7)}; }
+		bool FPU_IM() const { return FPU_control & FlagWrapper<u16, 0>::mask; }
+		bool FPU_DM() const { return FPU_control & FlagWrapper<u16, 1>::mask; }
+		bool FPU_ZM() const { return FPU_control & FlagWrapper<u16, 2>::mask; }
+		bool FPU_OM() const { return FPU_control & FlagWrapper<u16, 3>::mask; }
+		bool FPU_UM() const { return FPU_control & FlagWrapper<u16, 4>::mask; }
+		bool FPU_PM() const { return FPU_control & FlagWrapper<u16, 5>::mask; }
+		bool FPU_IEM() const { return FPU_control & FlagWrapper<u16, 7>::mask; }
+		u16 FPU_PC() const { return (FPU_control & BitfieldWrapper<u16, 8, 2>::mask) >> 8; }
+		u16 FPU_RC() const { return (FPU_control & BitfieldWrapper<u16, 10, 2>::mask) >> 10; }
+		bool FPU_IC() const { return FPU_control & FlagWrapper<u16, 12>::mask; }
 
-		inline constexpr /* */ ZMMRegister &ZMM(u64 num) /* */ { return ZMMRegisters[num]; }
-		inline constexpr const ZMMRegister &ZMM(u64 num) const { return ZMMRegisters[num]; }
+		bool FPU_I() const { return FPU_status & FlagWrapper<u16, 0>::mask; }
+		bool FPU_D() const { return FPU_status & FlagWrapper<u16, 1>::mask; }
+		bool FPU_Z() const { return FPU_status & FlagWrapper<u16, 2>::mask; }
+		bool FPU_O() const { return FPU_status & FlagWrapper<u16, 3>::mask; }
+		bool FPU_U() const { return FPU_status & FlagWrapper<u16, 4>::mask; }
+		bool FPU_P() const { return FPU_status & FlagWrapper<u16, 5>::mask; }
+		bool FPU_SF() const { return FPU_status & FlagWrapper<u16, 6>::mask; }
+		bool FPU_IR() const { return FPU_status & FlagWrapper<u16, 7>::mask; }
+		bool FPU_C0() const { return FPU_status & FlagWrapper<u16, 8>::mask; }
+		bool FPU_C1() const { return FPU_status & FlagWrapper<u16, 9>::mask; }
+		bool FPU_C2() const { return FPU_status & FlagWrapper<u16, 10>::mask; }
+		u16 FPU_TOP() const { return (FPU_control & BitfieldWrapper<u16, 11, 3>::mask) >> 11; }
+		bool FPU_C3() const { return FPU_status & FlagWrapper<u16, 14>::mask; }
+		bool FPU_B() const { return FPU_status & FlagWrapper<u16, 15>::mask; }
 
-		_REG_ACCESSOR(MXCSR, _MXCSR)
+		ST_Wrapper       ST(u64 num) { return {*this, (u32)((FPU_TOP() + num) & 7)}; }
+		const_ST_Wrapper ST(u64 num) const { return {*this, (u32)((FPU_TOP() + num) & 7)}; }
+		
+		ZMMRegister       &ZMM(u64 num) { return ZMMRegisters[num]; }
+		const ZMMRegister &ZMM(u64 num) const { return ZMMRegisters[num]; }
 
-		_FLAG_ACCESSOR(MXCSR_IE, _MXCSR, 0)
-		_FLAG_ACCESSOR(MXCSR_DE, _MXCSR, 1)
-		_FLAG_ACCESSOR(MXCSR_ZE, _MXCSR, 2)
-		_FLAG_ACCESSOR(MXCSR_OE, _MXCSR, 3)
-		_FLAG_ACCESSOR(MXCSR_UE, _MXCSR, 4)
-		_FLAG_ACCESSOR(MXCSR_PE, _MXCSR, 5)
-		_FLAG_ACCESSOR(MXCSR_DAZ, _MXCSR, 6)
-		_FLAG_ACCESSOR(MXCSR_IM, _MXCSR, 7)
-		_FLAG_ACCESSOR(MXCSR_DM, _MXCSR, 8)
-		_FLAG_ACCESSOR(MXCSR_ZM, _MXCSR, 9)
-		_FLAG_ACCESSOR(MXCSR_OM, _MXCSR, 10)
-		_FLAG_ACCESSOR(MXCSR_UM, _MXCSR, 11)
-		_FLAG_ACCESSOR(MXCSR_PM, _MXCSR, 12)
-		_BITFIELD_ACCESSOR(MXCSR_RC, _MXCSR, 13, 2)
-		_FLAG_ACCESSOR(MXCSR_FTZ, _MXCSR, 15)
+		u32 &MXCSR() { return _MXCSR; }
+		u32  MXCSR() const { return _MXCSR; }
+
+		FlagWrapper<u32, 0> MXCSR_IE() { return {_MXCSR}; }
+		FlagWrapper<u32, 1> MXCSR_DE() { return {_MXCSR}; }
+		FlagWrapper<u32, 2> MXCSR_ZE() { return {_MXCSR}; }
+		FlagWrapper<u32, 3> MXCSR_OE() { return {_MXCSR}; }
+		FlagWrapper<u32, 4> MXCSR_UE() { return {_MXCSR}; }
+		FlagWrapper<u32, 5> MXCSR_PE() { return {_MXCSR}; }
+		FlagWrapper<u32, 6> MXCSR_DAZ() { return {_MXCSR}; }
+		FlagWrapper<u32, 7> MXCSR_IM() { return {_MXCSR}; }
+		FlagWrapper<u32, 8> MXCSR_DM() { return {_MXCSR}; }
+		FlagWrapper<u32, 9> MXCSR_ZM() { return {_MXCSR}; }
+		FlagWrapper<u32, 10> MXCSR_OM() { return {_MXCSR}; }
+		FlagWrapper<u32, 11> MXCSR_UM() { return {_MXCSR}; }
+		FlagWrapper<u32, 12> MXCSR_PM() { return {_MXCSR}; }
+		BitfieldWrapper<u32, 13, 2> MXCSR_RC() { return {_MXCSR}; }
+		FlagWrapper<u32, 15> MXCSR_FTZ() { return {_MXCSR}; }
+
+		bool MXCSR_IE() const { return _MXCSR & FlagWrapper<u32, 0>::mask; }
+		bool MXCSR_DE() const { return _MXCSR & FlagWrapper<u32, 1>::mask; }
+		bool MXCSR_ZE() const { return _MXCSR & FlagWrapper<u32, 2>::mask; }
+		bool MXCSR_OE() const { return _MXCSR & FlagWrapper<u32, 3>::mask; }
+		bool MXCSR_UE() const { return _MXCSR & FlagWrapper<u32, 4>::mask; }
+		bool MXCSR_PE() const { return _MXCSR & FlagWrapper<u32, 5>::mask; }
+		bool MXCSR_DAZ() const { return _MXCSR & FlagWrapper<u32, 6>::mask; }
+		bool MXCSR_IM() const { return _MXCSR & FlagWrapper<u32, 7>::mask; }
+		bool MXCSR_DM() const { return _MXCSR & FlagWrapper<u32, 8>::mask; }
+		bool MXCSR_ZM() const { return _MXCSR & FlagWrapper<u32, 9>::mask; }
+		bool MXCSR_OM() const { return _MXCSR & FlagWrapper<u32, 10>::mask; }
+		bool MXCSR_UM() const { return _MXCSR & FlagWrapper<u32, 11>::mask; }
+		bool MXCSR_PM() const { return _MXCSR & FlagWrapper<u32, 12>::mask; }
+		u32 MXCSR_RC() const { return (_MXCSR & BitfieldWrapper<u32, 13, 2>::mask) >> 13; }
+		bool MXCSR_FTZ() const { return _MXCSR & FlagWrapper<u32, 15>::mask; }
 
 	private: // -- exe tables -- //
 
