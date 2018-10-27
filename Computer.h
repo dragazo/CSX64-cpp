@@ -83,7 +83,7 @@ namespace CSX64
 			const u32 index; // physical index of ST register
 
 			friend class Computer;
-			inline constexpr ST_Wrapper_common(const Computer &_c, u32 _index) noexcept : c(_c), index(_index) {}
+			inline ST_Wrapper_common(const Computer &_c, u32 _index) noexcept : c(_c), index(_index) {}
 
 		public:
 
@@ -107,12 +107,12 @@ namespace CSX64
 			// ---------------------------------------- //
 
 			// gets the tag for this ST register
-			inline constexpr u16 Tag() const { return (c.FPU_tag >> (index * 2)) & 3; }
+			inline u16 Tag() const { return (c.FPU_tag >> (index * 2)) & 3; }
 
-			inline constexpr bool Normal() const { return Tag() == tag_normal; }
-			inline constexpr bool Zero() const { return Tag() == tag_zero; }
-			inline constexpr bool Special() const { return Tag() == tag_special; }
-			inline constexpr bool Empty() const { return Tag() == tag_empty; }
+			inline bool Normal() const { return Tag() == tag_normal; }
+			inline bool Zero() const { return Tag() == tag_zero; }
+			inline bool Special() const { return Tag() == tag_special; }
+			inline bool Empty() const { return Tag() == tag_empty; }
 
 			// ---------------------------------------- //
 
@@ -135,7 +135,7 @@ namespace CSX64
 			// we'll therefore construct from a non-const (converted to const) and use const_cast to appease the compiler.
 
 			friend class Computer;
-			inline constexpr ST_Wrapper(Computer &_c, u32 _index) noexcept : ST_Wrapper_common(_c, _index) {}
+			inline ST_Wrapper(Computer &_c, u32 _index) noexcept : ST_Wrapper_common(_c, _index) {}
 
 		public:
 
@@ -167,7 +167,7 @@ namespace CSX64
 			inline ST_Wrapper operator/=(long double val) { *this = *this / val; return *this; }
 
 			// marks the ST register as empty
-			inline constexpr void Free() noexcept { const_cast<Computer&>(c).FPU_tag |= 3 << (index * 2); }
+			inline void Free() noexcept { const_cast<Computer&>(c).FPU_tag |= 3 << (index * 2); }
 		};
 		struct const_ST_Wrapper : ST_Wrapper_common
 		{
@@ -176,12 +176,12 @@ namespace CSX64
 			// ST_Wrapper_common is the impl for const_ST_Wrapper - the distinction only exists so that we don't require virtual destructors.
 
 			friend class Computer;
-			inline constexpr const_ST_Wrapper(const Computer &_c, u32 _index) noexcept : ST_Wrapper_common(_c, _index) {}
+			inline const_ST_Wrapper(const Computer &_c, u32 _index) noexcept : ST_Wrapper_common(_c, _index) {}
 
 		public:
 
 			// creates a const wrapper from a non-const wrapper
-			inline constexpr const_ST_Wrapper(ST_Wrapper wrap) noexcept : ST_Wrapper_common(wrap.c, wrap.index) {}
+			inline const_ST_Wrapper(ST_Wrapper wrap) noexcept : ST_Wrapper_common(wrap.c, wrap.index) {}
 		};
 
 	private: // -- data -- //
@@ -218,21 +218,21 @@ namespace CSX64
 	public: // -- data access -- //
 
 		// Gets the maximum amount of memory the client can request
-		inline constexpr u64 MaxMemory() const noexcept { return max_mem_size; }
+		u64 MaxMemory() const noexcept { return max_mem_size; }
 		// Sets the maximum amount of memory the client can request in the future. Does not impact the current memory array.
-		inline constexpr void MaxMemory(u64 max) noexcept { max_mem_size = max; }
+		void MaxMemory(u64 max) noexcept { max_mem_size = max; }
 
 		// Gets the amount of memory (in bytes) the computer currently has access to
-		inline constexpr u64 MemorySize() const noexcept { return mem_size; }
+		u64 MemorySize() const noexcept { return mem_size; }
 
 		// Flag marking if the program is still executing (still true even in halted state)
-		inline constexpr bool Running() const noexcept { return running; }
+		bool Running() const noexcept { return running; }
 		// Gets if the processor is awaiting data from an interactive stream
-		inline constexpr bool SuspendedRead() const noexcept { return suspended_read; }
+		bool SuspendedRead() const noexcept { return suspended_read; }
 		// Gets the current error code
-		inline constexpr ErrorCode Error() const noexcept { return error; }
+		ErrorCode Error() const noexcept { return error; }
 		// The return value from the program after errorless termination
-		inline constexpr int ReturnValue() const noexcept { return return_value; }
+		int ReturnValue() const noexcept { return return_value; }
 
 	public: // -- ctor/dtor -- //
 
