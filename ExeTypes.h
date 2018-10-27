@@ -10,6 +10,7 @@
 #include <memory>
 #include <cstring>
 #include <string>
+#include <vector>
 
 #include "CoreTypes.h"
 
@@ -350,6 +351,8 @@ namespace CSX64
 	};
     inline IFileWrapper::~IFileWrapper() {}
 
+	// a file wrapper that holds a std::fstream object, optionally managing its lifetime internally.
+	// all read/write/seek requests are made diretly to the file.
 	class BasicFileWrapper : public IFileWrapper
 	{
 	private: // -- data -- //
@@ -414,6 +417,146 @@ namespace CSX64
 			f->seekg((std::streamoff)off, dir); // fstream uses a single pointer for get/put
 			return (i64)f->tellg();
 		}
+	};
+
+	// a file wrapper that holds any istream object, optionally managing its lifetime internally.
+	// this wrapper can read, but cannot write or seek. the istream is used to simulate terminal input.
+	// when a read request is made, an internal buffer is examined.
+	// if empty, it performs a (potentially-blocking) read for a line of input to refill said buffer (terminated by \n).
+	// afterwards, a non-blocking read is performed on the current contents of the buffer.
+	class TerminalInputFileWrapper : public IFileWrapper
+	{
+	private: // -- data -- //
+
+		std::istream *f;
+		bool _managed;
+		bool _interactive;
+
+		std::vector<unsigned char> b;         // the input buffer
+		std::size_t                b_pos = 0; // position on the read head in b (to avoid lots of expensive moves)
+
+	public: // -- ctor / dtor / asgn -- //
+
+		// constructs a new TerminalInputFileWrapper from the given stream (which cannot be null).
+		// if <managed> is true, the stream is closed and deleted when this object is destroyed.
+		// throws std::invalid_argument if <file> is null.
+		TerminalInputFileWrapper(std::istream *file, bool managed, bool interactive)
+			: f(file), _managed(managed), _interactive(interactive)
+		{
+			// the file must not be null
+			if (file == nullptr) throw std::invalid_argument("file cannot be null");
+		}
+
+		virtual ~TerminalInputFileWrapper()
+		{
+			// if we're managing the file, delete it
+			if (_managed) delete f;
+		}
+
+		TerminalInputFileWrapper(const TerminalInputFileWrapper&) = delete;
+		TerminalInputFileWrapper(TerminalInputFileWrapper&&) = delete;
+
+		TerminalInputFileWrapper &operator=(const TerminalInputFileWrapper&) = delete;
+		TerminalInputFileWrapper &operator=(TerminalInputFileWrapper&&) = delete;
+
+	public: // -- interface -- //
+
+		virtual bool IsInteractive() const override { return _interactive; }
+
+		virtual bool CanRead() const override { return true; }
+		virtual bool CanWrite() const override { return false; }
+
+		virtual bool CanSeek() const override { return false; }
+
+		virtual i64 Read(void *buf, i64 cap) override
+		{
+			// if the buffer is empty, refill it
+			if (b_pos >= b.size())
+			{
+				// reset the buffer
+				b.clear();
+				b_pos = 0;
+
+				// while we can read a character
+				for (int ch; (ch = f->get()) != EOF; )
+				{
+					// add it to the buffer
+					b.push_back((unsigned char)ch);
+
+					// if it was a new line, stop
+					if (ch == '\n') break;
+				}
+			}
+
+			// get amount to read
+			std::size_t len = std::min(b.size() - b_pos, (std::size_t)cap);
+
+			// perform the read
+			std::memcpy(buf, b.data() + b_pos, len);
+
+			// update read position
+			b_pos += len;
+
+			// return number of bytes read
+			return (i64)len;
+		}
+		virtual i64 Write(void *buf, i64 len) override { throw FileWrapperPermissionsException("FileWrapper not flagged for writing"); }
+
+		virtual i64 Seek(i64 off, std::ios::seekdir dir) override { throw FileWrapperPermissionsException("FileWrapper not flagged for seeking"); }
+	};
+
+	// a file wrapper that holds any ostream object, optionally managing its lifetime internally.
+	// this wrapper can write, but cannot read or seek.
+	// write requests are handed directly to the ostream.
+	class TerminalOutputFileWrapper : public IFileWrapper
+	{
+	private: // -- data -- //
+
+		std::ostream *f;
+		bool _managed;
+		bool _interactive;
+
+	public: // -- ctor / dtor / asgn -- //
+
+		// constructs a new TerminalOutputFileWrapper from the given stream (which cannot be null).
+		// if <managed> is true, the stream is closed and deleted when this object is destroyed.
+		// throws std::invalid_argument if <file> is null.
+		TerminalOutputFileWrapper(std::ostream *file, bool managed, bool interactive)
+			: f(file), _managed(managed), _interactive(interactive)
+		{
+			// the file must not be null
+			if (file == nullptr) throw std::invalid_argument("file cannot be null");
+		}
+
+		virtual ~TerminalOutputFileWrapper()
+		{
+			// if we're managing the file, delete it
+			if (_managed) delete f;
+		}
+
+		TerminalOutputFileWrapper(const TerminalOutputFileWrapper&) = delete;
+		TerminalOutputFileWrapper(TerminalOutputFileWrapper&&) = delete;
+
+		TerminalOutputFileWrapper &operator=(const TerminalOutputFileWrapper&) = delete;
+		TerminalOutputFileWrapper &operator=(TerminalOutputFileWrapper&&) = delete;
+
+	public: // -- interface -- //
+
+		virtual bool IsInteractive() const override { return _interactive; }
+
+		virtual bool CanRead() const override { return false; }
+		virtual bool CanWrite() const override { return true; }
+
+		virtual bool CanSeek() const override { return false; }
+
+		virtual i64 Read(void *buf, i64 cap) override { throw FileWrapperPermissionsException("FileWrapper not flagged for reading"); }
+		virtual i64 Write(void *buf, i64 len) override
+		{
+			f->write((char*)buf, (std::streamsize)len);
+			return len;
+		}
+
+		virtual i64 Seek(i64 off, std::ios::seekdir dir) override { throw FileWrapperPermissionsException("FileWrapper not flagged for seeking"); }
 	};
 }
 
