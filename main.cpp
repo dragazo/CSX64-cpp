@@ -384,9 +384,9 @@ int RunConsole(std::vector<u8> &exe, std::vector<std::string> &args, bool fsf, b
 	computer.OTRF() = true;
 
 	// tie standard streams - stdin is non-interactive because we don't control it
-	computer.GetFD(0) = std::make_unique<BasicFileWrapper>(static_cast<std::fstream*>(&std::cin), false, false, true, false, false);
-	computer.GetFD(1) = std::make_unique<BasicFileWrapper>(static_cast<std::fstream*>(&std::cout), false, false, false, true, false);
-	computer.GetFD(2) = std::make_unique<BasicFileWrapper>(static_cast<std::fstream*>(&std::cerr), false, false, false, true, false);
+	computer.GetFD(0) = std::make_unique<BasicFileWrapper>(dynamic_cast<std::fstream*>(&std::cin), false, false, true, false, false);
+	computer.GetFD(1) = std::make_unique<BasicFileWrapper>(dynamic_cast<std::fstream*>(&std::cout), false, false, false, true, false);
+	computer.GetFD(2) = std::make_unique<BasicFileWrapper>(dynamic_cast<std::fstream*>(&std::cerr), false, false, false, true, false);
 
 	// begin execution
 	hrc::time_point start, stop;
