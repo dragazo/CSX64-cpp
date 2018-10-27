@@ -321,7 +321,7 @@ namespace CSX64
 	// the interface used by CSX64 file descriptors to reference files.
 	struct IFileWrapper
 	{
-		virtual ~IFileWrapper() = 0 {}
+		virtual ~IFileWrapper() = 0;
 
 		// returns true iff this stream is interactive (see CSX64 documentation)
 		virtual bool IsInteractive() const = 0;
@@ -348,6 +348,7 @@ namespace CSX64
 		// throws FileWrapperPermissionsException if the file cannot seek.
 		virtual i64 Seek(i64 off, std::ios::seekdir dir) = 0;
 	};
+    inline IFileWrapper::~IFileWrapper() {}
 
 	class BasicFileWrapper : public IFileWrapper
 	{
