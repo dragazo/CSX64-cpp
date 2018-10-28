@@ -473,7 +473,7 @@ int main(int argc, const char *argv[])
 		if (accepting_options)
 		{
 			// do the long names first
-			if (strcmp(argv[i], "--help") == 0) { std::system("\"https://github.com/dragazo/CSX64/blob/master/CSX64 Specification.pdf\""); return 0; }
+			/**/ if (strcmp(argv[i], "--help") == 0) { std::cout << HelpMessage; return 0; }
 			else if (strcmp(argv[i], "--assemble") == 0) { if (action != ProgramAction::ExecuteConsole) { std::cout << "usage error - see -h for help\n"; return 0; } action = ProgramAction::Assemble; }
 			else if (strcmp(argv[i], "--link") == 0) { if (action != ProgramAction::ExecuteConsole) { std::cout << "usage error - see -h for help\n"; return 0; } action = ProgramAction::Link; }
 			else if (strcmp(argv[i], "--output") == 0) { if (output != nullptr || i + 1 >= argc) { std::cout << "usage error - see -h for help\n"; return 0; } output = argv[++i]; }
@@ -482,6 +482,7 @@ int main(int argc, const char *argv[])
 			else if (strcmp(argv[i], "--end") == 0) { accepting_options = false; }
 			else if (strcmp(argv[i], "--fs") == 0) { fsf = true; }
 			else if (strcmp(argv[i], "--time") == 0) { time = true; }
+			else if (strcmp(argv[i], "--") == 0) { /* no-op separator */ }
 			// then the short names
 			else if (argv[i][0] == '-')
 			{
@@ -489,7 +490,6 @@ int main(int argc, const char *argv[])
 				{
 					switch (*arg)
 					{
-					case '-': break; // acts as a separator for short options and enables -- as a no-op arg spacer
 					case 'h': std::cout << HelpMessage; return 0;
 					case 'a': if (action != ProgramAction::ExecuteConsole) { std::cout << "usage error - see -h for help\n"; return 0; } action = ProgramAction::Assemble; break;
 					case 'l': if (action != ProgramAction::ExecuteConsole) { std::cout << "usage error - see -h for help\n"; return 0; } action = ProgramAction::Link; break;
