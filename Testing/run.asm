@@ -17,6 +17,7 @@ dump:
     stos byte ptr [4024]
     lods eax
     ret
+    mov rax, [rsp*5]
 
 ; compares 32-bit integers passed by address
 cmp_int:

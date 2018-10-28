@@ -95,7 +95,8 @@ namespace CSX64
 		bool TryParseFPURegister(const std::string &token, u64 &reg);
 		bool TryParseVPURegister(const std::string &token, u64 &reg, u64 &sizecode);
 
-		bool TryParseAddressReg(const std::string &label, Expr &hole, bool &present, u64 &m);
+		// computes the multiplier (not mult code) for <label> in <hole> and stores it in <mult>
+		bool TryGetRegMult(const std::string &label, Expr &hole, u64 &mult);
 		bool TryParseAddress(std::string token, u64 &a, u64 &b, Expr &ptr_base, u64 &sizecode, bool &explicit_size);
 
 		bool VerifyLegalExpression(Expr &expr);

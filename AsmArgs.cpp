@@ -696,9 +696,9 @@ bool AssembleArgs::TryParseVPURegister(const std::string &token, u64 &reg, u64 &
 	}
 }
 
-bool AssembleArgs::TryParseAddressReg(const std::string &label, Expr &hole, bool &present, u64 &m)
+bool AssembleArgs::TryGetRegMult(const std::string &label, Expr &hole, u64 &mult)
 {
-	m = 0; present = false; // initialize out params
+	mult = 0; // mult starts at zero (for logic below)
 
 	std::vector<Expr*> path;
 	std::vector<Expr*> list;
@@ -844,25 +844,8 @@ bool AssembleArgs::TryParseAddressReg(const std::string &label, Expr &hole, bool
 		// remove the register section from the expression (replace with integral 0)
 		list[1]->IntResult(0);
 
-		m += val; // add extracted mult to total mult
+		mult += val; // add extracted mult to total mult
 		list.clear(); // clear list for next pass
-	}
-
-	// -- final task: get mult code and negative flag -- //
-
-	// only other thing is transforming the multiplier into a mult code
-	switch (m)
-	{
-		// 0 is not present
-	case 0: m = 0; present = false; break;
-
-		// if present, only 1, 2, 4, and 8 are allowed
-	case 1: m = 0; present = true; break;
-	case 2: m = 1; present = true; break;
-	case 4: m = 2; present = true; break;
-	case 8: m = 3; present = true; break;
-
-	default: res = {AssembleError::ArgError, "line " + tostr(line) + ": Register multipliers may only be 1, 2, 4, or 8. Got: " + tostr((i64)m) + "*" + label}; return false;
 	}
 
 	// register successfully parsed
@@ -899,7 +882,7 @@ bool AssembleArgs::TryParseAddress(std::string token, u64 &a, u64 &b, Expr &ptr_
 	u64 m1 = 0, r1 = 666, r2 = 666, sz; // final register info - 666 denotes no value - m1 must default to 0 - sz defaults to 64-bit in the case that there's only an imm ptr_base
 	bool explicit_sz; // denotes that the ptr_base sizecode is explicit
 
-					  // extract the address internals
+	// extract the address internals
 	token = token.substr(1, token.size() - 2);
 
 	// turn into an expression
@@ -909,12 +892,11 @@ bool AssembleArgs::TryParseAddress(std::string token, u64 &a, u64 &b, Expr &ptr_
 	for (const auto &entry : CPURegisterInfo)
 	{
 		// extract the register data
-		bool present;
 		u64 mult;
-		if (!TryParseAddressReg(entry.first, ptr_base, present, mult)) { res = {AssembleError::FormatError, "line " + tostr(line) + ": Failed to extract register data\n-> " + res.ErrorMsg}; return false; }
+		if (!TryGetRegMult(entry.first, ptr_base, mult)) { res = {AssembleError::FormatError, "line " + tostr(line) + ": Failed to extract register data\n-> " + res.ErrorMsg}; return false; }
 
 		// if the register is present we need to do something with it
-		if (present)
+		if (mult != 0)
 		{
 			// if we have an explicit address component size to enforce
 			if (explicit_sz)
@@ -924,22 +906,39 @@ bool AssembleArgs::TryParseAddress(std::string token, u64 &a, u64 &b, Expr &ptr_
 			}
 			// otherwise record this as the size to enforce
 			else { sz = std::get<1>(entry.second); explicit_sz = true; }
+		}
 
-			// if the multiplier is non-trivial (non-1) it has to go in r1
-			if (mult != 0)
-			{
-				// if r1 already has a value, this is an error
-				if (r1 != 666) { res = {AssembleError::FormatError, "line " + tostr(line) + ": Only one register may have a (non-1) pre-multiplier"}; return false; }
+		// if the multiplier is trivial or has a trivial component
+		if (mult & 1)
+		{
+			mult &= ~(u64)1; // remove the trivial component
 
-				r1 = std::get<0>(entry.second);
-				m1 = mult;
-			}
-			// otherwise multiplier is trivial, try to put it in r2 first
-			else if (r2 == 666) r2 = std::get<0>(entry.second);
-			// if that falied, try r1
+			// if r2 is empty, put it there
+			if (r2 == 666) r2 = std::get<0>(entry.second);
+			// then try r1
 			else if (r1 == 666) r1 = std::get<0>(entry.second);
-			// if nothing worked, both are full
+			// otherwise we ran out of registers to use
 			else { res = {AssembleError::FormatError, "line " + tostr(line) + ": An address expression may use up to 2 registers"}; return false; }
+		}
+
+		// if a non-trivial multiplier is present
+		if (mult != 0)
+		{
+			// decode the mult code into m1
+			switch (mult)
+			{
+			// (mult 1 is trivial and thus handled above)
+			case 2: m1 = 1; break;
+			case 4: m1 = 2; break;
+			case 8: m1 = 3; break;
+
+			default: res = {AssembleError::UsageError, "line " + tostr(line) + ": Register multiplier must be 1, 2, 4, or 8. Got " + tostr((i64)mult) + "*" + entry.first}; return false;
+			}
+
+			// if r1 is empty, put it there
+			if (r1 == 666) r1 = std::get<0>(entry.second);
+			// otherwise we don't have anywhere to put it
+			else { res = {AssembleError::FormatError, "line " + tostr(line) + ": An address expression may only use one non-trivial multiplier"}; return false; }
 		}
 	}
 
