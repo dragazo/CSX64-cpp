@@ -288,13 +288,6 @@ namespace CSX64
 			}
 		}
 
-		// Closes all the managed file descriptors and severs ties to unmanaged ones.
-		void CloseFiles()
-		{
-			// close all files
-			for (auto &fd : FileDescriptors) fd = nullptr;
-		}
-
 		/// <summary>
 		/// Initializes the computer for execution
 		/// </summary>
@@ -341,12 +334,28 @@ namespace CSX64
 		// Unsets the suspended read state
 		void ResumeSuspendedRead() { if (running) suspended_read = false; }
 
+		// links the provided file to the first available file descriptor.
+		// returns the file descriptor that was used. if none were available, does not link the file and returns -1.
+		int OpenFileWrapper(std::unique_ptr<IFileWrapper> f)
+		{
+			int fd = FindAvailableFD();
+			if (fd >= 0) FileDescriptors[fd] = std::move(f);
+			return fd;
+		}
+		// links the provided file descriptor to the file (no bounds checking - see FDCount).
+		// if the file descriptor is already in use, it is first closed.
+		void OpenFileWrapper(int fd, std::unique_ptr<IFileWrapper> f) { FileDescriptors[fd] = std::move(f); }
+
+		// closes the file wrapper with specified file descriptor (no bounds checking).
+		void CloseFileWrapper(int fd) { FileDescriptors[fd] = nullptr; }
+		// Closes all the managed file descriptors and severs ties to unmanaged ones.
+		void CloseFiles() { for (auto &fd : FileDescriptors) fd = nullptr; }
+
 		// gets the wrapper object for the specified file descriptor. (no bounds checking - see FDCount)
 		// this value is null iff the specified file descriptor is not in use.
-		// this can be reassigned at will, which automatically cleans up its resources.
-		std::unique_ptr<IFileWrapper> &GetFD(int index) { return FileDescriptors[index]; }
-		// returns the lowest-index available file descriptor.
-		// if there are no available file descriptors, returns -1.
+		IFileWrapper *GetFileWrapper(int fd) { return FileDescriptors[fd].get(); }
+
+		// returns the lowest-index available file descriptor. if there are no available file descriptors, returns -1.
 		int FindAvailableFD()
 		{
 			for (int i = 0; i < FDCount; ++i)
