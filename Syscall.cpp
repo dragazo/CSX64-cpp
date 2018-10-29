@@ -59,6 +59,9 @@ namespace CSX64
 		IFileWrapper *const fd = FileDescriptors[fd_index].get();
 		if (fd == nullptr) { Terminate(ErrorCode::FDNotInUse); return false; }
 
+		// make sure we can write
+		if (!fd->CanWrite()) { Terminate(ErrorCode::FilePermissions); return false; }
+
 		// make sure we're in bounds
 		if (RCX() >= mem_size || RDX() >= mem_size || RCX() + RDX() > mem_size) { Terminate(ErrorCode::OutOfBounds); return false; }
 
