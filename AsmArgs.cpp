@@ -696,9 +696,9 @@ bool AssembleArgs::TryParseVPURegister(const std::string &token, u64 &reg, u64 &
 	}
 }
 
-bool AssembleArgs::TryGetRegMult(const std::string &label, Expr &hole, u64 &mult)
+bool AssembleArgs::TryGetRegMult(const std::string &label, Expr &hole, u64 &mult_res)
 {
-	mult = 0; // mult starts at zero (for logic below)
+	mult_res = 0; // mult starts at zero (for logic below)
 
 	std::vector<Expr*> path;
 	std::vector<Expr*> list;
@@ -844,7 +844,7 @@ bool AssembleArgs::TryGetRegMult(const std::string &label, Expr &hole, u64 &mult
 		// remove the register section from the expression (replace with integral 0)
 		list[1]->IntResult(0);
 
-		mult += val; // add extracted mult to total mult
+		mult_res += val; // add extracted mult to total mult
 		list.clear(); // clear list for next pass
 	}
 
