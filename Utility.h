@@ -61,10 +61,6 @@ namespace CSX64
 	// reads a binary representation of the string from the stream
 	std::istream &BinRead(std::istream &istr, std::string &str);
 
-	// -- misc stream stuff -- //
-
-	u64 smart_readsome(std::istream &istr, char *buf, u64 max);
-
 	// -- math utilities -- //
 
 	// stores the 2's complement negative of high:low into high:low
