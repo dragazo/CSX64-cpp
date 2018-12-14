@@ -185,14 +185,15 @@ namespace CSX64
 		// allocate enough space for a void*, padding, and the array
 		size += sizeof(void*) + align - 1;
 
-		// grab that much space
+		// grab that much space - if that fails, return null
 		void *raw = std::malloc(size);
+		if (!raw) return nullptr;
 
 		// get the pointer to return (before alignment)
 		void *ret = (char*)raw + sizeof(void*);
 
 		// align the return pointer
-		ret = (void*)Align((u64)ret, align);
+		ret = (char*)ret + (-(std::intptr_t)ret & (align - 1));
 
 		// store the raw pointer before start of ret array
 		*(void**)((char*)ret - sizeof(void*)) = raw;
