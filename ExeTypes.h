@@ -56,8 +56,9 @@ namespace CSX64
 		set, cur, end
 	};
 
-	// acts as a reference to T, but gets/sets the value from a location of type U
-	// meant for use with integral types
+	// acts as a reference to T, but gets/sets the value from a location of type U.
+	// this is performed by casting the T value to U before the store, thus modifying the high order bits.
+	// meant for use with integral types.
 	template<typename T, typename U>
 	struct ReferenceRouter
 	{
@@ -87,6 +88,7 @@ namespace CSX64
 		inline constexpr ReferenceRouter operator<<=(int val) noexcept { *this = *this << val; return *this; }
 		inline constexpr ReferenceRouter operator>>=(int val) noexcept { *this = *this >> val; return *this; }
 	};
+
 	// acts as a reference to a bitfield in an integer of type "T"
 	template<typename T, int pos, int len>
 	struct BitfieldWrapper

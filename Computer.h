@@ -645,13 +645,13 @@ namespace CSX64
 
 	public: // -- register access -- //
 
-		u64 &RFLAGS() { return _RFLAGS; }
-		u32 &EFLAGS() { return *(u32*)&_RFLAGS; }
-		u16 &FLAGS() { return *(u16*)&_RFLAGS; }
+		u64                        &RFLAGS() { return _RFLAGS; }
+		BitfieldWrapper<u64, 0, 32> EFLAGS() { return {_RFLAGS}; }
+		BitfieldWrapper<u64, 0, 16> FLAGS() { return {_RFLAGS}; }
 		
 		u64 RFLAGS() const { return _RFLAGS; }
-		u32 EFLAGS() const { return *(u32*)&_RFLAGS; }
-		u16 FLAGS() const { return *(u16*)&_RFLAGS; }
+		u32 EFLAGS() const { return (u32)_RFLAGS; }
+		u16 FLAGS() const { return (u16)_RFLAGS; }
 
 		u64                      &RIP() { return _RIP; }
 		ReferenceRouter<u32, u64> EIP() { return {_RIP}; }
@@ -3141,7 +3141,7 @@ namespace CSX64
 				if (!__ProcessSTRING_SCAS(sizecode)) return false;
 				break;
 
-			case 10: // REPE CMPS
+			case 10: // REPE SCAS
 
 				// if we can do the whole thing in a single tick
 				if (OTRF())
@@ -3162,7 +3162,7 @@ namespace CSX64
 				}
 				break;
 
-			case 11: // REPNE CMPS
+			case 11: // REPNE SCAS
 
 				// if we can do the whole thing in a single tick
 				if (OTRF())
