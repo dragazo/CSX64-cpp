@@ -41,7 +41,7 @@ namespace CSX64
 		BinRead(istr, len);
 		// allocate space and read the string
 		str.resize(len);
-		istr.read((char*)str.data(), len);
+		istr.read(str.data(), len);
 		// make sure we got the whole thing
 		if (istr.gcount() != len) istr.setstate(std::ios::failbit);
 
@@ -190,13 +190,13 @@ namespace CSX64
 		if (!raw) return nullptr;
 
 		// get the pointer to return (before alignment)
-		void *ret = (char*)raw + sizeof(void*);
+		void *ret = reinterpret_cast<char*>(raw) + sizeof(void*);
 
 		// align the return pointer
-		ret = (char*)ret + (-(std::intptr_t)ret & (align - 1));
+		ret = reinterpret_cast<char*>(ret) + (-(std::intptr_t)ret & (align - 1));
 
 		// store the raw pointer before start of ret array
-		*(void**)((char*)ret - sizeof(void*)) = raw;
+		reinterpret_cast<void**>(ret)[-1] = raw; // aliasing is safe because only we (should) ever modify it
 
 		// return ret pointer
 		return ret;
@@ -204,7 +204,7 @@ namespace CSX64
 	void aligned_free(void *ptr)
 	{
 		// free the raw pointer (freeing nullptr does nothing)
-		if (ptr) std::free(*(void**)((char*)ptr - sizeof(void*)));
+		if (ptr) std::free(reinterpret_cast<void**>(ptr)[-1]); // aliasing is safe because only we (should) ever modify it
 	}
 
 	bool Write(std::vector<u8> &arr, u64 pos, u64 size, u64 val)
@@ -445,7 +445,7 @@ namespace CSX64
 			// start of new row gets a line header
 			if ((start + i) % 16 == 0) dump << '\n' << std::hex << std::setw(8) << (start + i) << " - ";
 			
-			dump << std::hex << std::setw(2) << (int)((u8*)data)[start + i] << ' ';
+			dump << std::hex << std::setw(2) << (int)reinterpret_cast<const unsigned char*>(data)[start + i] << ' '; // aliasing is safe because u8 is unsigned char type
 		}
 
 		// end with a new line

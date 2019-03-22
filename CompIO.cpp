@@ -47,7 +47,7 @@ namespace CSX64
 			if (i < 10) ostr << ' ';
 
 			ostr << std::hex;
-			for (int j = 7; j >= 0; --j) ostr << std::setw(16) << ZMMRegisters[i].uint64(j) << ' ';
+			for (int j = 7; j >= 0; --j) ostr << std::setw(16) << ZMMRegisters[i].get<u64>(j) << ' ';
 			ostr << '\n';
 		}
 

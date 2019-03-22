@@ -6,6 +6,7 @@
 #include <limits>
 #include <cstdlib>
 #include <string>
+#include <cstring>
 #include <sstream>
 #include <iomanip>
 #include <vector>
@@ -27,15 +28,19 @@ namespace CSX64
 	inline bool IsLittleEndian()
 	{
 		static constexpr u64 val = 0x0102030405060708;
-		return *(u8*)&val == 8;
+		return *reinterpret_cast<const unsigned char*>(&val) == 8; // aliasing is ok because casting to char tyoe
 	}
 
 	// returns true iff the current system uses bit-zero to represent floating zero for f32 and f64
 	inline bool IsBitZeroFP()
 	{
-		static constexpr f64 _64 = 0;
-		static constexpr f32 _32 = 0;
-		return *(u64*)&_64 == 0 && *(u32*)&_32 == 0;
+		static constexpr f64 _f_64 = 0;
+		static constexpr u64 _i_64 = 0;
+
+		static constexpr f32 _f_32 = 0;
+		static constexpr u32 _i_32 = 0;
+
+		return std::memcmp(&_f_64, &_i_64, sizeof(u64)) == 0 && std::memcmp(&_f_32, &_i_32, sizeof(u32)) == 0;
 	}
 
 	// -- serialization -- //
@@ -44,14 +49,14 @@ namespace CSX64
 	template<typename T>
 	std::ostream &BinWrite(std::ostream &ostr, const T &val)
 	{
-		ostr.write((char*)&val, sizeof(T));
+		ostr.write(reinterpret_cast<const char*>(&val), sizeof(T)); // aliasing is ok because casting to char type
 		return ostr;
 	}
 	// reads the value's binary representation verbatim
 	template<typename T>
 	std::istream &BinRead(std::istream &istr, T &val)
 	{
-		istr.read((char*)&val, sizeof(T));
+		istr.read(reinterpret_cast<char*>(&val), sizeof(T)); // aliasing is ok because casting to char type
 		if (istr.gcount() != sizeof(T)) istr.setstate(std::ios::failbit);
 		return istr;
 	}
@@ -418,23 +423,51 @@ namespace CSX64
 	/// Interprets a double as its raw bits
 	/// </summary>
 	/// <param name="val">value to interpret</param>
-	inline constexpr u64 DoubleAsUInt64(double val) { return *(u64*)&val; }
+	inline u64 DoubleAsUInt64(double val)
+	{
+		static_assert(sizeof(u64) == sizeof(double), "punning width mismatch");
+
+		u64 dest;
+		std::memcpy(&dest, &val, sizeof(u64));
+		return dest;
+	}
 	/// <summary>
 	/// Interprets raw bits as a double
 	/// </summary>
 	/// <param name="val">value to interpret</param>
-	inline constexpr double AsDouble(u64 val) { return *(double*)&val; }
+	inline double AsDouble(u64 val)
+	{
+		static_assert(sizeof(double) == sizeof(u64), "punning width mismatch");
+
+		double dest;
+		std::memcpy(&dest, &val, sizeof(u64));
+		return dest;
+	}
 
 	/// <summary>
 	/// Interprets a float as its raw bits (placed in low 32 bits)
 	/// </summary>
 	/// <param name="val">the float to interpret</param>
-	inline constexpr u64 FloatAsUInt64(float val) { return *(std::uint32_t*)&val; }
+	inline u64 FloatAsUInt64(float val)
+	{
+		static_assert(sizeof(u32) == sizeof(float), "punning width mismatch");
+
+		u32 dest;
+		std::memcpy(&dest, &val, sizeof(u32));
+		return dest;
+	}
 	/// <summary>
 	/// Interprets raw bits as a float (low 32 bits)
 	/// </summary>
 	/// <param name="val">the bits to interpret</param>
-	inline constexpr float AsFloat(u32 val) { return *(float*)&val; }
+	inline float AsFloat(u32 val)
+	{
+		static_assert(sizeof(float) == sizeof(u32), "punning width mismatch");
+
+		float dest;
+		std::memcpy(&dest, &val, sizeof(u32));
+		return dest;
+	}
 
 	void ExtractDouble(double val, double &exp, double &sig);
 	double AssembleDouble(double exp, double sig);
@@ -443,7 +476,7 @@ namespace CSX64
 	/// Returns true if the floating-point value is denormalized (including +-0)
 	/// </summary>
 	/// <param name="val">the value to test</param>
-	inline constexpr bool IsDenorm(double val) { return (DoubleAsUInt64(val) & 0x7ff0000000000000ul) == 0; }
+	inline bool IsDenorm(double val) { return (DoubleAsUInt64(val) & 0x7ff0000000000000ul) == 0; }
 }
 
 #endif

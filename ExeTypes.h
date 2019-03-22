@@ -13,6 +13,7 @@
 #include <vector>
 
 #include "CoreTypes.h"
+#include "punning.h"
 
 namespace CSX64
 {
@@ -136,32 +137,63 @@ namespace CSX64
 		inline constexpr FlagWrapper operator=(FlagWrapper wrapper) noexcept { data = (data & ~mask) | (wrapper.data & mask); return *this; }
 	};
 
+	// represents a value held as a void* that is accessed as T& via bin_cpy<T>().
+	// this is used to avoid strict aliasing violations on entire words where flag/bitfield wrappers are insufficient.
+	template<typename T>
+	struct bin_cpy_wrapper
+	{
+		void *loc;
+
+		operator T() const noexcept { return bin_cpy<T>(loc); }
+		bin_cpy_wrapper operator=(T val) noexcept { bin_cpy<T>(loc, std::addressof(loc)); return *this; }
+		bin_cpy_wrapper operator=(bin_cpy_wrapper other) { bin_cpy<T>(loc, other.loc); return *this; }
+
+		bin_cpy_wrapper operator++() noexcept { *this = *this + 1; return *this; }
+		bin_cpy_wrapper operator--() noexcept { *this = *this - 1; return *this; }
+
+		T operator++(int) noexcept { T val = *this; ++*this; return val; }
+		T operator--(int) noexcept { T val = *this; --*this; return val; }
+
+		bin_cpy_wrapper operator+=(T val) noexcept { *this = *this + val; return *this; }
+		bin_cpy_wrapper operator-=(T val) noexcept { *this = *this - val; return *this; }
+		bin_cpy_wrapper operator*=(T val) noexcept { *this = *this * val; return *this; }
+
+		bin_cpy_wrapper operator/=(T val) noexcept { *this = *this / val; return *this; }
+		bin_cpy_wrapper operator%=(T val) noexcept { *this = *this % val; return *this; }
+
+		bin_cpy_wrapper operator&=(T val) noexcept { *this = *this & val; return *this; }
+		bin_cpy_wrapper operator|=(T val) noexcept { *this = *this | val; return *this; }
+		bin_cpy_wrapper operator^=(T val) noexcept { *this = *this ^ val; return *this; }
+
+		bin_cpy_wrapper operator<<=(int val) noexcept { *this = *this << val; return *this; }
+		bin_cpy_wrapper operator>>=(int val) noexcept { *this = *this >> val; return *this; }
+	};
+
 	struct CPURegister_sizecode_wrapper;
 	// Represents a 64-bit register
 	struct CPURegister
 	{
-	private:
-		u64 data;
+	private: // -- data -- //
 
-	public:
-		inline constexpr u64 &x64() noexcept { return data; }
-		inline constexpr u64 x64() const noexcept { return data; }
+		u64 data; // the raw data block used to represent all partitions of the 64-bit general-purpose register
 
-		inline constexpr ReferenceRouter<u32, u64> x32() noexcept { return {data}; }
-		inline constexpr u32 x32() const noexcept { return *(u32*)&data; }
+	public: // -- partition access -- //
 
-		inline constexpr u16 &x16() noexcept { return *(u16*)&data; }
-		inline constexpr u16 x16() const noexcept { return *(u16*)&data; }
+		constexpr u64 &x64() noexcept { return data; }
+		constexpr ReferenceRouter<u32, u64> x32() noexcept { return {data}; }
+		constexpr BitfieldWrapper<u64, 0, 16> x16() noexcept { return {data}; }
+		constexpr BitfieldWrapper<u64, 0, 8> x8() noexcept { return {data}; }
+		constexpr BitfieldWrapper<u64, 8, 8> x8h() noexcept { return {data}; }
 
-		inline constexpr u8 &x8() noexcept { return *(u8*)&data; }
-		inline constexpr u8 x8() const noexcept { return *(u8*)&data; }
-
-		inline constexpr u8 &x8h() noexcept { return *((u8*)&data + 1); }
-		inline constexpr u8 x8h() const noexcept { return *((u8*)&data + 1); }
+		constexpr u64 x64() const noexcept { return data; }
+		constexpr u32 x32() const noexcept { return (u32)data; }
+		constexpr u16 x16() const noexcept { return (u16)data; }
+		constexpr u8 x8() const noexcept { return (u8)data; }
+		constexpr u8 x8h() const noexcept { return (u8)(data >> 8); }
 
 		// Gets/sets the register partition with the specified size code
-		inline CPURegister_sizecode_wrapper operator[](u64 sizecode);
-		inline u64 operator[](u64 sizecode) const
+		CPURegister_sizecode_wrapper operator[](u64 sizecode);
+		u64 operator[](u64 sizecode) const
 		{
 			switch (sizecode)
 			{
@@ -179,7 +211,7 @@ namespace CSX64
 		CPURegister &reg;
 		u8 sizecode;
 
-		inline constexpr operator u64() const
+		constexpr operator u64() const
 		{
 			switch (sizecode)
 			{
@@ -191,7 +223,7 @@ namespace CSX64
 			default: throw std::invalid_argument("sizecode must be on range [0,3]");
 			}
 		}
-		inline constexpr CPURegister_sizecode_wrapper &operator=(u64 value)
+		constexpr CPURegister_sizecode_wrapper &operator=(u64 value)
 		{
 			switch (sizecode)
 			{
@@ -203,72 +235,41 @@ namespace CSX64
 			default: throw std::invalid_argument("sizecode must be on range [0,3]");
 			}
 		}
-		inline constexpr CPURegister_sizecode_wrapper &operator=(CPURegister_sizecode_wrapper other) { *this = (u64)other; return *this; }
+		constexpr CPURegister_sizecode_wrapper &operator=(CPURegister_sizecode_wrapper other) { *this = (u64)other; return *this; }
 	};
-	CPURegister_sizecode_wrapper CPURegister::operator[](u64 sizecode) { return {*this, (u8)sizecode}; }
+	inline CPURegister_sizecode_wrapper CPURegister::operator[](u64 sizecode) { return {*this, (u8)sizecode}; }
 
 	struct ZMMRegister_sizecode_wrapper;
 	// Represents a 512-bit register used by vpu instructions
 	struct alignas(64) ZMMRegister
 	{
 	private:
-		u64 data[8]; // reserves the needed space and ensures 8-byte alignment
+		
+		alignas(64) unsigned char data[64]; // the raw data block used to represent the entire 64-byte vector register
 
-	public:
-
-		// -- fill utilities -- //
+	public: // -- fill utilities -- //
 
 		// fills the register with zeros
-		inline void clear() { data[0] = data[1] = data[2] = data[3] = data[4] = data[5] = data[6] = data[7] = 0; }
+		void clear() { std::memset(data, 0, sizeof(data)); }
 
-		// -- index access utilities -- //
+	public: // -- partition access -- //
 
-		inline u64 &uint64(u64 index) /**/ { return ((u64*)data)[index]; }
-		inline u64 uint64(u64 index) const { return ((u64*)data)[index]; }
+		// gets the value of type T at the specified index (index offsets based on T)
+		template<typename T> bin_cpy_wrapper<T> get(u64 index) noexcept { return {data + index * sizeof(T)}; }
+		template<typename T> T get(u64 index) const noexcept { return bin_cpy<T>(data + index * sizeof(T)); }
 
-		inline u32 &uint32(u64 index) /**/ { return ((u32*)data)[index]; }
-		inline u32 uint32(u64 index) const { return ((u32*)data)[index]; }
-
-		inline u16 &uint16(u64 index) /**/ { return ((u16*)data)[index]; }
-		inline u16 uint16(u64 index) const { return ((u16*)data)[index]; }
-
-		inline u8 &uint8(u64 index) /**/ { return ((u8*)data)[index]; }
-		inline u8 uint8(u64 index) const { return ((u8*)data)[index]; }
-
-		// ---------------------------- //
-
-		inline i64 &int64(u64 index) /**/ { return ((i64*)data)[index]; }
-		inline i64 int64(u64 index) const { return ((i64*)data)[index]; }
-
-		inline i32 &int32(u64 index) /**/ { return ((i32*)data)[index]; }
-		inline i32 int32(u64 index) const { return ((i32*)data)[index]; }
-
-		inline i16 &int16(u64 index) /**/ { return ((i16*)data)[index]; }
-		inline i16 int16(u64 index) const { return ((i16*)data)[index]; }
-
-		inline i8 &int8(u64 index) /**/ { return ((i8*)data)[index]; }
-		inline i8 int8(u64 index) const { return ((i8*)data)[index]; }
-
-		// ---------------------------- /
-
-		inline double &fp64(u64 index) /**/ { return ((double*)data)[index]; }
-		inline double fp64(u64 index) const { return ((double*)data)[index]; }
-
-		inline float &fp32(u64 index) /**/ { return ((float*)data)[index]; }
-		inline float fp32(u64 index) const { return ((float*)data)[index]; }
-
-		// -- sizecode access utilities -- //
+	public: // -- sizecode access utilities -- //
 
 		// gets/sets the value with specified sizecode and index
-		inline ZMMRegister_sizecode_wrapper uint(u64 sizecode, u64 index);
-		inline u64 uint(u64 sizecode, u64 index) const
+		ZMMRegister_sizecode_wrapper uint(u64 sizecode, u64 index);
+		u64 uint(u64 sizecode, u64 index) const
 		{
 			switch (sizecode)
 			{
-			case 0: return uint8(index);
-			case 1: return uint16(index);
-			case 2: return uint32(index);
-			case 3: return uint64(index);
+			case 0: return get<u8>(index);
+			case 1: return get<u16>(index);
+			case 2: return get<u32>(index);
+			case 3: return get<u64>(index);
 
 			default: throw std::invalid_argument("sizecode must be on range [0,3]");
 			}
@@ -280,33 +281,33 @@ namespace CSX64
 		u8 index;
 		u8 sizecode;
 
-		inline constexpr operator u64() const
+		constexpr operator u64() const
 		{
 			switch (sizecode)
 			{
-			case 0: return reg.uint8(index);
-			case 1: return reg.uint16(index);
-			case 2: return reg.uint32(index);
-			case 3: return reg.uint64(index);
+			case 0: return reg.get<u8>(index);
+			case 1: return reg.get<u16>(index);
+			case 2: return reg.get<u32>(index);
+			case 3: return reg.get<u64>(index);
 
 			default: throw std::invalid_argument("sizecode must be on range [0,3]");
 			}
 		}
-		inline constexpr ZMMRegister_sizecode_wrapper &operator=(u64 value)
+		constexpr ZMMRegister_sizecode_wrapper &operator=(u64 value)
 		{
 			switch (sizecode)
 			{
-			case 0: reg.uint8(index) = (u8)value; return *this;
-			case 1: reg.uint16(index) = (u16)value; return *this;
-			case 2: reg.uint32(index) = (u32)value; return *this;
-			case 3: reg.uint64(index) = (u64)value; return *this;
+			case 0: reg.get<u8>(index) = (u8)value; return *this;
+			case 1: reg.get<u16>(index) = (u16)value; return *this;
+			case 2: reg.get<u32>(index) = (u32)value; return *this;
+			case 3: reg.get<u64>(index) = (u64)value; return *this;
 
 			default: throw std::invalid_argument("sizecode must be on range [0,3]");
 			}
 		}
-		inline constexpr ZMMRegister_sizecode_wrapper &operator=(ZMMRegister_sizecode_wrapper other) { *this = (u64)other; return *this; }
+		constexpr ZMMRegister_sizecode_wrapper &operator=(ZMMRegister_sizecode_wrapper other) { *this = (u64)other; return *this; }
 	};
-	ZMMRegister_sizecode_wrapper ZMMRegister::uint(u64 sizecode, u64 index) { return {*this, (u8)index, (u8)sizecode}; }
+	inline ZMMRegister_sizecode_wrapper ZMMRegister::uint(u64 sizecode, u64 index) { return {*this, (u8)index, (u8)sizecode}; }
 
 	// -------- //
 
@@ -344,7 +345,7 @@ namespace CSX64
 		// writes <len> bytes from buf.
 		// returns the number of bytes written (may be less than <len> due to an io error).
 		// throws FileWrapperPermissionsException if the file cannot write.
-		virtual i64 Write(void *buf, i64 len) = 0;
+		virtual i64 Write(const void *buf, i64 len) = 0;
 
 		// sets the current position in the file based on an offset <off> and an origin <dir>.
 		// returns the resulting position (offset from beginning).
@@ -404,12 +405,12 @@ namespace CSX64
 		virtual i64 Read(void *buf, i64 cap) override
 		{
 			if (!CanRead()) throw FileWrapperPermissionsException("FileWrapper not flagged for reading");
-			return (i64)f->read((char*)buf, (std::streamsize)cap).gcount();
+			return (i64)f->read(reinterpret_cast<char*>(buf), (std::streamsize)cap).gcount(); // aliasing ok because casting to char type
 		}
-		virtual i64 Write(void *buf, i64 len) override
+		virtual i64 Write(const void *buf, i64 len) override
 		{
 			if (!CanWrite()) throw FileWrapperPermissionsException("FileWrapper not flagged for writing");
-			f->write((char*)buf, (std::streamsize)len);
+			f->write(reinterpret_cast<const char*>(buf), (std::streamsize)len); // aliasing ok because casting to char type
 			return len;
 		}
 
@@ -502,7 +503,7 @@ namespace CSX64
 			// return number of bytes read
 			return (i64)len;
 		}
-		virtual i64 Write(void *buf, i64 len) override { throw FileWrapperPermissionsException("FileWrapper not flagged for writing"); }
+		virtual i64 Write(const void *buf, i64 len) override { throw FileWrapperPermissionsException("FileWrapper not flagged for writing"); }
 
 		virtual i64 Seek(i64 off, std::ios::seekdir dir) override { throw FileWrapperPermissionsException("FileWrapper not flagged for seeking"); }
 	};
@@ -552,9 +553,9 @@ namespace CSX64
 		virtual bool CanSeek() const override { return false; }
 
 		virtual i64 Read(void *buf, i64 cap) override { throw FileWrapperPermissionsException("FileWrapper not flagged for reading"); }
-		virtual i64 Write(void *buf, i64 len) override
+		virtual i64 Write(const void *buf, i64 len) override
 		{
-			f->write((char*)buf, (std::streamsize)len);
+			f->write(reinterpret_cast<const char*>(buf), (std::streamsize)len); // alias ok because casting to char type
 			return len;
 		}
 

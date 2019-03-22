@@ -33,7 +33,7 @@ namespace CSX64
 		// read from the file
 		try
 		{
-			i64 n = fd->Read((char*)mem + RCX(), (i64)RDX());
+			i64 n = fd->Read(reinterpret_cast<char*>(mem) + RCX(), (i64)RDX()); // aliasing is ok because casting to char type
 
 			// if we got nothing but the wrapper is interactive
 			if (n == 0 && fd->IsInteractive())
@@ -66,7 +66,7 @@ namespace CSX64
 		if (RCX() >= mem_size || RDX() >= mem_size || RCX() + RDX() > mem_size) { Terminate(ErrorCode::OutOfBounds); return false; }
 
 		// attempt to write from memory to the file - success = num written, fail = -1
-		try { RAX() = (u64)fd->Write((char*)mem + RCX(), (i64)RDX()) ? RDX() : ~(u64)0; }
+		try { RAX() = (u64)fd->Write(reinterpret_cast<char*>(mem) + RCX(), (i64)RDX()) ? RDX() : ~(u64)0; } // aliasing is ok because casting to char type
 		catch (...) { RAX() = ~(u64)0; }
 
 		return true;

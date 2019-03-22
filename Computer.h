@@ -304,6 +304,8 @@ namespace CSX64
 		/// <param name="count">The maximum number of operations to perform</param>
 		u64 Tick(u64 count);
 
+		int last_ins;
+
 		// Causes the machine to end execution with an error code and release various system resources (e.g. file handles).
 		void Terminate(ErrorCode err = ErrorCode::None)
 		{
@@ -313,6 +315,9 @@ namespace CSX64
 				// set error and stop execution
 				error = err;
 				running = false;
+
+				std::cout << "\n\nTerminating RIP:" << RIP() << '\n';
+				std::cout << "Last INS: " << last_ins << '\n';
 
 				CloseFiles(); // close all the file descriptors
 			}
@@ -326,6 +331,8 @@ namespace CSX64
 				// set return value and stop execution
 				return_value = ret;
 				running = false;
+
+				std::cout << "Exiting RIP:" << RIP() << '\n';
 
 				CloseFiles(); // close all the file descriptors
 			}
@@ -398,7 +405,7 @@ namespace CSX64
 			str.clear();
 
 			// read the string
-			const char *ptr = (const char*)mem + pos;
+			const char *ptr = reinterpret_cast<const char*>(mem) + pos; // aliasing is ok because casting to char type
 			for (; ; ++pos, ++ptr)
 			{
 				// ensure we're in bounds
@@ -422,9 +429,9 @@ namespace CSX64
 			if (pos < ReadonlyBarrier) { Terminate(ErrorCode::AccessViolation); return false; }
 
 			// write the string
-			std::memcpy((char*)mem + pos, str.data(), str.size());
+			std::memcpy(reinterpret_cast<char*>(mem) + pos, str.data(), str.size()); // aliasing ok because casting to char type
 			// write a null terminator
-			((char*)mem + pos)[str.size()] = 0;
+			(reinterpret_cast<char*>(mem) + pos)[str.size()] = 0; // aliasing ok because casting to char type
 
 			return true;
 		}
@@ -434,7 +441,9 @@ namespace CSX64
 		bool GetMem(u64 pos, T &val)
 		{
 			if (pos >= mem_size || pos + sizeof(T) > mem_size) { Terminate(ErrorCode::OutOfBounds); return false; }
-			val = *(T*)((char*)mem + pos);
+
+			bin_cpy<T>(std::addressof(val), reinterpret_cast<const char*>(mem) + pos); // aliasing ok because casting to char type
+
 			return true;
 		}
 		// writes a POD type T to memory. returns true on success
@@ -443,7 +452,9 @@ namespace CSX64
 		{
 			if (pos >= mem_size || pos + sizeof(T) > mem_size) { Terminate(ErrorCode::OutOfBounds); return false; }
 			if (pos < ReadonlyBarrier) { Terminate(ErrorCode::AccessViolation); return false; }
-			*(T*)((char*)mem + pos) = val;
+
+			bin_cpy<T>(reinterpret_cast<char*>(mem) + pos, std::addressof(val)); // aliasing ok because casting to char type
+
 			return true;
 		}
 
@@ -507,10 +518,10 @@ namespace CSX64
 
 			switch (size)
 			{
-			case 1: res = *(u8*)((char*)mem + pos); return true;
-			case 2: res = *(u16*)((char*)mem + pos); return true;
-			case 4: res = *(u32*)((char*)mem + pos); return true;
-			case 8: res = *(u64*)((char*)mem + pos); return true;
+			case 1: res = bin_cpy<u8>(reinterpret_cast<const char*>(mem) + pos); return true; // aliasing ok because casting to char type
+			case 2: res = bin_cpy<u16>(reinterpret_cast<const char*>(mem) + pos); return true; // aliasing ok because casting to char type
+			case 4: res = bin_cpy<u32>(reinterpret_cast<const char*>(mem) + pos); return true; // aliasing ok because casting to char type
+			case 8: res = bin_cpy<u64>(reinterpret_cast<const char*>(mem) + pos); return true; // aliasing ok because casting to char type
 
 			default: throw std::runtime_error("GetMemRaw size was non-standard");
 			}
@@ -519,7 +530,11 @@ namespace CSX64
 		bool GetMemRaw(u64 pos, u64 &res)
 		{
 			if (pos >= mem_size || pos + sizeof(T) > mem_size) { Terminate(ErrorCode::OutOfBounds); return false; }
-			res = *(T*)((char*)mem + pos);
+			
+			// !! WEIRD !!
+			//bin_cpy<T>(&res, reinterpret_cast<const char*>(mem) + pos);
+			res = bin_cpy<T>(reinterpret_cast<const char*>(mem) + pos);
+
 			return true;
 		}
 
@@ -530,10 +545,10 @@ namespace CSX64
 
 			switch (sizecode)
 			{
-			case 0: res = *(u8*)((char*)mem + pos); return true;
-			case 1: res = *(u16*)((char*)mem + pos); return true;
-			case 2: res = *(u32*)((char*)mem + pos); return true;
-			case 3: res = *(u64*)((char*)mem + pos); return true;
+			case 0: res = bin_cpy<u8>(reinterpret_cast<const char*>(mem) + pos); return true; // aliasing ok because casting to char type
+			case 1: res = bin_cpy<u16>(reinterpret_cast<const char*>(mem) + pos); return true; // aliasing ok because casting to char type
+			case 2: res = bin_cpy<u32>(reinterpret_cast<const char*>(mem) + pos); return true; // aliasing ok because casting to char type
+			case 3: res = bin_cpy<u64>(reinterpret_cast<const char*>(mem) + pos); return true; // aliasing ok because casting to char type
 
 			default: throw std::runtime_error("GetMemRaw size was non-standard");
 			}
@@ -547,10 +562,10 @@ namespace CSX64
 
 			switch (size)
 			{
-			case 1: *(u8*)((char*)mem + pos) = (u8)val; return true;
-			case 2: *(u16*)((char*)mem + pos) = (u16)val; return true;
-			case 4: *(u32*)((char*)mem + pos) = (u32)val; return true;
-			case 8: *(u64*)((char*)mem + pos) = (u64)val; return true;
+			case 1: bin_write<u8>(reinterpret_cast<char*>(mem) + pos, (u8)val); return true; // aliasing ok because casting to char type
+			case 2: bin_write<u16>(reinterpret_cast<char*>(mem) + pos, (u16)val); return true; // aliasing ok because casting to char type
+			case 4: bin_write<u32>(reinterpret_cast<char*>(mem) + pos, (u32)val); return true; // aliasing ok because casting to char type
+			case 8: bin_write<u64>(reinterpret_cast<char*>(mem) + pos, (u64)val); return true; // aliasing ok because casting to char type
 
 			default: throw std::runtime_error("GetMemRaw size was non-standard");
 			}
@@ -560,7 +575,9 @@ namespace CSX64
 		{
 			if (pos >= mem_size || pos + sizeof(T) > mem_size) { Terminate(ErrorCode::OutOfBounds); return false; }
 			if (pos < ReadonlyBarrier) { Terminate(ErrorCode::AccessViolation); return false; }
-			*(T*)((char*)mem + pos) = (T)val;
+
+			bin_write<T>(reinterpret_cast<char*>(mem) + pos, (T)val); // aliasing ok because casting to char type
+
 			return true;
 		}
 
@@ -572,10 +589,10 @@ namespace CSX64
 
 			switch (sizecode)
 			{
-			case 0: *(u8*)((char*)mem + pos) = (u8)val; return true;
-			case 1: *(u16*)((char*)mem + pos) = (u16)val; return true;
-			case 2: *(u32*)((char*)mem + pos) = (u32)val; return true;
-			case 3: *(u64*)((char*)mem + pos) = (u64)val; return true;
+			case 0: bin_write<u8>(reinterpret_cast<char*>(mem) + pos, (u8)val); return true; // aliasing ok because casting to char type
+			case 1: bin_write<u16>(reinterpret_cast<char*>(mem) + pos, (u16)val); return true; // aliasing ok because casting to char type
+			case 2: bin_write<u32>(reinterpret_cast<char*>(mem) + pos, (u32)val); return true; // aliasing ok because casting to char type
+			case 3: bin_write<u64>(reinterpret_cast<char*>(mem) + pos, (u64)val); return true; // aliasing ok because casting to char type
 
 			default: throw std::runtime_error("GetMemRaw size was non-standard");
 			}
@@ -608,7 +625,9 @@ namespace CSX64
 		bool GetByteAdv(u8 &res)
 		{
 			if (RIP() >= mem_size) { Terminate(ErrorCode::OutOfBounds); return false; }
-			res = *((u8*)mem + RIP()++);
+
+			bin_cpy<u8>(&res, reinterpret_cast<const char*>(mem) + RIP()++); // aliasing ok because casting to char type
+
 			return true;
 		}
 
@@ -678,61 +697,61 @@ namespace CSX64
 		u64 &R14() { return CPURegisters[14].x64(); }
 		u64 &R15() { return CPURegisters[15].x64(); }
 
-		ReferenceRouter<u32, u64> EAX() { return {CPURegisters[0].x32()}; }
-		ReferenceRouter<u32, u64> EBX() { return {CPURegisters[1].x32()}; }
-		ReferenceRouter<u32, u64> ECX() { return {CPURegisters[2].x32()}; }
-		ReferenceRouter<u32, u64> EDX() { return {CPURegisters[3].x32()}; }
-		ReferenceRouter<u32, u64> ESI() { return {CPURegisters[4].x32()}; }
-		ReferenceRouter<u32, u64> EDI() { return {CPURegisters[5].x32()}; }
-		ReferenceRouter<u32, u64> EBP() { return {CPURegisters[6].x32()}; }
-		ReferenceRouter<u32, u64> ESP() { return {CPURegisters[7].x32()}; }
-		ReferenceRouter<u32, u64> R8D() { return {CPURegisters[8].x32()}; }
-		ReferenceRouter<u32, u64> R9D() { return {CPURegisters[9].x32()}; }
-		ReferenceRouter<u32, u64> R10D() { return {CPURegisters[10].x32()}; }
-		ReferenceRouter<u32, u64> R11D() { return {CPURegisters[11].x32()}; }
-		ReferenceRouter<u32, u64> R12D() { return {CPURegisters[12].x32()}; }
-		ReferenceRouter<u32, u64> R13D() { return {CPURegisters[13].x32()}; }
-		ReferenceRouter<u32, u64> R14D() { return {CPURegisters[14].x32()}; }
-		ReferenceRouter<u32, u64> R15D() { return {CPURegisters[15].x32()}; }
+		decltype(auto) EAX() { return CPURegisters[0].x32(); }
+		decltype(auto) EBX() { return CPURegisters[1].x32(); }
+		decltype(auto) ECX() { return CPURegisters[2].x32(); }
+		decltype(auto) EDX() { return CPURegisters[3].x32(); }
+		decltype(auto) ESI() { return CPURegisters[4].x32(); }
+		decltype(auto) EDI() { return CPURegisters[5].x32(); }
+		decltype(auto) EBP() { return CPURegisters[6].x32(); }
+		decltype(auto) ESP() { return CPURegisters[7].x32(); }
+		decltype(auto) R8D() { return CPURegisters[8].x32(); }
+		decltype(auto) R9D() { return CPURegisters[9].x32(); }
+		decltype(auto) R10D() { return CPURegisters[10].x32(); }
+		decltype(auto) R11D() { return CPURegisters[11].x32(); }
+		decltype(auto) R12D() { return CPURegisters[12].x32(); }
+		decltype(auto) R13D() { return CPURegisters[13].x32(); }
+		decltype(auto) R14D() { return CPURegisters[14].x32(); }
+		decltype(auto) R15D() { return CPURegisters[15].x32(); }
 
-		u16 &AX() { return CPURegisters[0].x16(); }
-		u16 &BX() { return CPURegisters[1].x16(); }
-		u16 &CX() { return CPURegisters[2].x16(); }
-		u16 &DX() { return CPURegisters[3].x16(); }
-		u16 &SI() { return CPURegisters[4].x16(); }
-		u16 &DI() { return CPURegisters[5].x16(); }
-		u16 &BP() { return CPURegisters[6].x16(); }
-		u16 &SP() { return CPURegisters[7].x16(); }
-		u16 &R8W() { return CPURegisters[8].x16(); }
-		u16 &R9W() { return CPURegisters[9].x16(); }
-		u16 &R10W() { return CPURegisters[10].x16(); }
-		u16 &R11W() { return CPURegisters[11].x16(); }
-		u16 &R12W() { return CPURegisters[12].x16(); }
-		u16 &R13W() { return CPURegisters[13].x16(); }
-		u16 &R14W() { return CPURegisters[14].x16(); }
-		u16 &R15W() { return CPURegisters[15].x16(); }
+		decltype(auto) AX() { return CPURegisters[0].x16(); }
+		decltype(auto) BX() { return CPURegisters[1].x16(); }
+		decltype(auto) CX() { return CPURegisters[2].x16(); }
+		decltype(auto) DX() { return CPURegisters[3].x16(); }
+		decltype(auto) SI() { return CPURegisters[4].x16(); }
+		decltype(auto) DI() { return CPURegisters[5].x16(); }
+		decltype(auto) BP() { return CPURegisters[6].x16(); }
+		decltype(auto) SP() { return CPURegisters[7].x16(); }
+		decltype(auto) R8W() { return CPURegisters[8].x16(); }
+		decltype(auto) R9W() { return CPURegisters[9].x16(); }
+		decltype(auto) R10W() { return CPURegisters[10].x16(); }
+		decltype(auto) R11W() { return CPURegisters[11].x16(); }
+		decltype(auto) R12W() { return CPURegisters[12].x16(); }
+		decltype(auto) R13W() { return CPURegisters[13].x16(); }
+		decltype(auto) R14W() { return CPURegisters[14].x16(); }
+		decltype(auto) R15W() { return CPURegisters[15].x16(); }
 
-		u8 &AL() { return CPURegisters[0].x8(); }
-		u8 &BL() { return CPURegisters[1].x8(); }
-		u8 &CL() { return CPURegisters[2].x8(); }
-		u8 &DL() { return CPURegisters[3].x8(); }
-		u8 &SIL() { return CPURegisters[4].x8(); }
-		u8 &DIL() { return CPURegisters[5].x8(); }
-		u8 &BPL() { return CPURegisters[6].x8(); }
-		u8 &SPL() { return CPURegisters[7].x8(); }
-		u8 &R8B() { return CPURegisters[8].x8(); }
-		u8 &R9B() { return CPURegisters[9].x8(); }
-		u8 &R10B() { return CPURegisters[10].x8(); }
-		u8 &R11B() { return CPURegisters[11].x8(); }
-		u8 &R12B() { return CPURegisters[12].x8(); }
-		u8 &R13B() { return CPURegisters[13].x8(); }
-		u8 &R14B() { return CPURegisters[14].x8(); }
-		u8 &R15B() { return CPURegisters[15].x8(); }
+		decltype(auto) AL() { return CPURegisters[0].x8(); }
+		decltype(auto) BL() { return CPURegisters[1].x8(); }
+		decltype(auto) CL() { return CPURegisters[2].x8(); }
+		decltype(auto) DL() { return CPURegisters[3].x8(); }
+		decltype(auto) SIL() { return CPURegisters[4].x8(); }
+		decltype(auto) DIL() { return CPURegisters[5].x8(); }
+		decltype(auto) BPL() { return CPURegisters[6].x8(); }
+		decltype(auto) SPL() { return CPURegisters[7].x8(); }
+		decltype(auto) R8B() { return CPURegisters[8].x8(); }
+		decltype(auto) R9B() { return CPURegisters[9].x8(); }
+		decltype(auto) R10B() { return CPURegisters[10].x8(); }
+		decltype(auto) R11B() { return CPURegisters[11].x8(); }
+		decltype(auto) R12B() { return CPURegisters[12].x8(); }
+		decltype(auto) R13B() { return CPURegisters[13].x8(); }
+		decltype(auto) R14B() { return CPURegisters[14].x8(); }
+		decltype(auto) R15B() { return CPURegisters[15].x8(); }
 
-		u8 &AH() { return CPURegisters[0].x8h(); }
-		u8 &BH() { return CPURegisters[1].x8h(); }
-		u8 &CH() { return CPURegisters[2].x8h(); }
-		u8 &DH() { return CPURegisters[3].x8h(); }
+		decltype(auto) AH() { return CPURegisters[0].x8h(); }
+		decltype(auto) BH() { return CPURegisters[1].x8h(); }
+		decltype(auto) CH() { return CPURegisters[2].x8h(); }
+		decltype(auto) DH() { return CPURegisters[3].x8h(); }
 
 		u64 RAX() const { return CPURegisters[0].x64(); }
 		u64 RBX() const { return CPURegisters[1].x64(); }
@@ -1146,8 +1165,9 @@ namespace CSX64
 				if ((s1 & 2) != 0) CPURegisters[s1 >> 4].x8h() = (u8)res;
 				else CPURegisters[s1 >> 4][sizecode] = res;
 				return true;
+			}
 			// modes 3-4 - the fetch already validated mode was in the proper range
-			} else return SetMemRaw_szc(m, sizecode, res);
+			else return SetMemRaw_szc(m, sizecode, res);
 		}
 
 		/*

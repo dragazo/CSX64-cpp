@@ -166,7 +166,7 @@ int SaveBinaryFile(const std::string &path, const std::vector<u8> &exe)
 	if (!f) { std::cout << "Failed to open \"" << path << "\" for writing\n"; return FailOpen; }
 
 	// write the data
-	f.write((char*)exe.data(), exe.size());
+	f.write(reinterpret_cast<const char*>(exe.data()), exe.size()); // aliasing is ok because we're going between signed/unsigned variants
 
 	if (!f) { std::cout << "Failed to write to \"" << path << "\"\n"; return IOError; }
 	return 0;
@@ -185,7 +185,7 @@ int LoadBinaryFile(const std::string &path, std::vector<u8> &exe)
 	f.seekg(0);
 
 	// read the contents
-	f.read((char*)exe.data(), exe.size());
+	f.read(reinterpret_cast<char*>(exe.data()), exe.size()); // aliasing is ok because we're going between signed/unsigned variants
 	if (f.gcount() != exe.size()) { std::cout << "IO error while reading from " << path; return IOError; }
 
 	if (!f) { std::cout << "Failed to read from \"" << path << "\"\n"; return IOError; }

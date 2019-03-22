@@ -35,7 +35,7 @@ namespace CSX64
 		// copy over the text/rodata/data segments (not including header)
 		std::memcpy(mem, exe.data() + 32, exe.size() - 32);
 		// zero the bss segment
-		std::memset((char*)mem + (exe.size() - 32), 0, bss_seglen);
+		std::memset(reinterpret_cast<char*>(mem) + (exe.size() - 32), 0, bss_seglen);
 		// randomize the stack segment
 		//for (u64 i = exe.size() - 32 + bss_seglen; i < Memory.size(); ++i) Memory[i] = Rand();
 
@@ -52,7 +52,7 @@ namespace CSX64
 
 		// set up vpu registers
 		for (int i = 0; i < 32; ++i)
-			for (int j = 0; j < 8; ++j) ZMMRegisters[i].uint64(j) = Rand();
+			for (int j = 0; j < 8; ++j) ZMMRegisters[i].get<u64>(j) = Rand();
 		_MXCSR = 0x1f80;
 
 		// set execution state
@@ -127,6 +127,7 @@ namespace CSX64
 			#endif
 
 			//std::cout << op << '\n';
+			last_ins = (int)op;
 
 			// perform the instruction
 			(this->*opcode_handlers[op])();

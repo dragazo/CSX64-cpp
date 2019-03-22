@@ -76,13 +76,13 @@ namespace CSX64
 		// -- write segments -- //
 
 		BinWrite<u64>(writer, obj.Text.size());
-		writer.write((char*)obj.Text.data(), obj.Text.size());
+		writer.write(reinterpret_cast<const char*>(obj.Text.data()), obj.Text.size()); // aliasing is ok because they're un/signed variants
 
 		BinWrite<u64>(writer, obj.Rodata.size());
-		writer.write((char*)obj.Rodata.data(), obj.Rodata.size());
+		writer.write(reinterpret_cast<const char*>(obj.Rodata.data()), obj.Rodata.size()); // aliasing is ok because we're going between signed/unsigned variants
 
 		BinWrite<u64>(writer, obj.Data.size());
-		writer.write((char*)obj.Data.data(), obj.Data.size());
+		writer.write(reinterpret_cast<const char*>(obj.Data.data()), obj.Data.size()); // aliasing is ok because we're going between signed/unsigned variants
 		
 		BinWrite<u64>(writer, obj.BssLen);
 		
@@ -179,19 +179,19 @@ namespace CSX64
 		if (!BinRead(reader, temp64)) goto err;
 		obj.Text.clear();
 		obj.Text.resize(temp64);
-		reader.read((char*)obj.Text.data(), temp64);
+		reader.read(reinterpret_cast<char*>(obj.Text.data()), temp64); // aliasing is ok because we're going between signed/unsigned variants
 		if (reader.gcount() != temp64) goto err;
 
 		if (!BinRead(reader, temp64)) goto err;
 		obj.Rodata.clear();
 		obj.Rodata.resize(temp64);
-		reader.read((char*)obj.Rodata.data(), temp64);
+		reader.read(reinterpret_cast<char*>(obj.Rodata.data()), temp64); // aliasing is ok because we're going between signed/unsigned variants
 		if (reader.gcount() != temp64) goto err;
 
 		if (!BinRead(reader, temp64)) goto err;
 		obj.Data.clear();
 		obj.Data.resize(temp64);
-		reader.read((char*)obj.Data.data(), temp64);
+		reader.read(reinterpret_cast<char*>(obj.Data.data()), temp64); // aliasing is ok because we're going between signed/unsigned variants
 		if (reader.gcount() != temp64) goto err;
 
 		if (!BinRead(reader, temp64)) goto err;
