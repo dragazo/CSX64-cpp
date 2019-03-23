@@ -67,7 +67,7 @@ namespace CSX64
 
 		constexpr operator T() const noexcept { return (T)dest; }
 		constexpr ReferenceRouter operator=(T val) noexcept { dest = (U)val; return *this; }
-		constexpr ReferenceRouter operator=(ReferenceRouter wrapper) noexcept { dest = (T)wrapper; return *this; }
+		constexpr ReferenceRouter operator=(ReferenceRouter wrapper) noexcept { dest = (U)(T)wrapper; return *this; }
 
 		constexpr ReferenceRouter operator++() noexcept { *this = *this + 1; return *this; }
 		constexpr ReferenceRouter operator--() noexcept { *this = *this - 1; return *this; }

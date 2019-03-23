@@ -120,11 +120,11 @@ namespace CSX64
 				tmp_path = ostr.str();
 			}
 			// repeat while that already exists
-			while (std::ifstream(tmp_path));
+			while (std::ifstream {tmp_path});
 			
 			// update path and create it
 			path = std::move(tmp_path);
-			std::ofstream(path);
+			std::ofstream {path};
 		}
 		else if (raw_flags & (int)OpenFlags::create)
 		{
@@ -133,12 +133,12 @@ namespace CSX64
 			if (!fs::exists(path, err))
 			{
 				// create it
-				std::ofstream(path);
+				std::ofstream {path};
 			}
 		}
 
 		// open the file
-		std::unique_ptr<std::fstream> f = std::make_unique<std::fstream>();
+		auto f = std::make_unique<std::fstream>();
 		try { f->open(path, cpp_flags); }
 		catch (...) { RAX() = ~(u64)0; return true; }
 
@@ -202,7 +202,7 @@ namespace CSX64
 		// special request of 0 returns current break
 		if (RBX() == 0) RAX() = mem_size;
 		// if the request is too high or goes below init size, don't do it - return -1
-		else if (RBX() > max_mem_size || RBX() < min_mem_size) RAX() = ~(u64)0;
+		else if (RBX() > max_mem_size || RBX() < min_mem_size) { RAX() = ~(u64)0; }
 		// otherwise perform the reallocation
 		else RAX() = this->realloc(RBX(), true) ? 0 : ~(u64)0;
 

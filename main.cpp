@@ -8,9 +8,10 @@
 #include <cstdlib>
 #include <fstream>
 #include <vector>
-#include <experimental/filesystem>
 #include <utility>
 #include <sstream>
+#include <cassert>
+#include <experimental/filesystem>
 
 #include "CoreTypes.h"
 #include "Computer.h"
@@ -454,6 +455,57 @@ int main(int argc, const char *argv[])
 			"so none of it will work on this system!\n\n";
 		return -1;
 	}
+
+
+
+
+
+
+
+	u64 _val = 0xdeadbeefdeadbeef;
+	ReferenceRouter<u64, u64>{_val} = (u64)0;	
+	assert(_val == 0);
+
+	ReferenceRouter<u32, u64>{_val} = (u32)0;
+	assert(_val == 0);
+
+	_val = 0xdeadbeefdeadbeef;
+	ReferenceRouter<u16, u64>{_val} = (u16)0;	
+	assert(_val == 0);
+
+	_val = 0xdeadbeefdeadbeef;
+	ReferenceRouter<u8, u64>{_val} = (u8)0;	
+	assert(_val == 0);
+
+	_val = 0xdeadbeefdeadbeef;
+	BitfieldWrapper<u64, 0, 32>{_val} = (u64)0;
+	assert(_val == 0xdeadbeef00000000);
+
+	_val = 0xdeadbeefdeadbeef;
+	BitfieldWrapper<u64, 0, 16>{_val} = (u64)0;
+	assert(_val == 0xdeadbeefdead0000);
+
+	_val = 0xdeadbeefdeadbeef;
+	BitfieldWrapper<u64, 16, 16>{_val} = (u64)0;
+	assert(_val == 0xdeadbeef0000beef);
+
+	FlagWrapper<u64, 0>{_val} = true;
+	assert(_val == 0xdeadbeef0000beef);
+
+	FlagWrapper<u64, 0>{_val} = false;
+	assert(_val == 0xdeadbeef0000beee);
+
+	FlagWrapper<u64, 1>{_val} = false;
+	assert(_val == 0xdeadbeef0000beec);
+
+	FlagWrapper<u64, 0>{_val} = true;
+	assert(_val == 0xdeadbeef0000beed);
+
+	FlagWrapper<u64, 32>{_val} = true;
+	assert(_val == 0xdeadbeef0000beed);
+
+	FlagWrapper<u64, 33>{_val} = false;
+	assert(_val == 0xdeadbeed0000beed);
 
 	// --------------------------------------------------------------------------------------- //
 

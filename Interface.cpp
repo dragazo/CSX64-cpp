@@ -26,7 +26,10 @@ namespace CSX64
 		// get size of memory and make sure it's within limits
 		u64 size = exe.size() - 32 + bss_seglen + stacksize;
 
-		// make sure it's within limits
+		// mark the minimum memory size (so we can't truncate off program code/data/stack/etc.)
+		min_mem_size = size;
+
+		// make sure it's within max memory usage limits
 		if (size > max_mem_size) return false;
 
 		// get new memory array (does not include header)
@@ -57,7 +60,7 @@ namespace CSX64
 
 		// set execution state
 		RIP() = 0;
-		EFLAGS() = 2; // x86 standard dictates this initial state
+		RFLAGS() = 2; // x86 standard dictates this initial state
 		running = true;
 		suspended_read = false;
 		error = ErrorCode::None;
@@ -126,8 +129,7 @@ namespace CSX64
 			++op_exe_count[op];
 			#endif
 
-			std::cout << op << '\n';
-			last_ins = (int)op;
+			//std::cout << op << '\n';
 
 			// perform the instruction
 			(this->*opcode_handlers[op])();

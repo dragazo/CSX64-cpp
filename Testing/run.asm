@@ -63,8 +63,8 @@ __read_arr:
     ret
     
     align 64
-    fa: dq 0.0/0
-    fb: dq 0/0.0
+    fa: dq 0.0/0.1
+    fb: dq 0/0.1
     
     _sqrt_val: equ 10.0
     _dsqrt: dq _sqrt_val

@@ -573,9 +573,9 @@ namespace CSX64
 			data.resize(data.size() + obj->Data.size());
 
 			// append segments
-			std::memcpy(text.data() + (text.size() - obj->Text.size()), obj->Text.data(), obj->Text.size());
-			std::memcpy(rodata.data() + (rodata.size() - obj->Rodata.size()), obj->Rodata.data(), obj->Rodata.size());
-			std::memcpy(data.data() + (data.size() - obj->Data.size()), obj->Data.data(), obj->Data.size());
+			if (obj->Text.size() > 0) std::memcpy(text.data() + (text.size() - obj->Text.size()), obj->Text.data(), obj->Text.size());
+			if (obj->Rodata.size() > 0) std::memcpy(rodata.data() + (rodata.size() - obj->Rodata.size()), obj->Rodata.data(), obj->Rodata.size());
+			if (obj->Data.size() > 0) std::memcpy(data.data() + (data.size() - obj->Data.size()), obj->Data.data(), obj->Data.size());
 			bsslen += obj->BssLen;
 
 			// for each external symbol
@@ -679,9 +679,9 @@ namespace CSX64
 		Write(exe, 24, 8, bsslen);
 
 		// copy text and data
-		std::memcpy(exe.data() + 32, text.data(), text.size());
-		std::memcpy(exe.data() + 32 + text.size(), rodata.data(), rodata.size());
-		std::memcpy(exe.data() + 32 + text.size() + rodata.size(), data.data(), data.size());
+		if (text.size() > 0) std::memcpy(exe.data() + 32, text.data(), text.size());
+		if (rodata.size() > 0) std::memcpy(exe.data() + 32 + text.size(), rodata.data(), rodata.size());
+		if (data.size() > 0) std::memcpy(exe.data() + 32 + text.size() + rodata.size(), data.data(), data.size());
 
 		// linked successfully
 		return {LinkError::None, ""};

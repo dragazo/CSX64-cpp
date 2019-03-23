@@ -224,10 +224,20 @@ namespace CSX64
 			if (!Right->__Evaluate__(symbols, R, RF, err, visited)) ret = false;
 			if (ret == false) return false;
 
-			if (LF || RF) { res = DoubleAsUInt64((LF ? AsDouble(L) : L) / (RF ? AsDouble(R) : R)); floating = true; }
+			if (LF || RF)
+			{
+				double _num = LF ? AsDouble(L) : (double)L;
+				double _denom = RF ? AsDouble(R) : (double)R;
+
+				// catch division by zero
+				if (_denom == 0) { err = "divide by zero"; return false; }
+
+				res = DoubleAsUInt64(_num / _denom);
+				floating = true;
+			}
 			else
 			{
-				// catch division by zero in integral case (floating-point is ok (inf))
+				// catch division by zero
 				if (R == 0) { err = "divide by zero"; return false; }
 				res = L / R;
 			}
@@ -238,14 +248,12 @@ namespace CSX64
 			if (!Right->__Evaluate__(symbols, R, RF, err, visited)) ret = false;
 			if (ret == false) return false;
 
-			// catch division by zero in both float/int cases (floaing zero is integral zero)
-			if (R == 0) { err = "divide by zero"; return false; }
-
 			if (LF || RF)
 			{
-				double _num = LF ? AsDouble(L) : L, _denom = RF ? AsDouble(R) : R;
+				double _num = LF ? AsDouble(L) : (double)L;
+				double _denom = RF ? AsDouble(R) : (double)R;
 
-				// catch division by zero in floating case
+				// catch division by zero
 				if (_denom == 0) { err = "divide by zero"; return false; }
 
 				res = DoubleAsUInt64(std::fmod(_num, _denom));
@@ -253,7 +261,7 @@ namespace CSX64
 			}
 			else
 			{
-				// catch division by zero in integral case
+				// catch division by zero
 				if (R == 0) { err = "divide by zero"; return false; }
 				res = L % R;
 			}
@@ -264,7 +272,16 @@ namespace CSX64
 			if (!Right->__Evaluate__(symbols, R, RF, err, visited)) ret = false;
 			if (ret == false) return false;
 
-			if (LF || RF) { res = DoubleAsUInt64((LF ? AsDouble(L) : (i64)L) / (RF ? AsDouble(R) : (i64)R)); floating = true; }
+			if (LF || RF)
+			{
+				double _num = LF ? AsDouble(L) : (double)(i64)L;
+				double _denom = RF ? AsDouble(R) : (double)(i64)R;
+
+				// catch division by zero
+				if (_denom == 0) { err = "divide by zero"; return false; }
+
+				res = DoubleAsUInt64(_num / _denom); floating = true;
+			}
 			else
 			{
 				// catch division by zero in integral case (floating-point is ok (inf))
@@ -278,12 +295,10 @@ namespace CSX64
 			if (!Right->__Evaluate__(symbols, R, RF, err, visited)) ret = false;
 			if (ret == false) return false;
 
-			// catch division by zero in both float/int cases (floaing zero is integral zero)
-			if (R == 0) { err = "divide by zero"; return false; }
-
 			if (LF || RF)
 			{
-				double _num = LF ? AsDouble(L) : (i64)L, _denom = RF ? AsDouble(R) : (i64)R;
+				double _num = LF ? AsDouble(L) : (double)(i64)L;
+				double _denom = RF ? AsDouble(R) : (double)(i64)R;
 
 				// catch division by zero in floating case
 				if (_denom == 0) { err = "divide by zero"; return false; }

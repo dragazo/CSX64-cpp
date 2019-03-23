@@ -45,7 +45,7 @@
 #define COMMA ,
 
 // if nonzero, uses mask unions to perform the UpdateFlagsZSP() function - otherwise uses flag accessors
-#define FLAG_ACCESS_MASKING 1
+#define FLAG_ACCESS_MASKING 0
 
 // CSX64 considers many valid, but non-intel things to be undefined behavior at runtime (e.g. 8-bit addressing).
 // however, these types of things are already blocked by the assembler.
@@ -256,13 +256,13 @@ namespace CSX64
 		// if preserve_contents is true, the contents of the result is identical up to the lesser of the current and requested sizes. otherwise the contents are undefined.
 		// this will attempt to resize the array in-place; however, if force_realloc is true it will guarantee a full reallocation operation (e.g. for releasing extraneous memory).
 		// on success, the memory size is updated to the specified size.
-		// on failure, nothing is changed (as if the request was not made).
+		// on failure, nothing is changed (as if the request was not made) - strong guarantee.
 		bool realloc(u64 size, bool preserve_contents, bool force_realloc = false)
 		{
 			// if we have enough space already, just use that unless we were told not to
 			if (size <= mem_cap && !force_realloc)
 			{
-				// just need to update size
+				// just need to update size (we already have the requisite capacity)
 				mem_size = size;
 				return true;
 			}
@@ -304,8 +304,6 @@ namespace CSX64
 		/// <param name="count">The maximum number of operations to perform</param>
 		u64 Tick(u64 count);
 
-		int last_ins;
-
 		// Causes the machine to end execution with an error code and release various system resources (e.g. file handles).
 		void Terminate(ErrorCode err = ErrorCode::None)
 		{
@@ -315,10 +313,6 @@ namespace CSX64
 				// set error and stop execution
 				error = err;
 				running = false;
-
-				std::cout << "\n\nTerminating RIP:" << RIP() << '\n';
-				std::cout << "Last INS: " << last_ins << '\n';
-				WriteCPUDebugString(std::cout);
 
 				CloseFiles(); // close all the file descriptors
 			}
@@ -332,8 +326,6 @@ namespace CSX64
 				// set return value and stop execution
 				return_value = ret;
 				running = false;
-
-				std::cout << "Exiting RIP:" << RIP() << '\n';
 
 				CloseFiles(); // close all the file descriptors
 			}
