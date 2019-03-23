@@ -126,7 +126,7 @@ namespace CSX64
 			++op_exe_count[op];
 			#endif
 
-			//std::cout << op << '\n';
+			std::cout << op << '\n';
 			last_ins = (int)op;
 
 			// perform the instruction

@@ -65,29 +65,29 @@ namespace CSX64
 	{
 		U &dest;
 
-		inline constexpr operator T() const noexcept { return (T)dest; }
-		inline constexpr ReferenceRouter operator=(T val) noexcept { dest = val; return *this; }
-		inline constexpr ReferenceRouter operator=(ReferenceRouter wrapper) noexcept { dest = (T)wrapper.dest; return *this; }
+		constexpr operator T() const noexcept { return (T)dest; }
+		constexpr ReferenceRouter operator=(T val) noexcept { dest = (U)val; return *this; }
+		constexpr ReferenceRouter operator=(ReferenceRouter wrapper) noexcept { dest = (T)wrapper; return *this; }
 
-		inline constexpr ReferenceRouter operator++() noexcept { *this = *this + 1; return *this; }
-		inline constexpr ReferenceRouter operator--() noexcept { *this = *this - 1; return *this; }
+		constexpr ReferenceRouter operator++() noexcept { *this = *this + 1; return *this; }
+		constexpr ReferenceRouter operator--() noexcept { *this = *this - 1; return *this; }
 
-		inline constexpr T operator++(int) noexcept { T val = *this; *this = *this + 1; return val; }
-		inline constexpr T operator--(int) noexcept { T val = *this; *this = *this - 1; return val; }
+		constexpr T operator++(int) noexcept { T val = *this; *this = *this + 1; return val; }
+		constexpr T operator--(int) noexcept { T val = *this; *this = *this - 1; return val; }
 
-		inline constexpr ReferenceRouter operator+=(T val) noexcept { *this = *this + val; return *this; }
-		inline constexpr ReferenceRouter operator-=(T val) noexcept { *this = *this - val; return *this; }
-		inline constexpr ReferenceRouter operator*=(T val) noexcept { *this = *this * val; return *this; }
+		constexpr ReferenceRouter operator+=(T val) noexcept { *this = *this + val; return *this; }
+		constexpr ReferenceRouter operator-=(T val) noexcept { *this = *this - val; return *this; }
+		constexpr ReferenceRouter operator*=(T val) noexcept { *this = *this * val; return *this; }
 
-		inline constexpr ReferenceRouter operator/=(T val) { *this = *this / val; return *this; }
-		inline constexpr ReferenceRouter operator%=(T val) { *this = *this % val; return *this; }
+		constexpr ReferenceRouter operator/=(T val) { *this = *this / val; return *this; }
+		constexpr ReferenceRouter operator%=(T val) { *this = *this % val; return *this; }
 
-		inline constexpr ReferenceRouter operator&=(T val) noexcept { *this = *this & val; return *this; }
-		inline constexpr ReferenceRouter operator|=(T val) noexcept { *this = *this | val; return *this; }
-		inline constexpr ReferenceRouter operator^=(T val) noexcept { *this = *this ^ val; return *this; }
+		constexpr ReferenceRouter operator&=(T val) noexcept { *this = *this & val; return *this; }
+		constexpr ReferenceRouter operator|=(T val) noexcept { *this = *this | val; return *this; }
+		constexpr ReferenceRouter operator^=(T val) noexcept { *this = *this ^ val; return *this; }
 
-		inline constexpr ReferenceRouter operator<<=(int val) noexcept { *this = *this << val; return *this; }
-		inline constexpr ReferenceRouter operator>>=(int val) noexcept { *this = *this >> val; return *this; }
+		constexpr ReferenceRouter operator<<=(int val) noexcept { *this = *this << val; return *this; }
+		constexpr ReferenceRouter operator>>=(int val) noexcept { *this = *this >> val; return *this; }
 	};
 
 	// acts as a reference to a bitfield in an integer of type "T"
@@ -100,29 +100,29 @@ namespace CSX64
 		static constexpr T low_mask = __mask | (__mask - 1);
 		static constexpr T mask = low_mask << pos;
 
-		inline constexpr operator T() const noexcept { return (data >> pos) & low_mask; }
-		inline constexpr BitfieldWrapper operator=(T val) noexcept { data = (data & ~mask) | ((val & low_mask) << pos); return *this; }
-		inline constexpr BitfieldWrapper operator=(BitfieldWrapper wrapper) noexcept { data = (data & ~mask) | (wrapper.data & mask); return *this; }
+		constexpr operator T() const noexcept { return (data >> pos) & low_mask; }
+		constexpr BitfieldWrapper operator=(T val) noexcept { data = (data & ~mask) | ((val & low_mask) << pos); return *this; }
+		constexpr BitfieldWrapper operator=(BitfieldWrapper wrapper) noexcept { data = (data & ~mask) | (wrapper.data & mask); return *this; }
 
-		inline constexpr BitfieldWrapper operator++() noexcept { *this = *this + 1; return *this; }
-		inline constexpr BitfieldWrapper operator--() noexcept { *this = *this - 1; return *this; }
+		constexpr BitfieldWrapper operator++() noexcept { *this = *this + 1; return *this; }
+		constexpr BitfieldWrapper operator--() noexcept { *this = *this - 1; return *this; }
 
-		inline constexpr T operator++(int) noexcept { T val = *this; *this = *this + 1; return val; }
-		inline constexpr T operator--(int) noexcept { T val = *this; *this = *this - 1; return val; }
+		constexpr T operator++(int) noexcept { T val = *this; *this = *this + 1; return val; }
+		constexpr T operator--(int) noexcept { T val = *this; *this = *this - 1; return val; }
 
-		inline constexpr BitfieldWrapper operator+=(T val) noexcept { *this = *this + val; return *this; }
-		inline constexpr BitfieldWrapper operator-=(T val) noexcept { *this = *this - val; return *this; }
-		inline constexpr BitfieldWrapper operator*=(T val) noexcept { *this = *this * val; return *this; }
+		constexpr BitfieldWrapper operator+=(T val) noexcept { *this = *this + val; return *this; }
+		constexpr BitfieldWrapper operator-=(T val) noexcept { *this = *this - val; return *this; }
+		constexpr BitfieldWrapper operator*=(T val) noexcept { *this = *this * val; return *this; }
 
-		inline constexpr BitfieldWrapper operator/=(T val) { *this = *this / val; return *this; }
-		inline constexpr BitfieldWrapper operator%=(T val) { *this = *this % val; return *this; }
+		constexpr BitfieldWrapper operator/=(T val) { *this = *this / val; return *this; }
+		constexpr BitfieldWrapper operator%=(T val) { *this = *this % val; return *this; }
 
-		inline constexpr BitfieldWrapper operator&=(T val) noexcept { *this = *this & val; return *this; }
-		inline constexpr BitfieldWrapper operator|=(T val) noexcept { *this = *this | val; return *this; }
-		inline constexpr BitfieldWrapper operator^=(T val) noexcept { *this = *this ^ val; return *this; }
+		constexpr BitfieldWrapper operator&=(T val) noexcept { *this = *this & val; return *this; }
+		constexpr BitfieldWrapper operator|=(T val) noexcept { *this = *this | val; return *this; }
+		constexpr BitfieldWrapper operator^=(T val) noexcept { *this = *this ^ val; return *this; }
 
-		inline constexpr BitfieldWrapper operator<<=(int val) noexcept { *this = *this << val; return *this; }
-		inline constexpr BitfieldWrapper operator>>=(int val) noexcept { *this = *this >> val; return *this; }
+		constexpr BitfieldWrapper operator<<=(int val) noexcept { *this = *this << val; return *this; }
+		constexpr BitfieldWrapper operator>>=(int val) noexcept { *this = *this >> val; return *this; }
 	};
 	// acts a reference to a 1-bit flag in an integer of type "T"
 	template<typename T, int pos>
@@ -132,9 +132,9 @@ namespace CSX64
 
 		static constexpr T mask = (T)1 << pos;
 
-		inline constexpr operator bool() const noexcept { return data & mask; }
-		inline constexpr FlagWrapper operator=(bool val) noexcept { data = val ? data | mask : data & ~mask; return *this; }
-		inline constexpr FlagWrapper operator=(FlagWrapper wrapper) noexcept { data = (data & ~mask) | (wrapper.data & mask); return *this; }
+		constexpr operator bool() const noexcept { return data & mask; }
+		constexpr FlagWrapper operator=(bool val) noexcept { data = val ? data | mask : data & ~mask; return *this; }
+		constexpr FlagWrapper operator=(FlagWrapper wrapper) noexcept { data = (data & ~mask) | (wrapper.data & mask); return *this; }
 	};
 
 	// represents a value held as a void* that is accessed as T& via bin_cpy<T>().
@@ -144,9 +144,9 @@ namespace CSX64
 	{
 		void *loc;
 
-		operator T() const noexcept { return bin_cpy<T>(loc); }
-		bin_cpy_wrapper operator=(T val) noexcept { bin_cpy<T>(loc, std::addressof(loc)); return *this; }
-		bin_cpy_wrapper operator=(bin_cpy_wrapper other) { bin_cpy<T>(loc, other.loc); return *this; }
+		operator T() const noexcept { return bin_read<T>(loc); }
+		bin_cpy_wrapper operator=(T val) noexcept { bin_write<T>(loc, val); return *this; }
+		bin_cpy_wrapper operator=(bin_cpy_wrapper other) { bin_write<T>(loc, (T)other); return *this; }
 
 		bin_cpy_wrapper operator++() noexcept { *this = *this + 1; return *this; }
 		bin_cpy_wrapper operator--() noexcept { *this = *this - 1; return *this; }
@@ -256,7 +256,7 @@ namespace CSX64
 
 		// gets the value of type T at the specified index (index offsets based on T)
 		template<typename T> bin_cpy_wrapper<T> get(u64 index) noexcept { return {data + index * sizeof(T)}; }
-		template<typename T> T get(u64 index) const noexcept { return bin_cpy<T>(data + index * sizeof(T)); }
+		template<typename T> T get(u64 index) const noexcept { return bin_read<T>(data + index * sizeof(T)); }
 
 	public: // -- sizecode access utilities -- //
 

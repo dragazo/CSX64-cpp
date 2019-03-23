@@ -19,6 +19,7 @@
 #include <unordered_set>
 
 #include "CoreTypes.h"
+#include "punning.h"
 
 namespace CSX64
 {
@@ -426,11 +427,7 @@ namespace CSX64
 	/// <param name="val">value to interpret</param>
 	inline u64 DoubleAsUInt64(double val)
 	{
-		static_assert(sizeof(u64) == sizeof(double), "punning width mismatch");
-
-		u64 dest;
-		std::memcpy(&dest, &val, sizeof(u64));
-		return dest;
+		return pun<u64>(val);
 	}
 	/// <summary>
 	/// Interprets raw bits as a double
@@ -438,11 +435,7 @@ namespace CSX64
 	/// <param name="val">value to interpret</param>
 	inline double AsDouble(u64 val)
 	{
-		static_assert(sizeof(double) == sizeof(u64), "punning width mismatch");
-
-		double dest;
-		std::memcpy(&dest, &val, sizeof(u64));
-		return dest;
+		return pun<double>(val);
 	}
 
 	/// <summary>
@@ -451,11 +444,7 @@ namespace CSX64
 	/// <param name="val">the float to interpret</param>
 	inline u64 FloatAsUInt64(float val)
 	{
-		static_assert(sizeof(u32) == sizeof(float), "punning width mismatch");
-
-		u32 dest;
-		std::memcpy(&dest, &val, sizeof(u32));
-		return dest;
+		return pun<u32>(val);
 	}
 	/// <summary>
 	/// Interprets raw bits as a float (low 32 bits)
@@ -463,11 +452,7 @@ namespace CSX64
 	/// <param name="val">the bits to interpret</param>
 	inline float AsFloat(u32 val)
 	{
-		static_assert(sizeof(float) == sizeof(u32), "punning width mismatch");
-
-		float dest;
-		std::memcpy(&dest, &val, sizeof(u32));
-		return dest;
+		return pun<float>(val);
 	}
 
 	void ExtractDouble(double val, double &exp, double &sig);
