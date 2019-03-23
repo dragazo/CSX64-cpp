@@ -33,16 +33,16 @@ namespace CSX64
 		std::string b; // string builder (so token and chars can safely refer to the same object)
 
 		// make sure it starts with a quote and is terminated
-		if (token.empty() || token[0] != '"' && token[0] != '\'' && token[0] != '`' || token[0] != token[token.size() - 1]) { err = "Ill-formed string: " + token; return false; }
+		if (token.empty() || (token[0] != '"' && token[0] != '\'' && token[0] != '`') || token[0] != token[token.size() - 1]) { err = "Ill-formed string: " + token; return false; }
 
 		// read all the characters inside
-		for (int i = 1; i < token.size() - 1; ++i)
+		for (int i = 1; i < (int)token.size() - 1; ++i)
 		{
 			// if this is a `backquote` literal, it allows \escapes
 			if (token[0] == '`' && token[i] == '\\')
 			{
 				// bump up i and make sure it's still good
-				if (++i >= token.size() - 1) { err = "Ill-formed string (ends with beginning of an escape sequence): " + token; return false; }
+				if (++i >= (int)token.size() - 1) { err = "Ill-formed string (ends with beginning of an escape sequence): " + token; return false; }
 
 				int temp, temp2;
 				switch (token[i])
@@ -168,7 +168,7 @@ namespace CSX64
 		oplen = 0;
 
 		// try to take as many characters as possible (greedy)
-		if (pos + 2 <= token.size())
+		if (pos + 2 <= (int)token.size())
 		{
 			oplen = 2; // record oplen
 
@@ -198,7 +198,7 @@ namespace CSX64
 				}
 			}
 		}
-		if (pos + 1 <= token.size())
+		if (pos + 1 <= (int)token.size())
 		{
 			oplen = 1; // record oplen
 			switch (token[pos])
@@ -299,7 +299,7 @@ namespace CSX64
 		{
 			switch (TryPatchHole(seg, symbols, holes[i], res.ErrorMsg))
 			{
-			case PatchError::None: if (i != holes.size() - 1) swap(holes[i], holes.back()); holes.pop_back(); break; // remove the hole if we solved it
+			case PatchError::None: if (i != (int)holes.size() - 1) swap(holes[i], holes.back()); holes.pop_back(); break; // remove the hole if we solved it
 			case PatchError::Unevaluated: break;
 			case PatchError::Error: res.Error = AssembleError::ArgError; return false;
 
@@ -350,7 +350,7 @@ namespace CSX64
 		args.file.Symbols.insert(std::make_pair("__e__", Expr::CreateFloat(2.718281828459045235360287471352662497757247093699959574966)));
 
 		// potential parsing args for an instruction
-		u64 a = 0, b = 0;
+		u64 a = 0;
 		bool floating;
 
 		std::string err; // error location for evaluation
@@ -385,7 +385,8 @@ namespace CSX64
 			case AsmSegment::DATA: args.line_pos_in_seg = args.file.Data.size(); break;
 			case AsmSegment::BSS: args.line_pos_in_seg = args.file.BssLen; break;
 
-				// default does nothing - it is ill-formed to make an address outside of any segment
+				// default does nothing - (nothing to update)
+				default:;
 			}
 
 			// process marked label
@@ -443,7 +444,7 @@ namespace CSX64
 		if (!args.VerifyIntegrity()) return args.res;
 
 		// rename all the symbols we can shorten (done after verify to ensure there's no verify error messages with the renamed symbols)
-		for (int i = 0; i < rename_symbols.size(); ++i) RenameSymbol(args.file, std::move(rename_symbols[i]), "^" + tohex(i));
+		for (int i = 0; i < (int)rename_symbols.size(); ++i) RenameSymbol(args.file, std::move(rename_symbols[i]), "^" + tohex(i));
 		
 		// validate result
 		_file_ = std::move(args.file);

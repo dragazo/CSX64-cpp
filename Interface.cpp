@@ -85,7 +85,7 @@ namespace CSX64
 			// make room for the pointer array
 			stack -= 8 * pointers.size();
 			// write pointer array to memory
-			for (int i = 0; i < pointers.size(); ++i) SetMem(stack + i * 8, pointers[i]);
+			for (int i = 0; i < (int)pointers.size(); ++i) SetMem(stack + i * 8, pointers[i]);
 		}
 
 		// load arg count and arg array pointer to RDI, RSI

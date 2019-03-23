@@ -375,8 +375,7 @@ namespace CSX64
 	/// <param name="ch">the character to look for</param>
 	bool Contains(const std::string &str, char ch)
 	{
-		for (int i = 0; i < str.size(); ++i)
-			if (str[i] == ch) return true;
+		for (std::size_t i = 0; i < str.size(); ++i) if (str[i] == ch) return true;
 
 		return false;
 	}
@@ -436,11 +435,11 @@ namespace CSX64
 			dump << ' ' << std::hex << (start - start % 16) << " - ";
 
 			// and tack on some white space
-			for (int i = 0; i < start % 16; ++i) dump << "   ";
+			for (int i = 0; i < (int)start % 16; ++i) dump << "   ";
 		}
 
 		// write the data
-		for (int i = 0; i < count; ++i)
+		for (int i = 0; i < (int)count; ++i)
 		{
 			// start of new row gets a line header
 			if ((start + i) % 16 == 0) dump << '\n' << std::hex << std::setw(8) << (start + i) << " - ";

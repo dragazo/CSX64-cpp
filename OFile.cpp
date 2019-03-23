@@ -180,19 +180,19 @@ namespace CSX64
 		obj.Text.clear();
 		obj.Text.resize(temp64);
 		reader.read(reinterpret_cast<char*>(obj.Text.data()), temp64); // aliasing is ok because we're going between signed/unsigned variants
-		if (reader.gcount() != temp64) goto err;
+		if ((u64)reader.gcount() != temp64) goto err;
 
 		if (!BinRead(reader, temp64)) goto err;
 		obj.Rodata.clear();
 		obj.Rodata.resize(temp64);
 		reader.read(reinterpret_cast<char*>(obj.Rodata.data()), temp64); // aliasing is ok because we're going between signed/unsigned variants
-		if (reader.gcount() != temp64) goto err;
+		if ((u64)reader.gcount() != temp64) goto err;
 
 		if (!BinRead(reader, temp64)) goto err;
 		obj.Data.clear();
 		obj.Data.resize(temp64);
 		reader.read(reinterpret_cast<char*>(obj.Data.data()), temp64); // aliasing is ok because we're going between signed/unsigned variants
-		if (reader.gcount() != temp64) goto err;
+		if ((u64)reader.gcount() != temp64) goto err;
 
 		if (!BinRead(reader, temp64)) goto err;
 		obj.BssLen = temp64;

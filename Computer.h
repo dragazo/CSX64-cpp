@@ -238,8 +238,8 @@ namespace CSX64
 
 		// Validates the machine for operation, but does not prepare it for execute (see Initialize)
 		Computer() :
-			mem(nullptr), mem_size(0), mem_cap(0),
-			running(false), error(ErrorCode::None), max_mem_size((u64)8 * 1024 * 1024 * 1024),
+			mem(nullptr), mem_size(0), mem_cap(0), max_mem_size((u64)8 * 1024 * 1024 * 1024),
+			running(false), error(ErrorCode::None),
 			Rand((unsigned int)std::time(nullptr))
 		{}
 		virtual ~Computer() { CSX64::aligned_free(mem); }
@@ -636,11 +636,11 @@ namespace CSX64
 		{
 			// [1: imm][1:][2: mult_1][2: size][1: r1][1: r2]   ([4: r1][4: r2])   ([size: imm])
 
-			u8 settings, sizecode, regs;
+			u8 settings, sizecode, regs = 0; // regs = 0 is only to appease warnings
 			res = 0; // initialize res - functions as imm parsing location, so it has to start at 0
 
 			// get the settings byte and regs byte if applicable
-			if (!GetByteAdv(settings) || (settings & 3) != 0 && !GetByteAdv(regs)) return false;
+			if (!GetByteAdv(settings) || ((settings & 3) != 0 && !GetByteAdv(regs))) return false;
 
 			// get the sizecode
 			sizecode = (settings >> 2) & 3;
@@ -1132,7 +1132,7 @@ namespace CSX64
 
 			case 3:
 				// get mem
-				if (!GetAddressAdv(m) || get_a && !GetMemRaw_szc(m, a_sizecode, a)) return false;
+				if (!GetAddressAdv(m) || (get_a && !GetMemRaw_szc(m, a_sizecode, a))) return false;
 				// if sh is flagged
 				if ((s1 & 1) != 0)
 				{
@@ -1148,7 +1148,7 @@ namespace CSX64
 
 			case 4:
 				// get mem
-				if (!GetAddressAdv(m) || get_a && !GetMemRaw_szc(m, a_sizecode, a)) return false;
+				if (!GetAddressAdv(m) || (get_a && !GetMemRaw_szc(m, a_sizecode, a))) return false;
 				// get imm
 				return GetMemAdv_szc(b_sizecode, b);
 
@@ -1684,9 +1684,10 @@ namespace CSX64
 		{
 			u64 s, val;
 			if (!FetchIMMRMFormat(s, val)) return false;
-			u64 sizecode = (s >> 2) & 3;
 
 			#if STRICT_UND
+			u64 sizecode = (s >> 2) & 3;
+
 			// 8-bit addressing not allowed
 			if (sizecode == 0) { Terminate(ErrorCode::UndefinedBehavior); return false; }
 			#endif
@@ -3478,19 +3479,19 @@ namespace CSX64
 				// after storing fpu state, re-initializes
 				return FINIT();
 			case 7:
-				if (!GetMemRaw<u16>(m + 0, temp)) return false; FPU_control = (u16)temp;
-				if (!GetMemRaw<u16>(m + 4, temp)) return false; FPU_status = (u16)temp;
-				if (!GetMemRaw<u16>(m + 8, temp)) return false; FPU_tag = (u16)temp;
+				if (!GetMemRaw<u16>(m + 0, temp)) { return false; } FPU_control = (u16)temp;
+				if (!GetMemRaw<u16>(m + 4, temp)) { return false; } FPU_status = (u16)temp;
+				if (!GetMemRaw<u16>(m + 8, temp)) { return false; } FPU_tag = (u16)temp;
 
 				// for cross-platformability/speed, writes native double instead of some tword hacks
-				if (!GetMemRaw<u64>(m + 28, temp)) return false; ST(0) = AsDouble(temp);
-				if (!GetMemRaw<u64>(m + 38, temp)) return false; ST(1) = AsDouble(temp);
-				if (!GetMemRaw<u64>(m + 48, temp)) return false; ST(2) = AsDouble(temp);
-				if (!GetMemRaw<u64>(m + 58, temp)) return false; ST(3) = AsDouble(temp);
-				if (!GetMemRaw<u64>(m + 68, temp)) return false; ST(4) = AsDouble(temp);
-				if (!GetMemRaw<u64>(m + 78, temp)) return false; ST(5) = AsDouble(temp);
-				if (!GetMemRaw<u64>(m + 88, temp)) return false; ST(6) = AsDouble(temp);
-				if (!GetMemRaw<u64>(m + 98, temp)) return false; ST(7) = AsDouble(temp);
+				if (!GetMemRaw<u64>(m + 28, temp)) { return false; } ST(0) = AsDouble(temp);
+				if (!GetMemRaw<u64>(m + 38, temp)) { return false; } ST(1) = AsDouble(temp);
+				if (!GetMemRaw<u64>(m + 48, temp)) { return false; } ST(2) = AsDouble(temp);
+				if (!GetMemRaw<u64>(m + 58, temp)) { return false; } ST(3) = AsDouble(temp);
+				if (!GetMemRaw<u64>(m + 68, temp)) { return false; } ST(4) = AsDouble(temp);
+				if (!GetMemRaw<u64>(m + 78, temp)) { return false; } ST(5) = AsDouble(temp);
+				if (!GetMemRaw<u64>(m + 88, temp)) { return false; } ST(6) = AsDouble(temp);
+				if (!GetMemRaw<u64>(m + 98, temp)) { return false; } ST(7) = AsDouble(temp);
 
 				return true;
 
@@ -3507,9 +3508,9 @@ namespace CSX64
 
 				return true;
 			case 9:
-				if (!GetMemRaw<u16>(m + 0, temp)) return false; FPU_control = (u16)temp;
-				if (!GetMemRaw<u16>(m + 4, temp)) return false; FPU_status = (u16)temp;
-				if (!GetMemRaw<u16>(m + 8, temp)) return false; FPU_tag = (u16)temp;
+				if (!GetMemRaw<u16>(m + 0, temp)) { return false; } FPU_control = (u16)temp;
+				if (!GetMemRaw<u16>(m + 4, temp)) { return false; } FPU_status = (u16)temp;
+				if (!GetMemRaw<u16>(m + 8, temp)) { return false; } FPU_tag = (u16)temp;
 
 				return true;
 
@@ -3890,7 +3891,7 @@ namespace CSX64
 			long double b = ST(1);
 
 			PopFPU(); // pop stack and place in the new st(0)
-			ST(0) = ST(1) * std::log2l(ST(0));
+			ST(0) = b * std::log2(a);
 
 			FPU_status ^= Rand() & MASK_UNION_4(FPU_C0, FPU_C1, FPU_C2, FPU_C3);
 
@@ -4232,38 +4233,44 @@ namespace CSX64
 
 				src = (int)_src & 0x1f;
 
-				for (int i = 0; i < elem_count; ++i, mask >>= 1)
+				for (u64 i = 0; i < elem_count; ++i, mask >>= 1)
+				{
 					if ((mask & 1) != 0) ZMMRegisters[reg].uint((int)elem_sizecode, i) = ZMMRegisters[src].uint((int)elem_sizecode, i);
-					else if (zmask) ZMMRegisters[reg].uint((int)elem_sizecode, i) = 0;
+					else if (zmask) ZMMRegisters[reg].uint(elem_sizecode, i) = 0;
+				}
 
-					break;
+				break;
 			case 1:
 				if (!GetAddressAdv(m)) return false;
 				// if we're in vector mode and aligned flag is set, make sure address is aligned
 				if (elem_count > 1 && (s1 & 4) != 0 && m % Size(reg_sizecode + 4) != 0) { Terminate(ErrorCode::AlignmentViolation); return false; }
 
-				for (int i = 0; i < elem_count; ++i, mask >>= 1, m += Size(elem_sizecode))
+				for (u64 i = 0; i < elem_count; ++i, mask >>= 1, m += Size(elem_sizecode))
+				{
 					if ((mask & 1) != 0)
 					{
 						if (!GetMemRaw(m, Size(elem_sizecode), temp)) return false;
 						ZMMRegisters[reg].uint((int)elem_sizecode, i) = temp;
 					}
-					else if (zmask) ZMMRegisters[reg].uint((int)elem_sizecode, i) = 0;
+					else if (zmask) ZMMRegisters[reg].uint(elem_sizecode, i) = 0;
+				}
 
-					break;
+				break;
 			case 2:
 				if (!GetAddressAdv(m)) return false;
 				// if we're in vector mode and aligned flag is set, make sure address is aligned
 				if (elem_count > 1 && (s1 & 4) != 0 && m % Size(reg_sizecode + 4) != 0) { Terminate(ErrorCode::AlignmentViolation); return false; }
 
-				for (int i = 0; i < elem_count; ++i, mask >>= 1, m += Size(elem_sizecode))
+				for (u64 i = 0; i < elem_count; ++i, mask >>= 1, m += Size(elem_sizecode))
+				{
 					if ((mask & 1) != 0)
 					{
 						if (!SetMemRaw(m, Size(elem_sizecode), ZMMRegisters[reg].uint((int)elem_sizecode, i))) return false;
 					}
 					else if (zmask && !SetMemRaw(m, Size(elem_sizecode), 0)) return false;
+				}
 
-					break;
+				break;
 
 			default: Terminate(ErrorCode::UndefinedBehavior); return false;
 			}

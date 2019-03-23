@@ -47,16 +47,16 @@ namespace CSX64
 
 	// ------------------------------
 
-	Expr::Expr() : OP(OPs::None), _Result(0), _Floating(false) {}
+	Expr::Expr() : _Result(0), _Floating(false), OP(OPs::None) {}
 
-	Expr::Expr(const Expr &other) : OP(other.OP), _Result(other._Result), _Floating(other._Floating), _Token(other._Token)
+	Expr::Expr(const Expr &other) : _Token(other._Token), _Result(other._Result), _Floating(other._Floating), OP(other.OP)
 	{
 		// copy children recursively
 		if (other.Left) Left = std::make_unique<Expr>(*other.Left);
 		if (other.Right) Right = std::make_unique<Expr>(*other.Right);
 	}
-	Expr::Expr(Expr &&other) : OP(other.OP), Left(std::move(other.Left)), Right(std::move(other.Right)),
-		_Result(other._Result), _Floating(other._Floating), _Token(std::move(other._Token))
+	Expr::Expr(Expr &&other) : _Token(std::move(other._Token)), _Result(other._Result), _Floating(other._Floating),
+		OP(other.OP), Left(std::move(other.Left)), Right(std::move(other.Right))
 	{
 		// empty other
 		other.OP = OPs::None;
@@ -187,8 +187,7 @@ namespace CSX64
 				res = 0; // zero res just in case that's removed from the top of the function later on
 
 				// build the value
-				for (int i = 0; i < chars.size(); ++i)
-					res |= (chars[i] & 0xff) << (i * 8);
+				for (int i = 0; i < (int)chars.size(); ++i) res |= (chars[i] & 0xff) << (i * 8);
 
 				break;
 			}
@@ -492,7 +491,7 @@ namespace CSX64
 		else
 		{
 			// if they found it, we're done
-			if (Left->_FindPath(value, path, upper) || Right && Right->_FindPath(value, path, upper)) return true;
+			if (Left->_FindPath(value, path, upper) || (Right && Right->_FindPath(value, path, upper))) return true;
 		}
 
 		// otherwise we couldn't find it

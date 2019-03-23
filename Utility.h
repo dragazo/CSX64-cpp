@@ -109,13 +109,15 @@ namespace CSX64
 	bool TryGetValue(const std::unordered_map<T, U> &map, const T &key, const U *&ptr)
 	{
 		auto iter = map.find(key);
-		return ptr = iter == map.end() ? nullptr : &iter->second;
+		ptr = (iter == map.end() ? nullptr : &iter->second);
+		return ptr;
 	}
 	template<typename T, typename U>
 	bool TryGetValue(std::unordered_map<T, U> &map, const T &key, U *&ptr)
 	{
 		auto iter = map.find(key);
-		return ptr = iter == map.end() ? nullptr : &iter->second;
+		ptr = (iter == map.end() ? nullptr : &iter->second);
+		return ptr;
 	}
 
 	// returns true if the map contains a node with the specified key
@@ -125,8 +127,7 @@ namespace CSX64
 	template<typename T, typename U>
 	bool ContainsValue(const std::unordered_map<T, U> &map, const U &value)
 	{
-		for (const auto &entry : map)
-			if (entry.second == value) return true;
+		for (const auto &entry : map) if (entry.second == value) return true;
 		return false;
 	}
 
@@ -135,7 +136,7 @@ namespace CSX64
 	bool TryGetValue(const std::unordered_set<T> &set, const T &value, T *&ptr)
 	{
 		auto iter = set.find(value);
-		return ptr = iter == set.end() ? nullptr : &*iter;
+		return ptr = (iter == set.end() ? nullptr : &*iter);
 	}
 	// returns true if the set contains an entry with the specified value
 	template<typename T, typename U>
@@ -382,12 +383,12 @@ namespace CSX64
 	/// Parses a 2-bit size code into an actual size (in bytes) 0:1  1:2  2:4  3:8
 	/// </summary>
 	/// <param name="sizecode">the code to parse</param>
-	inline constexpr u64 Size(u64 sizecode) { return _Sizes[sizecode]; }
+	inline constexpr u64 Size(u64 sizecode) { return (u64)1 << sizecode; }
 	/// <summary>
 	/// Parses a 2-bit size code into an actual size (in bits) 0:8  1:16  2:32  3:64
 	/// </summary>
 	/// <param name="sizecode">the code to parse</param>
-	inline constexpr u64 SizeBits(u64 sizecode) { return _SizesBits[sizecode]; }
+	inline constexpr u64 SizeBits(u64 sizecode) { return (u64)8 << sizecode; }
 
 	/// <summary>
 	/// Gets the sizecode of the specified size. Throws <see cref="ArgumentException"/> if the size is not a power of 2

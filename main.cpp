@@ -186,7 +186,7 @@ int LoadBinaryFile(const std::string &path, std::vector<u8> &exe)
 
 	// read the contents
 	f.read(reinterpret_cast<char*>(exe.data()), exe.size()); // aliasing is ok because we're going between signed/unsigned variants
-	if (f.gcount() != exe.size()) { std::cout << "IO error while reading from " << path; return IOError; }
+	if ((std::size_t)f.gcount() != exe.size()) { std::cout << "IO error while reading from " << path; return IOError; }
 
 	if (!f) { std::cout << "Failed to read from \"" << path << "\"\n"; return IOError; }
 	return 0;

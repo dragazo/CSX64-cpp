@@ -21,12 +21,12 @@ bool AssembleArgs::SplitLine(std::string rawline)
 	// -- parse label and op -- //
 
 	// skip leading white space
-	for (; pos < rawline.size() && std::isspace(rawline[pos]); ++pos);
+	for (; pos < (int)rawline.size() && std::isspace(rawline[pos]); ++pos);
 	// get a white space-delimited token
-	for (end = pos; end < rawline.size() && !std::isspace(rawline[end]); ++end);
+	for (end = pos; end < (int)rawline.size() && !std::isspace(rawline[end]); ++end);
 
 	// if we got a label
-	if (pos < rawline.size() && rawline[end - 1] == LabelDefChar)
+	if (pos < (int)rawline.size() && rawline[end - 1] == LabelDefChar)
 	{
 		// set as label def
 		label_def = rawline.substr(pos, end - pos - 1);
@@ -34,15 +34,15 @@ bool AssembleArgs::SplitLine(std::string rawline)
 		// get another token for op to use
 
 		// skip leading white space
-		for (pos = end; pos < rawline.size() && std::isspace(rawline[pos]); ++pos);
+		for (pos = end; pos < (int)rawline.size() && std::isspace(rawline[pos]); ++pos);
 		// get a white space-delimited token
-		for (end = pos; end < rawline.size() && !std::isspace(rawline[end]); ++end);
+		for (end = pos; end < (int)rawline.size() && !std::isspace(rawline[end]); ++end);
 	}
 	// otherwise there's no label for this line
 	else label_def.clear();
 
 	// if we got something, record as op, otherwise is empty string
-	if (pos < rawline.size()) op = rawline.substr(pos, end - pos);
+	if (pos < (int)rawline.size()) op = rawline.substr(pos, end - pos);
 	else op.clear();
 
 	// -- parse args -- //
@@ -51,12 +51,12 @@ bool AssembleArgs::SplitLine(std::string rawline)
 	while (true)
 	{
 		// skip leading white space
-		for (pos = end + 1; pos < rawline.size() && std::isspace(rawline[pos]); ++pos);
+		for (pos = end + 1; pos < (int)rawline.size() && std::isspace(rawline[pos]); ++pos);
 		// when pos reaches end of token, we're done parsing
-		if (pos >= rawline.size()) break;
+		if (pos >= (int)rawline.size()) break;
 
 		// find the next terminator (comma-separated)
-		for (end = pos, quote = -1; end < rawline.size(); ++end)
+		for (end = pos, quote = -1; end < (int)rawline.size(); ++end)
 		{
 			if (rawline[end] == '"' || rawline[end] == '\'' || rawline[end] == '`') quote = quote < 0 ? end : rawline[end] == rawline[quote] ? -1 : quote;
 			else if (quote < 0 && rawline[end] == ',') break; // comma marks end of token
@@ -84,7 +84,7 @@ bool AssembleArgs::IsValidName(const std::string &token, std::string &err)
 	// first char is underscore or letter
 	if (token[0] != '_' && !std::isalpha(token[0])) { err = "Symbol contained an illegal character"; return false; }
 	// all other chars may additionally be numbers or periods
-	for (int i = 1; i < token.size(); ++i)
+	for (int i = 1; i < (int)token.size(); ++i)
 		if (token[i] != '_' && token[i] != '.' && !std::isalnum(token[i])) { err = "Symbol contained an illegal character"; return false; }
 
 	return true;
@@ -255,22 +255,22 @@ bool AssembleArgs::__TryParseImm(const std::string &token, std::unique_ptr<Expr>
 	stack.push_back(nullptr); // stack will always have a null at its base (simplifies code slightly)
 
 	// skip white space
-	for (; pos < token.size() && std::isspace(token[pos]); ++pos);
+	for (; pos < (int)token.size() && std::isspace(token[pos]); ++pos);
 	// if we're past the end, token was empty
-	if (pos >= token.size()) { res = {AssembleError::FormatError, "line " + tostr(line) + ": Empty expression encountered"}; return false; }
+	if (pos >= (int)token.size()) { res = {AssembleError::FormatError, "line " + tostr(line) + ": Empty expression encountered"}; return false; }
 
 	while (true)
 	{
 		// -- read (unary op...)[operand](binary op) -- //
 
 		// consume unary ops (allows white space)
-		for (; pos < token.size(); ++pos)
+		for (; pos < (int)token.size(); ++pos)
 		{
 			if (Contains(UnaryOps, token[pos])) unaryOps.push_back(token[pos]); // absorb unary ops
 			else if (!std::isspace(token[pos])) break; // non-white is start of operand
 		}
 		// if we're past the end, there were unary ops with no operand
-		if (pos >= token.size()) { res = {AssembleError::FormatError, "line " + tostr(line) + ": Unary ops encountered without an operand"}; return false; }
+		if (pos >= (int)token.size()) { res = {AssembleError::FormatError, "line " + tostr(line) + ": Unary ops encountered without an operand"}; return false; }
 
 		int depth = 0;  // parens depth - initially 0
 		int quote = -1; // index of current quote char - initially not in one
@@ -278,7 +278,7 @@ bool AssembleArgs::__TryParseImm(const std::string &token, std::unique_ptr<Expr>
 		bool numeric = std::isdigit(token[pos]); // flag if this is a numeric literal
 
 		// move end to next logical separator (white space or binary op)
-		for (end = pos; end < token.size(); ++end)
+		for (end = pos; end < (int)token.size(); ++end)
 		{
 			// if we're not in a quote
 			if (quote < 0)
@@ -286,7 +286,7 @@ bool AssembleArgs::__TryParseImm(const std::string &token, std::unique_ptr<Expr>
 				// account for important characters
 				if (token[end] == '(') ++depth;
 				else if (token[end] == ')') --depth; // depth control
-				else if (numeric && (token[end] == 'e' || token[end] == 'E') && end + 1 < token.size() && (token[end + 1] == '+' || token[end + 1] == '-')) ++end; // make sure an exponent sign won't be parsed as binary + or - by skipping it
+				else if (numeric && (token[end] == 'e' || token[end] == 'E') && end + 1 < (int)token.size() && (token[end + 1] == '+' || token[end + 1] == '-')) ++end; // make sure an exponent sign won't be parsed as binary + or - by skipping it
 				else if (token[end] == '"' || token[end] == '\'' || token[end] == '`') quote = end; // quotes mark start of a string
 				else if (depth == 0 && (std::isspace(token[end]) || TryGetOp(token, end, op, oplen))) break; // break on white space or binary op
 
@@ -392,14 +392,14 @@ bool AssembleArgs::__TryParseImm(const std::string &token, std::unique_ptr<Expr>
 		// -- get binary op -- //
 
 		// we may have stopped token parsing on white space, so wind up to find a binary op
-		for (; end < token.size(); ++end)
+		for (; end < (int)token.size(); ++end)
 		{
 			if (TryGetOp(token, end, op, oplen)) break; // break when we find an op
 			// if we hit a non-white character, there are tokens with no binary ops between them
 			else if (!std::isspace(token[end])) { res = {AssembleError::FormatError, "line " + tostr(line) + ": Encountered two tokens with no binary op between them: " + token}; return false; }
 		}
 		// if we didn't find any binary ops, we're done
-		if (end >= token.size()) break;
+		if (end >= (int)token.size()) break;
 
 		// -- process binary op -- //
 
@@ -513,7 +513,7 @@ bool AssembleArgs::TryExtractPtrVal(const Expr *expr, const Expr *&val, const st
 	}
 
 	// must be of standard label form
-	if (expr->OP != Expr::OPs::Add || expr->Left->Token() && *expr->Left->Token() != _base) return false;
+	if (expr->OP != Expr::OPs::Add || (expr->Left->Token() && *expr->Left->Token() != _base)) return false;
 
 	// return the value portion
 	val = expr->Right.get();
@@ -539,14 +539,14 @@ std::unique_ptr<Expr> AssembleArgs::Ptrdiff(std::unique_ptr<Expr> expr)
 		for (int i = 0, j = 0; ; ++i, ++j)
 		{
 			// wind i up to next add label
-			for (; i < add.size() && !TryExtractPtrVal(&add[i], a, seg_name); ++i);
+			for (; i < (int)add.size() && !TryExtractPtrVal(&add[i], a, seg_name); ++i);
 			// if this exceeds bounds, break
-			if (i >= add.size()) break;
+			if (i >= (int)add.size()) break;
 
 			// wind j up to next sub label
-			for (; j < sub.size() && !TryExtractPtrVal(&sub[j], b, seg_name); ++j);
+			for (; j < (int)sub.size() && !TryExtractPtrVal(&sub[j], b, seg_name); ++j);
 			// if this exceeds bounds, break
-			if (j >= sub.size()) break;
+			if (j >= (int)sub.size()) break;
 
 			// we got a pair: replace items in add/sub with their pointer values
 			// if extract succeeded but returned null, the "missing" value is zero - just remove from the list
@@ -638,7 +638,7 @@ bool AssembleArgs::TryParseInstantPrefixedImm(const std::string &token, const st
 	}
 
 	// make sure we consumed the entire string
-	if (end != token.size()) { res = {AssembleError::FormatError, "line " + tostr(line) + ": Compound expressions used as prefixed expressions must be parenthesized \"" + token}; return false; }
+	if (end != (int)token.size()) { res = {AssembleError::FormatError, "line " + tostr(line) + ": Compound expressions used as prefixed expressions must be parenthesized \"" + token}; return false; }
 
 	// prefix index must be instant imm
 	if (!TryParseInstantImm(token.substr(prefix.size()), val, floating, sizecode, explicit_size)) { res = {AssembleError::ArgError, "line " + tostr(line) + ": Failed to parse instant prefixed imm \"" + token + "\"\n-> " + res.ErrorMsg}; return false; }
@@ -716,7 +716,7 @@ bool AssembleArgs::TryGetRegMult(const std::string &label, Expr &hole, u64 &mult
 		}
 
 		// if it doesn't have a mult section
-		if (list.size() == 1 || list.size() > 1 && list[1]->OP != Expr::OPs::Mul)
+		if (list.size() == 1 || (list.size() > 1 && list[1]->OP != Expr::OPs::Mul))
 		{
 			// add in a multiplier of 1
 			list[0]->OP = Expr::OPs::Mul;
@@ -728,7 +728,7 @@ bool AssembleArgs::TryGetRegMult(const std::string &label, Expr &hole, u64 &mult
 		}
 
 		// start 2 above (just above regular mult code)
-		for (int i = 2; i < list.size();)
+		for (int i = 2; i < (int)list.size();)
 		{
 			switch (list[i]->OP)
 			{
@@ -834,7 +834,7 @@ bool AssembleArgs::TryGetRegMult(const std::string &label, Expr &hole, u64 &mult
 		for (int i = (int)list.size() - 1; i >= 2; --i)
 		{
 			// if this will negate the register
-			if (list[i]->OP == Expr::OPs::Neg || list[i]->OP == Expr::OPs::Sub && list[i]->Right.get() == list[i - 1])
+			if (list[i]->OP == Expr::OPs::Neg || (list[i]->OP == Expr::OPs::Sub && list[i]->Right.get() == list[i - 1]))
 			{
 				// negate found partial mult
 				val = ~val + 1;
@@ -1126,7 +1126,7 @@ bool AssembleArgs::TryProcessDeclare(u64 size)
 	std::string chars, err;
 
 	// for each argument (not using foreach because order is incredibly important and i'm paranoid)
-	for (int i = 0; i < args.size(); ++i)
+	for (int i = 0; i < (int)args.size(); ++i)
 	{
 		// if it's a string
 		if (args[i][0] == '"' || args[i][0] == '\'' || args[i][0] == '`')
@@ -1135,7 +1135,7 @@ bool AssembleArgs::TryProcessDeclare(u64 size)
 			if (!TryExtractStringChars(args[i], chars, err)) { res = {AssembleError::FormatError, "line " + tostr(line) + ": Invalid string literal: " + args[i] + "\n-> " + err}; return false; }
 
 			// dump into memory (one byte each)
-			for (int j = 0; j < chars.size(); ++j) if (!TryAppendByte((u8)chars[j])) return false;
+			for (int j = 0; j < (int)chars.size(); ++j) if (!TryAppendByte((u8)chars[j])) return false;
 			// make sure we write a multiple of size
 			if (!TryPad(AlignOffset((u64)chars.size(), size))) return false;
 		}
@@ -1509,7 +1509,7 @@ bool AssembleArgs::TryProcessRR_RM(OPCode op, bool has_ext_op, u8 ext_op, u64 si
 				bool src_2_explicit_size;
 				if (!TryParseAddress(args[2], a, b, ptr_base, src_2_sizecode, src_2_explicit_size)) return false;
 
-				if (sizecode != src_1_sizecode || src_2_explicit_size && sizecode != src_2_sizecode) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Operand size mismatch"}; return false; }
+				if (sizecode != src_1_sizecode || (src_2_explicit_size && sizecode != src_2_sizecode)) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Operand size mismatch"}; return false; }
 
 				if (!TryAppendVal(1, (dest << 4) | (sizecode << 2) | (dest_high ? 2 : 0ul) | 1)) return false;
 				if (!TryAppendVal(1, (src_1_high ? 128 : 0ul) | src_1)) return false;
@@ -2594,7 +2594,7 @@ bool AssembleArgs::TryProcessVPUBinary(OPCode op, u64 elem_sizecode, bool maskab
 					bool src2_explicit;
 					if (!TryParseAddress(args[2], a, b, ptr_base, src2_sizecode, src2_explicit)) return false;
 
-					if (dest_sizecode != src1_sizecode || src2_explicit && src2_sizecode != (scalar ? elem_sizecode : dest_sizecode)) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Operand size mismatch"}; return false; }
+					if (dest_sizecode != src1_sizecode || (src2_explicit && src2_sizecode != (scalar ? elem_sizecode : dest_sizecode))) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Operand size mismatch"}; return false; }
 
 					if (!TryAppendVal(1, (dest << 3) | (aligned ? 4 : 0ul) | (dest_sizecode - 4))) return false;
 					if (!TryAppendVal(1, (mask_present ? 128 : 0ul) | (zmask ? 64 : 0ul) | (scalar ? 32 : 0ul) | (elem_sizecode << 2) | 1)) return false;
