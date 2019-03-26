@@ -40,9 +40,14 @@ namespace CSX64
 	// Maps VPU register names (all caps) to tuples of (id, sizecode)
 	extern const std::unordered_map<std::string, std::tuple<u8, u8>> VPURegisterInfo;
 
+	// represents an assembly router function - calling this selects that syntax branch for assembly (one for each instruction)
 	typedef bool(*asm_router)(AssembleArgs &args);
 
+	// maps (uppercase) instructions to their associated assembly router
 	extern const std::unordered_map<std::string, asm_router> asm_routing_table;
+
+	// set of all (uppercase) instructions that can legally be modified by the lock prefix
+	extern const std::unordered_set<std::string> valid_lock_instructions;
 }
 
 #endif

@@ -11,6 +11,37 @@ extern malloc, calloc, free, realloc
 
 global __read_arr
 
+prefix_stuff_dont_call_this:
+	mfence
+	sfence
+	lfence
+	pause
+	
+	lock adc rsi, rax
+	lock add rsi, rbx
+	lock sub rbx, rbx
+	
+	lock and r11d, 0xdeadbeef
+	lock or r11w, 0xbad
+	lock xor [rbp], qword 0x12
+	
+	lock btc edx, 12
+	lock btr word ptr [dword esp + 12], ax
+	lock bts byte ptr [rsp], 0
+	
+	lock dec rdi
+	lock inc qword ptr [rbp]
+	lock neg ecx
+	lock not r12w
+	
+	lock xchg rdi, rsi
+	
+	rep ret
+	repz ret
+	repnz ret
+	repe ret
+	repne ret
+
 dump:
     mov rdi, 40125
     mov rsi, rdi

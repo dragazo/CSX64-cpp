@@ -156,10 +156,14 @@ namespace CSX64
 		bool TryProcessSTOS_string(OPCode op, bool rep);
 		bool TryProcessSCAS_string(OPCode op, bool repe, bool repne);
 
-		bool __TryProcessREP_init(std::string &actual);
+		// extracts a prefix from the args and returns the actual instruction token (as uppercase)
+		bool TryProcessPrefixOp(std::string &actual);
+
 		bool TryProcessREP();
 		bool TryProcessREPE();
 		bool TryProcessREPNE();
+
+		bool TryProcessLOCK();
 
 		bool TryProcessBSx(OPCode op, bool forward);
 

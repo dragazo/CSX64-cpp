@@ -98,5 +98,8 @@
     <ClInclude Include="FastRng.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="punning.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

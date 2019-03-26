@@ -2873,7 +2873,7 @@ namespace CSX64
 			case 2:
 				// Intel's reference has this instruction modify CF unnecessarily - leaving those lines in but commenting them out
 
-				temp_u8 = AL();
+				temp_u8 = (u8)AL();
 				temp_b = CF();
 
 				//CF() = false;
@@ -2900,7 +2900,7 @@ namespace CSX64
 				return true;
 
 			case 3:
-				temp_u8 = AL();
+				temp_u8 = (u8)AL();
 				temp_b = CF();
 
 				CF() = false;

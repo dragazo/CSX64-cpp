@@ -61,6 +61,14 @@ namespace CSX64
 
 	inline bool asm_router_PAUSE(AssembleArgs &args) { return args.TryProcessNoArgOp_no_write(); }
 
+	// ----------------------- //
+
+	// -- unmapped wrappers -- //
+
+	// ----------------------- //
+
+	inline bool asm_router_LOCK(AssembleArgs &args) { return args.TryProcessLOCK(); }
+
 	// --------- //
 
 	// -- x86 -- //

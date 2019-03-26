@@ -385,8 +385,7 @@ namespace CSX64
 			case AsmSegment::DATA: args.line_pos_in_seg = args.file.Data.size(); break;
 			case AsmSegment::BSS: args.line_pos_in_seg = args.file.BssLen; break;
 
-				// default does nothing - (nothing to update)
-				default:;
+			default:; // default does nothing - (nothing to update)
 			}
 
 			// process marked label

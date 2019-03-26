@@ -1919,9 +1919,9 @@ bool AssembleArgs::TryProcessSCAS_string(OPCode op, bool repe, bool repne)
 	return true;
 }
 
-bool AssembleArgs::__TryProcessREP_init(std::string &actual)
+bool AssembleArgs::TryProcessPrefixOp(std::string &actual)
 {
-	if (args.size() == 0) { res = {AssembleError::ArgCount, "line " + tostr(line) + ": REP expected an instruction to augment"}; return false; }
+	if (args.size() == 0) { res = { AssembleError::ArgCount, "line " + tostr(line) + ": expected an instruction to augment" }; return false; }
 
 	// first arg contains the instrucion to execute - find first white-space delimiter
 	std::size_t len;
@@ -1937,14 +1937,17 @@ bool AssembleArgs::__TryProcessREP_init(std::string &actual)
 
 	return true;
 }
+
 bool AssembleArgs::TryProcessREP()
 {
 	// initialize
 	std::string actual;
-	if (!__TryProcessREP_init(actual)) return false;
+	if (!TryProcessPrefixOp(actual)) return false;
 	
 	// route to proper handlers
-	if (actual == "MOVS") return TryProcessMOVS_string(OPCode::string, true);
+	if (actual == "RET") return TryProcessNoArgOp(OPCode::RET);
+
+	else if (actual == "MOVS") return TryProcessMOVS_string(OPCode::string, true);
 	else if (actual == "MOVSB") return TryProcessNoArgOp(OPCode::string, true, (1 << 2) | 0);
 	else if (actual == "MOVSW") return TryProcessNoArgOp(OPCode::string, true, (1 << 2) | 1);
 	else if (actual == "MOVSD") return TryProcessNoArgOp(OPCode::string, true, (1 << 2) | 2);
@@ -1969,10 +1972,12 @@ bool AssembleArgs::TryProcessREPE()
 {
 	// initialize
 	std::string actual;
-	if (!__TryProcessREP_init(actual)) return false;
+	if (!TryProcessPrefixOp(actual)) return false;
 
 	// route to proper handlers
-	if (actual == "CMPS") return TryProcessCMPS_string(OPCode::string, true, false);
+	if (actual == "RET") return TryProcessNoArgOp(OPCode::RET);
+
+	else if (actual == "CMPS") return TryProcessCMPS_string(OPCode::string, true, false);
 	else if (actual == "CMPSB") return TryProcessNoArgOp(OPCode::string, true, (3 << 2) | 0);
 	else if (actual == "CMPSW") return TryProcessNoArgOp(OPCode::string, true, (3 << 2) | 1);
 	else if (actual == "CMPSD") return TryProcessNoArgOp(OPCode::string, true, (3 << 2) | 2);
@@ -1991,10 +1996,12 @@ bool AssembleArgs::TryProcessREPNE()
 {
 	// initialize
 	std::string actual;
-	if (!__TryProcessREP_init(actual)) return false;
+	if (!TryProcessPrefixOp(actual)) return false;
 
 	// route to proper handlers
-	if (actual == "CMPS") return TryProcessCMPS_string(OPCode::string, false, true);
+	if (actual == "RET") return TryProcessNoArgOp(OPCode::RET);
+
+	else if (actual == "CMPS") return TryProcessCMPS_string(OPCode::string, false, true);
 	else if (actual == "CMPSB") return TryProcessNoArgOp(OPCode::string, true, (4 << 2) | 0);
 	else if (actual == "CMPSW") return TryProcessNoArgOp(OPCode::string, true, (4 << 2) | 1);
 	else if (actual == "CMPSD") return TryProcessNoArgOp(OPCode::string, true, (4 << 2) | 2);
@@ -2008,6 +2015,23 @@ bool AssembleArgs::TryProcessREPNE()
 
 	// otherwise this is illegal usage of REP
 	else { res = {AssembleError::UsageError, "line " + tostr(line) + ": REPNE cannot be used with the specified instruction"}; return false; }
+}
+
+bool AssembleArgs::TryProcessLOCK()
+{
+	// initialize
+	std::string actual;
+	if (!TryProcessPrefixOp(actual)) return false;
+
+	// make sure actual is an instruction that can legally be modified by LOCK
+	if (!Contains(valid_lock_instructions, actual)) { res = { AssembleError::UsageError, "line " + tostr(line) + ": LOCK cannot modify the specified instruction" }; return false; }
+
+	// get the proper routing handler
+	const asm_router *router;
+	if (!TryGetValue(asm_routing_table, actual, router)) { res = { AssembleError::UnknownOp, "line " + tostr(line) + ": Unknown augmented instruction" }; return false; }
+	
+	// perform the assembly action
+	return (*router)(*this);
 }
 
 bool AssembleArgs::TryProcessBSx(OPCode op, bool forward)

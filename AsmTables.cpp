@@ -569,6 +569,8 @@ namespace CSX64
 	{"REPNE", asm_router_REPNE},
 	{"REPNZ", asm_router_REPNE},
 
+	{"LOCK", asm_router_LOCK},
+
 	{"BSF", asm_router_BSF},
 	{"BSR", asm_router_BSR},
 
@@ -1052,5 +1054,10 @@ namespace CSX64
 
 	{"CMPSD", asm_router_CMPSD_disambig},
 
+	};
+
+	const std::unordered_set<std::string> valid_lock_instructions
+	{
+		"ADD", "ADC", "AND", "BTC", "BTR", "BTS", "CMPXCHG", "CMPXCH8B", "CMPXCHG16B", "DEC", "INC", "NEG", "NOT", "OR", "SBB", "SUB", "XOR", "XADD", "XCHG"
 	};
 }
