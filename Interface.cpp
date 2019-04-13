@@ -69,27 +69,27 @@ namespace CSX64
 		u64 stack = size;
 		RBP() = stack; // RBP points to before we start pushing args
 
-		// if we have cmd line args, load them
-		if (!args.empty())
+		// an array of pointers to command line args in computer memory.
+		// one for each arg, plus a null terminator.
+		std::vector<u64> cmdarg_pointers(args.size() + 1);
+
+		// put each arg on the stack and get their addresses
+		for (u64 i = 0; i < args.size(); ++i)
 		{
-			std::vector<u64> pointers(args.size()); // an array of pointers to args in computer memory
+			// push the arg onto the stack
+			stack -= args[i].size() + 1;
+			SetCString(stack, args[i]);
 
-			// for each arg (backwards to make more sense visually, but the order doesn't actually matter)
-			for (int i = (int)args.size() - 1; i >= 0; --i)
-			{
-				// push the arg onto the stack
-				stack -= args[i].size() + 1;
-				SetCString(stack, args[i]);
-
-				// record pointer to this arg
-				pointers[i] = stack;
-			}
-
-			// make room for the pointer array
-			stack -= 8 * pointers.size();
-			// write pointer array to memory
-			for (int i = 0; i < (int)pointers.size(); ++i) SetMem(stack + i * 8, pointers[i]);
+			// record pointer to this arg
+			cmdarg_pointers[i] = stack;
 		}
+		// the last pointer is null (C guarantees this, so we will as well)
+		cmdarg_pointers[args.size()] = 0;
+
+		// make room for the command line pointer array
+		stack -= 8 * cmdarg_pointers.size();
+		// write pointer array to memory
+		for (u64 i = 0; i < cmdarg_pointers.size(); ++i) SetMem(stack + i * 8, cmdarg_pointers[i]);
 
 		// load arg count and arg array pointer to RDI, RSI
 		RDI() = args.size();

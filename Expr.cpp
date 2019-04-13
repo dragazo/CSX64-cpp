@@ -280,12 +280,14 @@ namespace CSX64
 				// catch division by zero
 				if (_denom == 0) { err = "divide by zero"; return false; }
 
-				res = DoubleAsUInt64(_num / _denom); floating = true;
+				res = DoubleAsUInt64(_num / _denom);
+				floating = true;
 			}
 			else
 			{
-				// catch division by zero in integral case (floating-point is ok (inf))
+				// catch division by zero
 				if (R == 0) { err = "divide by zero"; return false; }
+
 				res = (u64)((i64)L / (i64)R);
 			}
 

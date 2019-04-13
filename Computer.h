@@ -45,7 +45,7 @@
 #define COMMA ,
 
 // if nonzero, uses mask unions to perform the UpdateFlagsZSP() function - otherwise uses flag accessors
-#define FLAG_ACCESS_MASKING 0
+#define FLAG_ACCESS_MASKING 1
 
 // CSX64 considers many valid, but non-intel things to be undefined behavior at runtime (e.g. 8-bit addressing).
 // however, these types of things are already blocked by the assembler.
