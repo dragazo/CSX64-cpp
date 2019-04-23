@@ -14,9 +14,11 @@
 
 #include "CoreTypes.h"
 #include "punning.h"
+#include "csx_exceptions.h"
 
 namespace CSX64
 {
+	// error codes resulting from executing client code (these don't trigger exceptions).
 	enum class ErrorCode
 	{
 		None, OutOfBounds, UnhandledSyscall, UndefinedBehavior, ArithmeticError, Abort,
@@ -314,13 +316,6 @@ namespace CSX64
 	// -- io -- //
 
 	// -------- //
-
-	// exception type thrown when IFileWrapper permissions are violated
-	struct FileWrapperPermissionsException : std::runtime_error
-	{
-		using std::runtime_error::runtime_error;
-		using std::runtime_error::what;
-	};
 
 	// the interface used by CSX64 file descriptors to reference files.
 	struct IFileWrapper

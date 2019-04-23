@@ -251,7 +251,7 @@ namespace CSX64
 		Computer &operator=(Computer&&) = delete;
 
 	public: // -- exe interface -- //
-
+		
 		// reallocates the current array to be the specified size. returns true on success.
 		// if preserve_contents is true, the contents of the result is identical up to the lesser of the current and requested sizes. otherwise the contents are undefined.
 		// this will attempt to resize the array in-place; however, if force_realloc is true it will guarantee a full reallocation operation (e.g. for releasing extraneous memory).
@@ -294,7 +294,9 @@ namespace CSX64
 		/// <param name="exe">the memory to load before starting execution (memory beyond this range is undefined)</param>
 		/// <param name="args">the command line arguments to provide to the computer. pass null or empty array for none</param>
 		/// <param name="stacksize">the amount of additional space to allocate for the program's stack</param>
-		bool Initialize(std::vector<u8> &exe, std::vector<std::string> args, u64 stacksize = 2 * 1024 * 1024);
+		/// throws ExecutableFormatError if the executable is not properly-formatted.
+		/// throws MemoryAllocException if attempting to exceed max memory settings or if allocation fails.
+		void Initialize(const std::vector<u8> &exe, const std::vector<std::string> &args, u64 stacksize = 2 * 1024 * 1024);
 
 		/// <summary>
 		/// Performs a single operation. Returns the number of successful operations.

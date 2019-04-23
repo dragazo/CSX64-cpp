@@ -177,6 +177,7 @@
     <ClInclude Include="BiggerInts\BiggerInts.h" />
     <ClInclude Include="CoreTypes.h" />
     <ClInclude Include="Computer.h" />
+    <ClInclude Include="csx_exceptions.h" />
     <ClInclude Include="ExeDir.h" />
     <ClInclude Include="Expr.h" />
     <ClInclude Include="FastRng.h" />

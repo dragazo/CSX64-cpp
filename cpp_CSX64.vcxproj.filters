@@ -101,5 +101,8 @@
     <ClInclude Include="punning.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="csx_exceptions.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

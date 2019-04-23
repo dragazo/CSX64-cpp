@@ -366,15 +366,27 @@ namespace CSX64
 			rawline.clear();
 			while ((ch = code.get()) != EOF)
 			{
+				// if we hit a comment char, discard it and the rest of the line
 				if (ch == CommentChar)
 				{
 					code.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
-					break;
+					break; // we extracted a new line char, so stop line processing loop
 				}
+				// if we hit a new line char, we're done (don't append it to the string)
 				else if (ch == '\n') break;
+				// otherwise it's a normal char - add it to the raw line
 				else rawline.push_back(ch);
 			}
 			++args.line;
+
+			// if this is a shebang line (must have "#!" at the start of line 1)
+			if (args.line == 1 && rawline.size() >= 2 && rawline[0] == '#' && rawline[1] == '!')
+			{
+				// ignore it - do this by pretending the line was empty
+				rawline.clear();
+			}
+
+			// split the line and prepare for parsing
 			if (!args.SplitLine(std::move(rawline))) return args.res;
 
 			// update current line pos

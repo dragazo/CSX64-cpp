@@ -11,17 +11,19 @@ namespace CSX64
 	u64 op_exe_count[256];
 	#endif
 
-	bool Computer::Initialize(std::vector<u8> &exe, std::vector<std::string> args, u64 stacksize)
+	void Computer::Initialize(const std::vector<u8> &exe, const std::vector<std::string> &args, u64 stacksize)
 	{
 		// read header
 		u64 text_seglen;
 		u64 rodata_seglen;
 		u64 data_seglen;
 		u64 bss_seglen;
-		if (!Read(exe, 0, 8, text_seglen) || !Read(exe, 8, 8, rodata_seglen) || !Read(exe, 16, 8, data_seglen) || !Read(exe, 24, 8, bss_seglen)) return false;
+		if (!Read(exe, 0, 8, text_seglen) || !Read(exe, 8, 8, rodata_seglen) || !Read(exe, 16, 8, data_seglen) || !Read(exe, 24, 8, bss_seglen))
+			throw ExecutableFormatError("executable header missing");
 		
 		// make sure exe is well-formed
-		if (32 + text_seglen + rodata_seglen + data_seglen != exe.size()) return false;
+		if (32 + text_seglen + rodata_seglen + data_seglen != exe.size())
+			throw ExecutableFormatError("executable header invalid");
 
 		// get size of memory and make sure it's within limits
 		u64 size = exe.size() - 32 + bss_seglen + stacksize;
@@ -30,10 +32,12 @@ namespace CSX64
 		min_mem_size = size;
 
 		// make sure it's within max memory usage limits
-		if (size > max_mem_size) return false;
-
+		if (size > max_mem_size)
+			throw MemoryAllocException("executable size exceeded max memory");
+		
 		// get new memory array (does not include header)
-		if (!this->realloc(size, false)) return false;
+		if (!this->realloc(size, false))
+			throw MemoryAllocException("memory allocation failed");
 
 		// copy over the text/rodata/data segments (not including header)
 		std::memcpy(mem, exe.data() + 32, exe.size() - 32);
@@ -106,8 +110,6 @@ namespace CSX64
 		// clear op_exe_count
 		for (u64 i = 0; i < 256; ++i) op_exe_count[i] = 0;
 		#endif
-
-		return true;
 	}
 
 	u64 Computer::Tick(u64 count)
