@@ -1,17 +1,12 @@
-#include <list>
-#include <string>
-#include <cstring>
-#include <cstdlib>
 #include <iostream>
-#include <chrono>
-#include <cstddef>
-#include <cstdlib>
 #include <fstream>
-#include <vector>
 #include <utility>
-#include <sstream>
-#include <cassert>
-#include <experimental/filesystem>
+#include <vector>
+#include <string>
+#include <cstdlib>
+#include <chrono>
+#include <unordered_map>
+#include <filesystem>
 
 #include "CoreTypes.h"
 #include "Computer.h"
@@ -21,11 +16,7 @@
 
 using namespace CSX64;
 
-// !! REPLACE THIS WITH std::filesystem WHEN VISUAL STUDIO IS UPDATED !! //
-namespace fs = std::experimental::filesystem;
-
-namespace chrono = std::chrono;
-typedef std::chrono::high_resolution_clock hrc;
+namespace fs = std::filesystem;
 
 // Represents a desired action
 enum class ProgramAction
@@ -39,7 +30,7 @@ enum class ProgramAction
 	Link,     // links 1+ csx64 object files into a csx64 executable
 };
 
-// An extension of assembly and link error codes for use specifically in <see cref="Main(string[])"/>
+// An extension of assembly and link error codes for use specifically in
 enum AsmLnkErrorExt
 {
 	FailOpen = 100,
@@ -86,25 +77,26 @@ std::string FormatTime(long long ns)
 const int ExecErrorReturnCode = -1;
 
 const char *HelpMessage =
-R"(
-usage: csx [<options>...] [--] <pathspec>...
+R"(Usage: csx [OPTION]... [ARG]...
+Assemble, link, or execute CSX64 files.
 
- -h, --help             shows this help info
+  -h, --help                print this help page and exit
 
- -a, --assemble         assemble csx64 asm files into csx64 object files
- -l, --link             link csx64 object files into a csx64 executable
- -s, --script           assemble, link, and execute a csx64 asm file in memory
- -S, --multiscript      as --script, but takes multiple csx64 asm files
- otherwise              executes a csx64 executable as a console application
+  -a, --assemble            assemble CSX64 asm files into CSX64 obj files
+  -l, --link                link CSX64 asm/obj files into a CSX64 executable
+  -s, --script              assemble, link, and execute a CSX64 asm/obj file in memory
+  -S, --multiscript         as --script, but takes multiple CSX64 asm/obj files
+  otherwise                 execute a CSX64 executable with provided args
 
- -o, --out <pathspec>   specifies explicit output path
- --entry <entry>        main entry point for linker
+  -o, --out <path>          specify an explicit output path
+      --entry <entry>       main entry point for linker
+      --rootdir <dir>       specify an explicit rootdir (contains _start.o and stdlib/*.o)
 
- --fs                   sets the file system flag during execution
- --time                 after execution display elapsed time
- --end                  remaining args are pathspec
+      --fs                  sets the file system flag during execution
+  -t, --time                after execution display elapsed time
+      --end                 remaining args are not options (added to arg list)
 
-report bugs to https://github.com/dragazo/CSX64-cpp/issues
+Report bugs to: https://github.com/dragazo/CSX64-cpp/issues
 )";
 
 // adds standard symbols to the assembler predefine table
@@ -168,30 +160,35 @@ void AddPredefines()
 	DefineSymbol("SEEK_END", (u64)SeekMode::end);
 }
 
-// -- file io -- //
+// ------------------ //
 
-// Saves binary data to a file. Returns true if there were no errors
-// path - the file to save to
-// exe  - the binary data to save
-// len  - the length of the executable
-int SaveBinaryFile(const std::string &path, const std::vector<u8> &exe)
+// -- exeutable io -- //
+
+// ------------------ //
+
+// Saves a csx64 executable to a file (no format checking).
+// path - the file to save to.
+// exe  - the csx64 executable to save.
+int SaveExecutable(const std::string &path, const std::vector<u8> &exe)
 {
 	std::ofstream f(path, std::ios::binary);
-	if (!f) { std::cout << "Failed to open \"" << path << "\" for writing\n"; return FailOpen; }
+	if (!f) { std::cerr << "Failed to open " << path << " for writing\n"; return FailOpen; }
 
 	// write the data
 	f.write(reinterpret_cast<const char*>(exe.data()), exe.size()); // aliasing is ok because we're going between signed/unsigned variants
 
-	if (!f) { std::cout << "Failed to write to \"" << path << "\"\n"; return IOError; }
+	// make sure it succeeded
+	if (!f) { std::cerr << "IO error while writing to " << path << '\n'; return IOError; }
+
 	return 0;
 }
-// Loads the contents of a binary file. Returns true if there were no errors
-// path - the file to read
-// exe  - the resulting binary data
-int LoadBinaryFile(const std::string &path, std::vector<u8> &exe)
+// Loads a csx64 executable from a file (no format checking).
+// path - the file to read.
+// exe  - the resulting csx64 executable (on success).
+int LoadExecutable(const std::string &path, std::vector<u8> &exe)
 {
 	std::ifstream f(path, std::ios::binary | std::ios::ate);
-	if (!f) { std::cout << "Failed to open \"" << path << "\"\n"; return FailOpen; }
+	if (!f) { std::cerr << "Failed to open " << path << " for reading\n"; return FailOpen; }
 
 	// get length and go back to start
 	exe.clear();
@@ -200,262 +197,191 @@ int LoadBinaryFile(const std::string &path, std::vector<u8> &exe)
 
 	// read the contents
 	f.read(reinterpret_cast<char*>(exe.data()), exe.size()); // aliasing is ok because we're going between signed/unsigned variants
-	if ((std::size_t)f.gcount() != exe.size()) { std::cout << "IO error while reading from " << path; return IOError; }
+	
+	// make sure it succeeded
+	if ((std::size_t)f.gcount() != exe.size()) { std::cerr << "IO error while reading from " << path << '\n'; return IOError; }
 
-	if (!f) { std::cout << "Failed to read from \"" << path << "\"\n"; return IOError; }
 	return 0;
 }
 
-/// <summary>
-/// Serializes an object file to a file. Returns true if there were no errors
-/// </summary>
-/// <param name="path">the destination file to save to
-/// <param name="obj">the object file to serialize
+// -------------------- //
+
+// -- object file io -- //
+
+// -------------------- //
+
+// Saves an object file to a file. Returns true if there were no errors.
+// path - the destination file to save to.
+// obj  - the object file to serialize.
 int SaveObjectFile(const std::string &path, const ObjectFile &obj)
 {
 	std::ofstream f(path, std::ios::binary);
-	if (!f) { std::cout << "Failed to open \"" << path << "\"\n"; return FailOpen; }
+	if (!f) { std::cerr << "Failed to open " << path << " for writing\n"; return FailOpen; }
 
-	ObjectFile::WriteTo(f, obj);
-
-	if (!f) { std::cout << "Failed to write to \"" << path << "\"\n"; return IOError; }
+	if (!ObjectFile::WriteTo(f, obj)) { std::cerr << "Failed to write object file " << path << '\n'; return IOError; }
 	return 0;
 }
-/// <summary>
-/// Deserializes an object file from a file. Returns true if there were no errors
-/// </summary>
-/// <param name="path">the source file to read from
-/// <param name="obj">the resulting object file
+// Loads an object file from a file. Returns true if there were no errors.
+// path - the source file to read from.
+// obj  - the resulting object file.
 int LoadObjectFile(const std::string &path, ObjectFile &obj)
 {
 	std::ifstream f(path, std::ios::binary);
-	if (!f) { std::cout << "Failed to open \"" << path << "\"\n"; return FailOpen; }
+	if (!f) { std::cerr << "Failed to open " << path << " for reading\n"; return FailOpen; }
 
-	ObjectFile::ReadFrom(f, obj);
-
-	if (!f) { std::cout << "Failed to write to \"" << path << "\"\n"; return IOError; }
+	if (!ObjectFile::ReadFrom(f, obj)) { std::cerr << "Failed to read object file " << path << '\n'; return IOError; }
 	return 0;
 }
 
-// Loads an object file and adds it to the list
-// objs - the list of object files
-// path - the file to to load
-int LoadObjectFile(std::vector<ObjectFile> &objs, const std::string &path)
-{
-	ObjectFile obj;
-	int ret = LoadObjectFile(path, obj);
-	if (ret != 0) return ret;
-
-	objs.emplace_back(std::move(obj));
-
-	return 0;
-}
-// Loads the .o object files from a directory and adds them to the list
-// objs - the list of object files
-// path - the directory to load
+// Loads the .o (obj) files from a directory and adds them to the list.
+// objs - the resulting list of object files (new entries appended to the end).
+// path - the directory to load.
 int LoadObjectFileDir(std::vector<ObjectFile> &objs, const std::string &path)
 {
 	std::error_code err;
 	fs::file_status stat = fs::status(path, err);
-		
-	if (!fs::exists(stat) || !fs::is_directory(stat))
+
+	// make sure path exists and is a directory
+	if (!fs::exists(stat))
 	{
-		std::cout << "no directory found: " << path << '\n';
+		std::cerr << path << " does not exist\n";
+		return (int)AsmLnkErrorExt::DirectoryNotFound;
+	}
+	if (!fs::is_directory(stat))
+	{
+		std::cerr << path << " is not a directory\n";
 		return (int)AsmLnkErrorExt::DirectoryNotFound;
 	}
 
-	ObjectFile obj;
-	std::string f_path;
-	for (auto &entry : fs::directory_iterator(path, err))
+	// for every item in the directory: if it ends with ".o" load it as an object file
+	for (const auto &entry : fs::directory_iterator(path, err))
 	{
-		f_path = entry.path().string();
-		if (EndsWith(ToUpper(f_path), ".O"))
+		std::string f_path = entry.path().string();
+		if (EndsWith(f_path, ".o"))
 		{
-			int ret = LoadObjectFile(f_path, obj);
+			int ret = LoadObjectFile(f_path, objs.emplace_back());
 			if (ret != 0) return ret;
-
-			objs.emplace_back(std::move(obj));
 		}
 	}
 
 	return 0;
 }
 
-// -- assembly / linking -- //
+// -------------- //
 
-/// <summary>
-/// Assembles the (from) file into an object file and saves it to the (to) file. Returns true if successful
-/// </summary>
-/// <param name="from">source assembly file
-/// <param name="to">destination for resulting object file
-int Assemble(const std::string &from, const std::string &to)
+// -- assembly -- //
+
+// -------------- //
+
+// assembles assembly source code from a file (file) into an object file (dest).
+// file - the assembly source file.
+// dest - the resulting object file (on success).
+int Assemble(const std::string &file, ObjectFile &dest)
 {
-	// open the file
-	std::ifstream f(from);
-	if (!f) { std::cout << "Failed to open \"" << from << "\"\n"; return FailOpen; }
+	// open the file for reading - make sure it succeeds
+	std::ifstream source(file);
+	if (!source) { std::cerr << "Failed to open " << file << " for reading\n"; return FailOpen; }
 
-	// assemble the program
-	ObjectFile obj;
-	AssembleResult res = Assemble(f, obj);
-	
-	// if there was no error
-	if (res.Error == AssembleError::None)
+	// assemble the source
+	AssembleResult res = CSX64::Assemble(source, dest);
+
+	// if there was an error, show error message
+	if (res.Error != AssembleError::None)
 	{
-		// save result
-		return SaveObjectFile(to, obj);
-	}
-	// otherwise show error message
-	else
-	{
-		std::cout << "Assemble Error in " << from << ":\n" << res.ErrorMsg << '\n';
+		std::cerr << "Assemble Error in " << file << ":\n" << res.ErrorMsg << '\n';
 		return (int)res.Error;
 	}
-}
-/// <summary>
-/// Assembles the (from) file into an object file and saves it as the same name but with a .o extension
-/// </summary>
-/// <param name="from">the source assembly file
-int Assemble(const std::string &from)
-{
-	fs::path _path(from);
-	_path.replace_extension(".o");
-	return Assemble(from, _path.string());
+
+	return 0;
 }
 
-// Loads the stdlib object files and appends them to the back of the list.
-// objs    - the destination for storing loaded stdlib object files.
-// rootdir - the root directory to use for core file lookup - null for default
+// ------------- //
+
+// -- linking -- //
+
+// ------------- //
+
+// Loads the stdlib object files and appends them to the end of the list.
+// objs    - the destination for storing loaded stdlib object files (appended to end).
+// rootdir - the root directory to use for core file lookup - null for default.
 int LoadStdlibObjs(std::vector<ObjectFile> &objs, const char *rootdir)
 {
 	// get exe directory - default to provided root dir if present
 	const char *dir = rootdir ? rootdir : exe_dir();
-
+	
 	// if that failed, error
 	if (!dir)
 	{
-		// print the error message and a hint of how to fix it
 		std::cerr <<
-			R"(
-Uhoh! Looks like I don't have full support for your system.
-I couldn't find your install directory.
-You can specify it explicitly with --rootdir <pathspec> to bypass this issue.
-)";
+			"Uhoh! Apparently CSX64 doesn't have full support for your system.\n"
+			"Error:  Could not locate root directory.\n"
+			"Bypass: Specify explicitly with --rootdir <pathspec>.\n\n"
+			"Please also post an issue along with your system information to\n"
+			"    https://github.com/dragazo/CSX64-cpp/issues.\n\n";
 
-		// return error code
 		return -1;
 	}
 
 	// load the _start file
-	int ret = LoadObjectFile(objs, dir + (std::string)"/_start.o");
+	int ret = LoadObjectFile(dir + (std::string)"/_start.o", objs.emplace_back());
 	if (ret != 0) return ret;
 
-	// load the stdlib files
-	ret = LoadObjectFileDir(objs, dir + (std::string)"/stdlib");
-	if (ret != 0) return ret;
-
-	return 0;
+	// then load the stdlib files
+	return LoadObjectFileDir(objs, dir + (std::string)"/stdlib");
 }
 
-/// <summary>
-/// Links several object files to create an executable and saves it to the (to) file. Returns true if successful
-/// </summary>
-/// <param name="paths">the object files to link</param>
-/// <param name="to">destination for the resulting executable</param>
-/// <param name="entry_point">the main entry point</param>
-/// <param name="rootdir">the root directory to use for core file lookup - null for default</param>
-int Link(std::vector<std::string> &paths, const std::string &to, const std::string &entry_point, const char *rootdir)
+// Links several files to create an executable (stored to dest).
+// dest        - the resulting executable (on success).
+// files       - the files to link. ".o" files are loaded as object files, otherwise treated as assembly source and assembled.
+// entry_point - the main entry point.
+// rootdir     - the root directory to use for core file lookup - null for default.
+int Link(std::vector<u8> &dest, const std::vector<std::string> &files, const std::string &entry_point, const char *rootdir)
 {
 	std::vector<ObjectFile> objs;
-	int ret; // error code location temporary
 
 	// load the stdlib files
-	ret = LoadStdlibObjs(objs, rootdir);
+	int ret = LoadStdlibObjs(objs, rootdir);
 	if (ret != 0) return ret;
 
-	// load the user-defined pathspecs
-	for(const std::string &path : paths)
+	// load the provided files
+	for (const std::string &file : files)
 	{
-		ret = LoadObjectFile(objs, path);
+		// treat ".o" as object file, otherwise as assembly source
+		ret = EndsWith(file, ".o") ? LoadObjectFile(file, objs.emplace_back()) : Assemble(file, objs.emplace_back());
 		if (ret != 0) return ret;
 	}
 
-	// link the object files
-	std::vector<u8> exe;
-	LinkResult res = Link(exe, objs, entry_point);
+	// link the resulting object files into an executable
+	LinkResult res = CSX64::Link(dest, objs, entry_point);
 
-	// if there was no error
-	if (res.Error == LinkError::None)
-	{
-		// save result
-		return SaveBinaryFile(to, exe);
-	}
-	// otherwise show error message
-	else
-	{
-		std::cout << "Link Error:\n" << res.ErrorMsg << '\n';
-		return (int)res.Error;
-	}
-}
-
-// Takes one or more assembly files. Assembles and links them into an executable (stored in exe).
-// exe         - destination for resulting executable data (on success).
-// files       - a list of one or more assembly files.
-// entry_point - the main program entry point to use (for linking).
-// rootdir     - the root directory to use for core file lookup - null for default.
-int AssembleAndLink(std::vector<u8> &exe, const std::vector<std::string> &files, std::string entry_point, const char *rootdir)
-{
-	std::vector<ObjectFile> objs; // list of all object files for linking
-	int ret; // error code temporary
-
-	// load the stdlib object files
-	ret = LoadStdlibObjs(objs, rootdir);
-	if (ret != 0) return ret;
-
-	// assemble all the provided (assembly) files
-	for (const std::string &file : files)
-	{
-		// add a new object file to the objs list - keep the reference to it for convenience
-		ObjectFile &dest = objs.emplace_back();
-
-		// open the file (make sure that succeeds)
-		std::ifstream f(file);
-		if (!f) { std::cout << "Failed to open \"" << file << "\"\n"; return FailOpen; }
-
-		// assemble it - store result in newly-allocated dest object file
-		AssembleResult res = Assemble(f, dest);
-
-		// if there was an error show error message
-		if (res.Error != AssembleError::None)
-		{
-			std::cout << "Assemble Error in " << file << ":\n" << res.ErrorMsg << '\n';
-			return (int)res.Error;
-		}
-	}
-
-	// link all the object files and get the resulting executable
-	LinkResult res = Link(exe, objs, entry_point);
-
-	// if there was an error show error message
+	// if there was an error, show error message
 	if (res.Error != LinkError::None)
 	{
-		std::cout << "Link Error:\n" << res.ErrorMsg << '\n';
+		std::cerr << "Link Error:\n" << res.ErrorMsg << '\n';
 		return (int)res.Error;
 	}
 
 	return 0;
 }
 
+// --------------- //
+
 // -- execution -- //
 
-/// <summary>
-/// Executes a program via the console client. returns true if there were no errors
-/// </summary>
-/// <param name="exe">the code to execute
-/// <param name="args">the command line arguments for the client program
+// --------------- //
+
+// Executes a console program. Return value is either client program exit code or a csx64 execution error code (delineated in stderr).
+// exe  - the client program to execute
+// args - command line args for the client program.
+// fsf  - value of FSF (file system flag) during client program execution.
+// time - marks if the execution time should be measured.
 int RunConsole(const std::vector<u8> &exe, const std::vector<std::string> &args, bool fsf, bool time)
 {
 	// create the computer
 	Computer computer;
+
+	// for this usage, remove max memory restrictions
+	computer.MaxMemory(~(u64)0);
 
 	try
 	{
@@ -485,90 +411,33 @@ int RunConsole(const std::vector<u8> &exe, const std::vector<std::string> &args,
 	computer.OpenFileWrapper(2, std::make_unique<TerminalOutputFileWrapper>(&std::cerr, false, false));
 
 	// begin execution
-	hrc::time_point start, stop;
-	start = hrc::now();
+	auto start = std::chrono::high_resolution_clock::now();
 	while (computer.Running()) computer.Tick(~(u64)0);
-	stop = hrc::now();
+	auto stop = std::chrono::high_resolution_clock::now();
 
 	// if there was an error
 	if (computer.Error() != ErrorCode::None)
 	{
-		// print error message
-		std::cout << "\n\nError Encountered: " << (int)computer.Error() << '\n';
-		// return execution error code
+		std::cerr << "\n\nError Encountered: " << (int)computer.Error() << '\n';
 		return ExecErrorReturnCode;
 	}
 	// otherwise no error
 	else
 	{
-		// print elapsed time
-		if (time) std::cout << "\n\nElapsed Time: " << FormatTime(chrono::duration_cast<chrono::nanoseconds>(stop - start).count()) << '\n';
-		// use return value
+		if (time) std::cout << "\n\nElapsed Time: " << FormatTime(std::chrono::duration_cast<std::chrono::nanoseconds>(stop - start).count()) << '\n';
 		return computer.ReturnValue();
 	}
 }
 
-/// <summary>
-/// Executes a program via the console client. returns true if there were no errors
-/// </summary>
-/// <param name="path">the file to execute
-/// <param name="args">the command line arguments for the client program
-int RunConsole(const std::string &path, const std::vector<std::string> &args, bool fsf, bool time)
+// -------------------------- //
+
+// -- cmd line arg parsing -- //
+
+// -------------------------- //
+
+// holds all the information needed to parse command line options for main().
+struct cmdln_pack
 {
-	// read the binary data
-	std::vector<u8> exe;
-	int ret = LoadBinaryFile(path, exe);
-	if (ret != 0) return ret;
-
-	// run as a console client and return success flag
-	return RunConsole(exe, args, fsf, time);
-}
-
-// Takes one or more assembly files. Assembles, links, and executes the result in memory as a console application.
-// files       - a list of one or more assembly files.
-// entry_point - the main program entry point to use (for linking).
-// rootdir     - the root directory to use for core file lookup - null for default.
-// args        - a list of command line args to provide the program during execution.
-// fsf         - marks if the fsf flag is set during execution.
-// time        - marks if the execution phase should be timed.
-int RunConsoleScript(const std::vector<std::string> &files, std::string entry_point, const char *rootdir, const std::vector<std::string> &args, bool fsf, bool time)
-{
-	std::vector<u8> exe;
-	int ret = AssembleAndLink(exe, files, entry_point, rootdir);
-	if (ret != 0) return ret;
-
-	return RunConsole(exe, args, fsf, time);
-}
-
-// -- main -- //
-
-int main(int argc, const char *argv[])
-{
-	using namespace CSX64;
-
-	// we make a lot of assumptions about the current platform being little-endian (in fact some code still artificially simulates it)
-	// however, the majority isn't simulated since that'd be ridiculously-slow - so we need to make sure this system is really little-endian.
-
-	if (!IsLittleEndian())
-	{
-		std::cerr << "Uhoh!! Looks like this platform isn't little-endian!\n"
-			"Most everything in CSX64 assumes little-endian,\n"
-			"so none of it will work on this system!\n\n";
-		return -1;
-	}
-
-	// we also make a lot of assumptions that floating-zero is integral-zero, so we need to make sure that's a valid assumption
-
-	if (!IsBitZeroFP())
-	{
-		std::cerr << "Uhoh!! Looks like this platform doesn't use IEEE-754 floating-point!\n"
-			"Most floating-point operations in CSX64 assume this,\n"
-			"so none of it will work on this system!\n\n";
-		return -1;
-	}
-
-	// --------------------------------------------------------------------------------------- //
-
 	ProgramAction action = ProgramAction::ExecuteConsole; // requested action
 	std::vector<std::string> pathspec;                    // input paths
 	const char *entry_point = nullptr;                    // main entry point for linker
@@ -578,99 +447,263 @@ int main(int argc, const char *argv[])
 	bool time = false;                                    // time flag
 	bool accepting_options = true;                        // marks that we're still accepting options
 
-	// process the terminal args
-	for (int i = 1; i < argc; ++i)
+	// these are parsing helpers - ignore
+	int argc, i;
+	const char *const *argv;
+
+	// parses the provided command line args and fills out this structure with the results.
+	// returns true on success. failure returns false after printing an error message to stderr.
+	// MUST BE CALLED ON A FRESHLY-CONSTRUCTED PACK.
+	bool parse(int _argc, const char *const *_argv);
+};
+
+bool _help(cmdln_pack &p) { std::cout << HelpMessage; return false; }
+
+bool _assemble(cmdln_pack &p)
+{
+	if (p.action != ProgramAction::ExecuteConsole) { std::cerr << p.argv[p.i] << ": Already specified mode\n"; return false; }
+	
+	p.action = ProgramAction::Assemble;
+	return true;
+}
+bool _link(cmdln_pack &p)
+{
+	if (p.action != ProgramAction::ExecuteConsole) { std::cerr << p.argv[p.i] << ": Already specified mode\n"; return false; }
+	
+	p.action = ProgramAction::Link;
+	return true;
+}
+bool _script(cmdln_pack &p)
+{
+	if (p.action != ProgramAction::ExecuteConsole) { std::cerr << p.argv[p.i] << ": Already specified mode\n"; return false; }
+	
+	p.action = ProgramAction::ExecuteConsoleScript;
+	return true;
+}
+bool _multiscript(cmdln_pack &p)
+{
+	if (p.action != ProgramAction::ExecuteConsole) { std::cerr << p.argv[p.i] << ": Already specified mode\n"; return false; }
+
+	p.action = ProgramAction::ExecuteConsoleMultiscript;
+	return true;
+}
+
+bool _out(cmdln_pack &p)
+{
+	if (p.output != nullptr) { std::cerr << p.argv[p.i] << ": Already specified output path\n"; return false; }
+	if (p.i + 1 >= p.argc) { std::cerr << p.argv[p.i] << ": Expected output path\n"; return false; }
+
+	p.output = p.argv[++p.i];
+	return true;
+}
+bool _entry(cmdln_pack &p)
+{
+	if (p.entry_point != nullptr) { std::cerr << p.argv[p.i] << ": Already specified entry point\n"; return false; }
+	if (p.i + 1 >= p.argc) { std::cerr << p.argv[p.i] << ": Expected entry point\n"; return false; }
+
+	p.entry_point = p.argv[++p.i];
+	return true;
+}
+bool _rootdir(cmdln_pack &p)
+{
+	if (p.rootdir != nullptr) { std::cerr << p.argv[p.i] << ": Already specified root directory\n"; return false; }
+	if (p.i + 1 >= p.argc) { std::cerr << p.argv[p.i] << ": Expected root directory\n"; return false; }
+
+	p.rootdir = p.argv[++p.i];
+	return true;
+}
+
+bool _fs(cmdln_pack &p) { p.fsf = true; return true; }
+bool _time(cmdln_pack &p) { p.time = true; return true; }
+bool _end(cmdln_pack &p) { p.accepting_options = false; return true; }
+
+// maps (long) options to their parsing handlers
+const std::unordered_map<std::string, bool(*)(cmdln_pack&)> long_names
+{
+	{ "--help", _help },
+
+{ "--assemble", _assemble },
+{ "--link", _link },
+{ "--script", _script },
+{ "--multiscript", _multiscript },
+
+{ "--output", _out },
+{ "--entry", _entry },
+{ "--rootdir", _rootdir },
+
+{ "--fs", _fs },
+{ "--time", _time },
+{ "--end", _end },
+};
+// maps (short) options to their parsing handlers
+const std::unordered_map<char, bool(*)(cmdln_pack&)> short_names
+{
+	{ '-', [](cmdln_pack&) { return true; } }, // no-op separator
+
+{ 'h', _help },
+
+{ 'a', _assemble },
+{ 'l', _link },
+{ 's', _script },
+{ 'S', _multiscript },
+
+{ 'o', _out },
+
+{ 't', _time },
+};
+
+bool cmdln_pack::parse(int _argc, const char *const *_argv)
+{
+	// set up argc/argv for the parsing pack
+	argc = _argc;
+	argv = _argv;
+
+	// for each arg (store index in this->i for handlers)
+	for (i = 1; i < argc; ++i)
 	{
-		// if we're still accepting options
 		if (accepting_options)
 		{
-			// do the long names first
-			/**/ if (strcmp(argv[i], "--help") == 0) { std::cout << HelpMessage; return 0; }
-			else if (strcmp(argv[i], "--assemble") == 0) { if (action != ProgramAction::ExecuteConsole) { std::cout << "usage error - see -h for help\n"; return 0; } action = ProgramAction::Assemble; }
-			else if (strcmp(argv[i], "--link") == 0) { if (action != ProgramAction::ExecuteConsole) { std::cout << "usage error - see -h for help\n"; return 0; } action = ProgramAction::Link; }
-			else if (strcmp(argv[i], "--script") == 0) { if (action != ProgramAction::ExecuteConsole) { std::cout << "usage error - see -h for help\n"; return 0; } action = ProgramAction::ExecuteConsoleScript; }
-			else if (strcmp(argv[i], "--multiscript") == 0) { if (action != ProgramAction::ExecuteConsole) { std::cout << "usage error - see -h for help\n"; return 0; } action = ProgramAction::ExecuteConsoleMultiscript; }
-			else if (strcmp(argv[i], "--output") == 0) { if (output != nullptr || i + 1 >= argc) { std::cout << "usage error - see -h for help\n"; return 0; } output = argv[++i]; }
-			else if (strcmp(argv[i], "--entry") == 0) { if (entry_point != nullptr || i + 1 >= argc) { std::cout << "usage error - see -h for help\n"; return 0; } entry_point = argv[++i]; }
-			else if (strcmp(argv[i], "--rootdir") == 0) { if (rootdir != nullptr || i + 1 >= argc) { std::cout << "usage error - see -h for help\n"; return 0; } rootdir = argv[++i]; }
-			else if (strcmp(argv[i], "--end") == 0) { accepting_options = false; }
-			else if (strcmp(argv[i], "--fs") == 0) { fsf = true; }
-			else if (strcmp(argv[i], "--time") == 0) { time = true; }
-			else if (strcmp(argv[i], "--") == 0) { /* no-op separator */ }
-			// then the short names
+			auto it = long_names.find(argv[i]);
+
+			// if we found a handler, call it
+			if (it != long_names.end()) { if (!it->second(*this)) return false; }
+			// otherwise if it starts with a '-' it's a list of short options
 			else if (argv[i][0] == '-')
 			{
-				for (const char *arg = argv[i] + 1; *arg; ++arg)
+				for (const char *p = argv[i] + 1; *p; ++p)
 				{
-					switch (*arg)
-					{
-					case 'h': std::cout << HelpMessage; return 0;
-					case 'a': if (action != ProgramAction::ExecuteConsole) { std::cout << "usage error - see -h for help\n"; return 0; } action = ProgramAction::Assemble; break;
-					case 'l': if (action != ProgramAction::ExecuteConsole) { std::cout << "usage error - see -h for help\n"; return 0; } action = ProgramAction::Link; break;
-					case 's': if (action != ProgramAction::ExecuteConsole) { std::cout << "usage error - see -h for help\n"; return 0; } action = ProgramAction::ExecuteConsoleScript; break;
-					case 'S': if (action != ProgramAction::ExecuteConsole) { std::cout << "usage error - see -h for help\n"; return 0; } action = ProgramAction::ExecuteConsoleMultiscript; break;
-					case 'o': if (output != nullptr || i + 1 >= argc) { std::cout << "usage error - see -h for help\n"; return 0; } output = argv[++i]; break;
+					auto it = short_names.find(*p);
 
-					default: std::cout << "unknown option '" << *arg << "' see -h for help\n"; return 0;
-					}
+					// if we found a handler, call it
+					if (it != short_names.end()) { if (!it->second(*this)) return false; }
+					// otherwise it's an unknown option
+					else { std::cerr << argv[i] << ": Unknown option '" << *p << "'\n"; return false; }
 				}
 			}
-			// otherwise it's part of pathspec
+			// otherwise it's a pathspec
 			else pathspec.emplace_back(argv[i]);
 		}
-		// if we're not accepting options, it's part of pathspec
 		else pathspec.emplace_back(argv[i]);
 	}
 
+	return true;
+}
+
+// -------------------- //
+
+// -- main interface -- //
+
+// -------------------- //
+
+int main(int argc, char *argv[])
+{
+	// we make a lot of assumptions about the current platform being little-endian (in fact some code still artificially simulates it)
+	// however, the majority isn't simulated since that'd be ridiculously-slow - so we need to make sure this system is really little-endian.
+
+	if (!IsLittleEndian())
+	{
+		std::cerr <<
+			"Uhoh!! Looks like this platform isn't little-endian!\n"
+			"Most everything in CSX64 assumes little-endian,\n"
+			"so most of it won't work on this system!\n\n";
+		return -1;
+	}
+
+	// ------------------------------------ //
+
+	cmdln_pack dat; // command line option parsing pack
+
+	// parse our command line args - on failure a message is printed to stdout, just return 0.
+	if (!dat.parse(argc, argv)) return 0;
+
+	// ------------------------------------ //
+
 	// perform the action
-	switch (action)
+	switch (dat.action)
 	{
 	case ProgramAction::ExecuteConsole:
-		if (pathspec.empty()) { std::cout << "Expected a file to execute\n"; return 0; }
-		return RunConsole(pathspec[0], pathspec, fsf, time);
+
+	{
+		if (dat.pathspec.empty()) { std::cerr << "Expected a file to execute\n"; return 0; }
+
+		std::vector<u8> exe;
+		int res = LoadExecutable(dat.pathspec[0], exe);
+
+		return res != 0 ? res : RunConsole(exe, dat.pathspec, dat.fsf, dat.time);
+	}
 
 	case ProgramAction::ExecuteConsoleScript:
 
-		// add the assembler predefines now
-		AddPredefines();
+	{
+		if (dat.pathspec.empty()) { std::cerr << "Expected a file to assemble, link, and execute\n"; return 0; }
 
-		if (pathspec.empty()) { std::cout << "Expected a file to assemble, link, and execute\n"; return 0; }
-		return RunConsoleScript({ pathspec[0] }, entry_point ? entry_point : "main", rootdir, pathspec, fsf, time);
+		AddPredefines();
+		std::vector<u8> exe;
+
+		int res = Link(exe, { dat.pathspec[0] }, dat.entry_point ? dat.entry_point : "main", dat.rootdir);
+		return res != 0 ? res : RunConsole(exe, dat.pathspec, dat.fsf, dat.time);
+	}
 
 	case ProgramAction::ExecuteConsoleMultiscript:
 
-		// add the assembler predefines now
-		AddPredefines();
+	{
+		if (dat.pathspec.empty()) { std::cerr << "Expected 1+ files to assemble, link, and execute\n"; return 0; }
 
-		if (pathspec.empty()) { std::cout << "Expected 1+ files to assemble, link, and execute\n"; return 0; }
-		return RunConsoleScript(pathspec, entry_point ? entry_point : "main", rootdir, { "<script>" }, fsf, time);
+		AddPredefines();
+		std::vector<u8> exe;
+
+		int res = Link(exe, dat.pathspec, dat.entry_point ? dat.entry_point : "main", dat.rootdir);
+		return res != 0 ? res : RunConsole(exe, { "<script>" }, dat.fsf, dat.time);
+	}
 
 	case ProgramAction::Assemble:
-		if (pathspec.empty()) { std::cout << "Assembler expected at least 1 file to assemble\n"; return 0; }
-		
-		// add the assembler predefines now
+
+	{
+		if (dat.pathspec.empty()) { std::cerr << "Expected at least 1 file to assemble\n"; return 0; }
+
 		AddPredefines();
-		
-		if (output == nullptr) // if no output is provided, batch process each pathspec
+		ObjectFile obj;
+
+		// if no explicit output is provided, batch process each pathspec
+		if (dat.output == nullptr)
 		{
-			for (const std::string &path : pathspec)
+			for (const std::string &path : dat.pathspec)
 			{
-				int res = Assemble(path);
+				fs::path dest(path);
+				dest.replace_extension(".o");
+
+				int res = Assemble(path, obj);
+				if (res != 0) return res;
+
+				res = SaveObjectFile(dest.string(), obj);
 				if (res != 0) return res;
 			}
 			return 0;
 		}
-		else // otherwise, we're expecting only one input with a named output
+		// otherwise, we're expecting only one input with a named output
+		else
 		{
-			if (pathspec.size() != 1) { std::cout << "Assembler with an explicit output expected only one input\n"; return 0; }
-			return Assemble(pathspec[0], output);
+			if (dat.pathspec.size() != 1) { std::cerr << "Assembler with an explicit output expected only one input\n"; return 0; }
+
+			int res = Assemble(dat.pathspec[0], obj);
+			return res != 0 ? res : SaveObjectFile(dat.output, obj);
 		}
+	}
 
 	case ProgramAction::Link:
-		if (pathspec.empty()) { std::cout << ("Linker expected at least 1 file to link\n"); return 0; }
 
-		return Link(pathspec, output ? output : "a.exe", entry_point ? entry_point : "main", rootdir);
+	{
+		if (dat.pathspec.empty()) { std::cerr << "Linker expected at least 1 file to link\n"; return 0; }
+
+		AddPredefines();
+		std::vector<u8> exe;
+
+		int res = Link(exe, dat.pathspec, dat.entry_point ? dat.entry_point : "main", dat.rootdir);
+
+		return res != 0 ? res : SaveExecutable(dat.output ? dat.output : "a.out", exe);
 	}
+
+	} // end switch
 
 	return 0;
 }

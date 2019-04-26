@@ -95,8 +95,6 @@ namespace CSX64
 		// mark as initially dirty
 		obj._Clean = false;
 
-		u64 i;
-
 		u32 temp32;
 		u64 temp64;
 
@@ -109,7 +107,7 @@ namespace CSX64
 		if (!BinRead(reader, temp32)) goto err;
 		obj.GlobalSymbols.clear();
 		obj.GlobalSymbols.reserve(temp32);
-		for (i = 0; i < temp32; ++i)
+		for (u64 i = 0; i < temp32; ++i)
 		{
 			if (!BinRead(reader, str)) goto err;
 			obj.GlobalSymbols.emplace(std::move(str));
@@ -120,7 +118,7 @@ namespace CSX64
 		if (!BinRead(reader, temp32)) goto err;
 		obj.ExternalSymbols.clear();
 		obj.ExternalSymbols.reserve(temp32);
-		for (i = 0; i < temp32; ++i)
+		for (u64 i = 0; i < temp32; ++i)
 		{
 			if (!BinRead(reader, str)) goto err;
 			obj.ExternalSymbols.emplace(std::move(str));
@@ -131,7 +129,7 @@ namespace CSX64
 		if (!BinRead(reader, temp32)) goto err;
 		obj.Symbols.clear();
 		obj.Symbols.reserve(temp32);
-		for (i = 0; i < temp32; ++i)
+		for (u64 i = 0; i < temp32; ++i)
 		{
 			if (!BinRead(reader, str)) goto err;
 			if (!Expr::ReadFrom(reader, expr)) goto err;
@@ -150,7 +148,7 @@ namespace CSX64
 		if (!BinRead(reader, temp32)) goto err;
 		obj.TextHoles.clear();
 		obj.TextHoles.reserve(temp32);
-		for (i = 0; i < temp32; ++i)
+		for (u64 i = 0; i < temp32; ++i)
 		{
 			if (!HoleData::ReadFrom(reader, hole)) goto err;
 			obj.TextHoles.emplace_back(std::move(hole));
@@ -159,7 +157,7 @@ namespace CSX64
 		if (!BinRead(reader, temp32)) goto err;
 		obj.RodataHoles.clear();
 		obj.RodataHoles.reserve(temp32);
-		for (i = 0; i < temp32; ++i)
+		for (u64 i = 0; i < temp32; ++i)
 		{
 			if (!HoleData::ReadFrom(reader, hole)) goto err;
 			obj.RodataHoles.emplace_back(std::move(hole));
@@ -168,7 +166,7 @@ namespace CSX64
 		if (!BinRead(reader, temp32)) goto err;
 		obj.DataHoles.clear();
 		obj.DataHoles.reserve(temp32);
-		for (i = 0; i < temp32; ++i)
+		for (u64 i = 0; i < temp32; ++i)
 		{
 			if (!HoleData::ReadFrom(reader, hole)) goto err;
 			obj.DataHoles.emplace_back(std::move(hole));
