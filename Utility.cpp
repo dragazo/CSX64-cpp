@@ -9,6 +9,7 @@
 #include <iomanip>
 #include <vector>
 #include <exception>
+#include <stdexcept>
 #include <cctype>
 #include <iostream>
 #include <random>
@@ -46,109 +47,6 @@ namespace CSX64
 		if (istr.gcount() != len) istr.setstate(std::ios::failbit);
 
 		return istr;
-	}
-
-	// -- math utilities -- //
-
-	void Neg_128(u64 &high, u64 &low)
-	{
-		high = ~high;
-		low = ~low + 1;
-		if (low == 0) ++high;
-	}
-
-	void UnsignedMul(u64 a, u64 b, u64 &res_high, u64 &res_low)
-	{
-		// a * b = (wh + x) * (yh + z) = (wy)h^2 + (wz + xy)h + xz
-
-		// extract the values
-		u64 w = a >> 32;
-		u64 x = a & 0xffffffff;
-		u64 y = b >> 32;
-		u64 z = b & 0xffffffff;
-
-		// compute the results
-		u64 high = w * y;
-		u64 mid = w * z + x * y;
-		u64 low = x * z;
-
-		// merge mid into high
-		high += mid >> 32;
-		// account for overflow from mid calculation
-		if (mid < w * z) high += (u64)1 << 32;
-
-		// merge mid into low
-		w = low;
-		low += mid << 32;
-		// account for overflow in low
-		if (low < w) ++high;
-
-		// store results
-		res_high = high;
-		res_low = low;
-	}
-	void SignedMul(u64 a, u64 b, u64 &res_high, u64 &res_low)
-	{
-		// we'll do the signed variant in terms of unsigned
-
-		// get net negative flag
-		bool neg = false;
-		if ((i64)a < 0) { a = ~a + 1; neg = !neg; }
-		if ((i64)b < 0) { b = ~b + 1; neg = !neg; }
-
-		// perform unsigned product
-		UnsignedMul(a, b, res_high, res_low);
-
-		// account for sign
-		if (neg) Neg_128(res_high, res_low);
-	}
-
-	void UnsignedDiv(u64 num_high, u64 num_low, u64 denom, u64 &quot_high, u64 &quot_low, u64 &rem)
-	{
-		using namespace BiggerInts;
-
-		// if it's really a 64-bit divide, we can do it with built-in operators (significantly faster on hardware than simulated)
-		if (num_high == 0)
-		{
-			quot_high = 0;
-			quot_low = num_low / denom;
-			rem = num_low % denom;
-		}
-		// otherwise do a real 128-bit divide
-		else
-		{
-			uint_t<128> num;
-			num.high = num_high;
-			num.low = num_low;
-			auto dm = divmod(num, (uint_t<128>)denom);
-			quot_high = dm.first.high;
-			quot_low = dm.first.low;
-			rem = dm.second.low;
-		}
-	}
-	void SignedDiv(u64 num_high, u64 num_low, u64 denom, u64 &quot_high, u64 &quot_low, u64 &rem)
-	{
-		// we'll do the signed variant in terms of unsigned
-
-		// get net negative flag
-		bool neg = false;
-		if ((i64)num_high < 0) { Neg_128(num_high, num_low); neg = !neg; }
-		if ((i64)denom < 0) { denom = ~denom + 1; neg = !neg; }
-
-		// perform unsigned product
-		UnsignedDiv(num_high, num_low, denom, quot_high, quot_low, rem);
-
-		// account for sign
-		if (neg)
-		{
-			Neg_128(quot_high, quot_low);
-			rem = ~rem + 1;
-		}
-	}
-
-	bool TruncGood_128_64(u64 high, u64 low)
-	{
-		return (i64)low < 0 ? high == ~(u64)0 : high == (u64)0;
 	}
 
 	// -- misc utilities -- //
@@ -267,7 +165,7 @@ namespace CSX64
 	std::string TrimStart(const std::string &str)
 	{
 		std::size_t i;
-		for (i = 0; i < str.size() && std::isspace(str[i]); ++i);
+		for (i = 0; i < str.size() && std::isspace((unsigned char)str[i]); ++i);
 
 		std::string res = str.substr(i);
 		return res;
@@ -275,7 +173,7 @@ namespace CSX64
 	std::string TrimEnd(const std::string &str)
 	{
 		std::size_t sz;
-		for (sz = str.size(); sz > 0 && std::isspace(str[sz - 1]); --sz);
+		for (sz = str.size(); sz > 0 && std::isspace((unsigned char)str[sz - 1]); --sz);
 		
 		std::string res = str.substr(0, sz);
 		return res;
@@ -283,7 +181,7 @@ namespace CSX64
 	std::string TrimEnd(std::string &&str)
 	{
 		std::size_t sz;
-		for (sz = str.size(); sz > 0 && std::isspace(str[sz - 1]); --sz);
+		for (sz = str.size(); sz > 0 && std::isspace((unsigned char)str[sz - 1]); --sz);
 
 		// if it's an rvalue we can exploit std::string being a dynamic array
 		std::string res = std::move(str);
@@ -293,8 +191,8 @@ namespace CSX64
 	std::string Trim(const std::string &str)
 	{
 		std::size_t i, sz;
-		for (i = 0; i < str.size() && std::isspace(str[i]); ++i);
-		for (sz = str.size(); sz > 0 && std::isspace(str[sz - 1]); --sz);
+		for (i = 0; i < str.size() && std::isspace((unsigned char)str[i]); ++i);
+		for (sz = str.size(); sz > 0 && std::isspace((unsigned char)str[sz - 1]); --sz);
 
 		std::string res = str.substr(i, sz - i);
 		return res;
@@ -397,7 +295,7 @@ namespace CSX64
 	}
 	bool StartsWithToken(const std::string &str, const std::string &val)
 	{
-		return StartsWith(str, val) && (str.size() == val.size() || std::isspace(str[val.size()]));
+		return StartsWith(str, val) && (str.size() == val.size() || std::isspace((unsigned char)str[val.size()]));
 	}
 	
 	bool EndsWith(const std::string &str, const std::string &val)

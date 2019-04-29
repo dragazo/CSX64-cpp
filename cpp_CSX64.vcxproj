@@ -156,6 +156,7 @@
     <ClCompile Include="AsmTables.cpp" />
     <ClCompile Include="Assembly.cpp" />
     <ClCompile Include="CompIO.cpp" />
+    <ClCompile Include="Executable.cpp" />
     <ClCompile Include="ExeDir.cpp">
       <DisableLanguageExtensions Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">false</DisableLanguageExtensions>
       <DisableLanguageExtensions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</DisableLanguageExtensions>
@@ -178,6 +179,7 @@
     <ClInclude Include="CoreTypes.h" />
     <ClInclude Include="Computer.h" />
     <ClInclude Include="csx_exceptions.h" />
+    <ClInclude Include="Executable.h" />
     <ClInclude Include="ExeDir.h" />
     <ClInclude Include="Expr.h" />
     <ClInclude Include="FastRng.h" />

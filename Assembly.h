@@ -9,12 +9,9 @@
 #include "CoreTypes.h"
 #include "HoleData.h"
 #include "Expr.h"
+#include "Executable.h"
 
 // -- Assembly -- //
-
-// LIMITATIONS:
-// HoleData assumes 32-bit addresses to cut down on memory/disk usage
-// Assembler/linker use List<byte>, which uses 32-bit indexing
 
 namespace CSX64
 {
@@ -158,7 +155,7 @@ namespace CSX64
 	/// <param name="objs">the object files to link. should all be clean. the first item in this array is the _start file</param>
 	/// <param name="entry_point">the raw starting file</param>
 	/// <exception cref="ArgumentException"></exception>
-	LinkResult Link(std::vector<u8> &exe, std::vector<ObjectFile> &objs, std::string entry_point = "main");
+	LinkResult Link(Executable &exe, std::vector<ObjectFile> &objs, std::string entry_point = "main");
 }
 
 #endif

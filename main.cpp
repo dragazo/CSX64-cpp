@@ -31,7 +31,7 @@ enum class ProgramAction
 };
 
 // An extension of assembly and link error codes for use specifically in
-enum AsmLnkErrorExt
+enum class AsmLnkErrorExt
 {
 	FailOpen = 100,
 	NullPath,
@@ -169,39 +169,59 @@ void AddPredefines()
 // Saves a csx64 executable to a file (no format checking).
 // path - the file to save to.
 // exe  - the csx64 executable to save.
-int SaveExecutable(const std::string &path, const std::vector<u8> &exe)
+int SaveExecutable(const std::string &path, const Executable &exe)
 {
-	std::ofstream f(path, std::ios::binary);
-	if (!f) { std::cerr << "Failed to open " << path << " for writing\n"; return FailOpen; }
-
-	// write the data
-	f.write(reinterpret_cast<const char*>(exe.data()), exe.size()); // aliasing is ok because we're going between signed/unsigned variants
-
-	// make sure it succeeded
-	if (!f) { std::cerr << "IO error while writing to " << path << '\n'; return IOError; }
-
-	return 0;
+	try
+	{
+		exe.save(path);
+		return 0;
+	}
+	catch (const FileOpenError&)
+	{
+		std::cerr << "Failed to open " << path << " for writing\n";
+		return (int)AsmLnkErrorExt::FailOpen;
+	}
+	catch (const IOError&)
+	{
+		std::cerr << "An IO error occurred while saving executable to " << path << '\n';
+		return (int)AsmLnkErrorExt::IOError;
+	}
 }
 // Loads a csx64 executable from a file (no format checking).
 // path - the file to read.
 // exe  - the resulting csx64 executable (on success).
-int LoadExecutable(const std::string &path, std::vector<u8> &exe)
+int LoadExecutable(const std::string &path, Executable &exe)
 {
-	std::ifstream f(path, std::ios::binary | std::ios::ate);
-	if (!f) { std::cerr << "Failed to open " << path << " for reading\n"; return FailOpen; }
-
-	// get length and go back to start
-	exe.clear();
-	exe.resize(f.tellg());
-	f.seekg(0);
-
-	// read the contents
-	f.read(reinterpret_cast<char*>(exe.data()), exe.size()); // aliasing is ok because we're going between signed/unsigned variants
-	
-	// make sure it succeeded
-	if ((std::size_t)f.gcount() != exe.size()) { std::cerr << "IO error while reading from " << path << '\n'; return IOError; }
-
-	return 0;
+	try
+	{
+		exe.load(path);
+		return 0;
+	}
+	catch (const FileOpenError&)
+	{
+		std::cerr << "Failed to open " << path << " for reading\n";
+		return (int)AsmLnkErrorExt::FailOpen;
+	}
+	catch (const TypeError&)
+	{
+		std::cerr << path << " is not a CSX64 executable\n";
+		return (int)AsmLnkErrorExt::FormatError;
+	}
+	catch (const VersionError&)
+	{
+		std::cerr << "Executable " << path << " is of an incompatible version of CSX64\n";
+		return (int)AsmLnkErrorExt::FormatError;
+	}
+	catch (const FormatError&)
+	{
+		std::cerr << "Executable " << path << " is of an unrecognized format\n";
+		return (int)AsmLnkErrorExt::FormatError;
+	}
+	catch (const std::bad_alloc&)
+	{
+		std::cerr << "Failed to allocate space for executable\n";
+		return (int)AsmLnkErrorExt::MemoryAllocError;
+	}
 }
 
 // -------------------- //
@@ -210,26 +230,26 @@ int LoadExecutable(const std::string &path, std::vector<u8> &exe)
 
 // -------------------- //
 
-// Saves an object file to a file. Returns true if there were no errors.
+// Saves an object file to a file.
 // path - the destination file to save to.
-// obj  - the object file to serialize.
+// obj  - the object file to save.
 int SaveObjectFile(const std::string &path, const ObjectFile &obj)
 {
 	std::ofstream f(path, std::ios::binary);
-	if (!f) { std::cerr << "Failed to open " << path << " for writing\n"; return FailOpen; }
+	if (!f) { std::cerr << "Failed to open " << path << " for writing\n"; return (int)AsmLnkErrorExt::FailOpen; }
 
-	if (!ObjectFile::WriteTo(f, obj)) { std::cerr << "Failed to write object file " << path << '\n'; return IOError; }
+	if (!ObjectFile::WriteTo(f, obj)) { std::cerr << "Failed to write object file " << path << '\n'; return (int)AsmLnkErrorExt::IOError; }
 	return 0;
 }
-// Loads an object file from a file. Returns true if there were no errors.
+// Loads an object file from a file.
 // path - the source file to read from.
-// obj  - the resulting object file.
+// obj  - the resulting object file (on success).
 int LoadObjectFile(const std::string &path, ObjectFile &obj)
 {
 	std::ifstream f(path, std::ios::binary);
-	if (!f) { std::cerr << "Failed to open " << path << " for reading\n"; return FailOpen; }
+	if (!f) { std::cerr << "Failed to open " << path << " for reading\n"; return (int)AsmLnkErrorExt::FailOpen; }
 
-	if (!ObjectFile::ReadFrom(f, obj)) { std::cerr << "Failed to read object file " << path << '\n'; return IOError; }
+	if (!ObjectFile::ReadFrom(f, obj)) { std::cerr << "Failed to read object file " << path << '\n'; return (int)AsmLnkErrorExt::IOError; }
 	return 0;
 }
 
@@ -242,16 +262,8 @@ int LoadObjectFileDir(std::vector<ObjectFile> &objs, const std::string &path)
 	fs::file_status stat = fs::status(path, err);
 
 	// make sure path exists and is a directory
-	if (!fs::exists(stat))
-	{
-		std::cerr << path << " does not exist\n";
-		return (int)AsmLnkErrorExt::DirectoryNotFound;
-	}
-	if (!fs::is_directory(stat))
-	{
-		std::cerr << path << " is not a directory\n";
-		return (int)AsmLnkErrorExt::DirectoryNotFound;
-	}
+	if (!fs::exists(stat)) { std::cerr << path << " does not exist\n"; return (int)AsmLnkErrorExt::DirectoryNotFound; }
+	if (!fs::is_directory(stat)) { std::cerr << path << " is not a directory\n"; return (int)AsmLnkErrorExt::DirectoryNotFound; }
 
 	// for every item in the directory: if it ends with ".o" load it as an object file
 	for (const auto &entry : fs::directory_iterator(path, err))
@@ -280,7 +292,7 @@ int Assemble(const std::string &file, ObjectFile &dest)
 {
 	// open the file for reading - make sure it succeeds
 	std::ifstream source(file);
-	if (!source) { std::cerr << "Failed to open " << file << " for reading\n"; return FailOpen; }
+	if (!source) { std::cerr << "Failed to open " << file << " for reading\n"; return (int)AsmLnkErrorExt::FailOpen; }
 
 	// assemble the source
 	AssembleResult res = CSX64::Assemble(source, dest);
@@ -335,7 +347,7 @@ int LoadStdlibObjs(std::vector<ObjectFile> &objs, const char *rootdir)
 // files       - the files to link. ".o" files are loaded as object files, otherwise treated as assembly source and assembled.
 // entry_point - the main entry point.
 // rootdir     - the root directory to use for core file lookup - null for default.
-int Link(std::vector<u8> &dest, const std::vector<std::string> &files, const std::string &entry_point, const char *rootdir)
+int Link(Executable &dest, const std::vector<std::string> &files, const std::string &entry_point, const char *rootdir)
 {
 	std::vector<ObjectFile> objs;
 
@@ -375,7 +387,7 @@ int Link(std::vector<u8> &dest, const std::vector<std::string> &files, const std
 // args - command line args for the client program.
 // fsf  - value of FSF (file system flag) during client program execution.
 // time - marks if the execution time should be measured.
-int RunConsole(const std::vector<u8> &exe, const std::vector<std::string> &args, bool fsf, bool time)
+int RunConsole(const Executable &exe, const std::vector<std::string> &args, bool fsf, bool time)
 {
 	// create the computer
 	Computer computer;
@@ -388,15 +400,15 @@ int RunConsole(const std::vector<u8> &exe, const std::vector<std::string> &args,
 		// initialize program
 		computer.Initialize(exe, args);
 	}
-	catch (const ExecutableFormatError &ex)
+	catch (const FormatError &ex)
 	{
 		std::cerr << ex.what() << '\n';
-		return FormatError;
+		return (int)AsmLnkErrorExt::FormatError;
 	}
 	catch (const MemoryAllocException &ex)
 	{
 		std::cerr << ex.what() << '\n';
-		return MemoryAllocError;
+		return (int)AsmLnkErrorExt::MemoryAllocError;
 	}
 
 	// set private flags
@@ -570,6 +582,9 @@ bool cmdln_pack::parse(int _argc, const char *const *_argv)
 			// otherwise if it starts with a '-' it's a list of short options
 			else if (argv[i][0] == '-')
 			{
+				// hold on to the current arg (some options can change i)
+				const char *arg = argv[i];
+				
 				for (const char *p = argv[i] + 1; *p; ++p)
 				{
 					auto it = short_names.find(*p);
@@ -577,7 +592,7 @@ bool cmdln_pack::parse(int _argc, const char *const *_argv)
 					// if we found a handler, call it
 					if (it != short_names.end()) { if (!it->second(*this)) return false; }
 					// otherwise it's an unknown option
-					else { std::cerr << argv[i] << ": Unknown option '" << *p << "'\n"; return false; }
+					else { std::cerr << arg << ": Unknown option '" << *p << "'\n"; return false; }
 				}
 			}
 			// otherwise it's a pathspec
@@ -626,9 +641,9 @@ int main(int argc, char *argv[])
 	{
 		if (dat.pathspec.empty()) { std::cerr << "Expected a file to execute\n"; return 0; }
 
-		std::vector<u8> exe;
+		Executable exe;
+		
 		int res = LoadExecutable(dat.pathspec[0], exe);
-
 		return res != 0 ? res : RunConsole(exe, dat.pathspec, dat.fsf, dat.time);
 	}
 
@@ -638,8 +653,8 @@ int main(int argc, char *argv[])
 		if (dat.pathspec.empty()) { std::cerr << "Expected a file to assemble, link, and execute\n"; return 0; }
 
 		AddPredefines();
-		std::vector<u8> exe;
-
+		Executable exe;
+		
 		int res = Link(exe, { dat.pathspec[0] }, dat.entry_point ? dat.entry_point : "main", dat.rootdir);
 		return res != 0 ? res : RunConsole(exe, dat.pathspec, dat.fsf, dat.time);
 	}
@@ -650,8 +665,8 @@ int main(int argc, char *argv[])
 		if (dat.pathspec.empty()) { std::cerr << "Expected 1+ files to assemble, link, and execute\n"; return 0; }
 
 		AddPredefines();
-		std::vector<u8> exe;
-
+		Executable exe;
+		
 		int res = Link(exe, dat.pathspec, dat.entry_point ? dat.entry_point : "main", dat.rootdir);
 		return res != 0 ? res : RunConsole(exe, { "<script>" }, dat.fsf, dat.time);
 	}
@@ -659,7 +674,7 @@ int main(int argc, char *argv[])
 	case ProgramAction::Assemble:
 
 	{
-		if (dat.pathspec.empty()) { std::cerr << "Expected at least 1 file to assemble\n"; return 0; }
+		if (dat.pathspec.empty()) { std::cerr << "Expected 1+ files to assemble\n"; return 0; }
 
 		AddPredefines();
 		ObjectFile obj;
@@ -693,13 +708,12 @@ int main(int argc, char *argv[])
 	case ProgramAction::Link:
 
 	{
-		if (dat.pathspec.empty()) { std::cerr << "Linker expected at least 1 file to link\n"; return 0; }
+		if (dat.pathspec.empty()) { std::cerr << "Linker expected 1+ files to link\n"; return 0; }
 
 		AddPredefines();
-		std::vector<u8> exe;
+		Executable exe;
 
 		int res = Link(exe, dat.pathspec, dat.entry_point ? dat.entry_point : "main", dat.rootdir);
-
 		return res != 0 ? res : SaveExecutable(dat.output ? dat.output : "a.out", exe);
 	}
 

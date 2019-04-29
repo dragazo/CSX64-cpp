@@ -23,6 +23,7 @@
 #include "Expr.h"
 #include "AsmRouting.h"
 #include "AsmTables.h"
+#include "Executable.h"
 
 namespace CSX64
 {
@@ -464,7 +465,7 @@ namespace CSX64
 		// return no error
 		return {AssembleError::None, ""};
 	}
-	LinkResult Link(std::vector<u8> &exe, std::vector<ObjectFile> &objs, std::string entry_point)
+	LinkResult Link(Executable &exe, std::vector<ObjectFile> &objs, std::string entry_point)
 	{
 		// parsing locations for evaluation
 		u64 _res;
@@ -679,22 +680,15 @@ namespace CSX64
 
 		// -- finalize things -- //
 
-		// allocate executable space (header + text + data)
-		exe.clear();
-		exe.resize(32 + text.size() + rodata.size() + data.size());
-
-		// write header (length of each segment)
-		Write(exe, 0, 8, text.size());
-		Write(exe, 8, 8, rodata.size());
-		Write(exe, 16, 8, data.size());
-		Write(exe, 24, 8, bsslen);
-
-		// copy text and data
-		if (text.size() > 0) std::memcpy(exe.data() + 32, text.data(), text.size());
-		if (rodata.size() > 0) std::memcpy(exe.data() + 32 + text.size(), rodata.data(), rodata.size());
-		if (data.size() > 0) std::memcpy(exe.data() + 32 + text.size() + rodata.size(), data.data(), data.size());
-
-		// linked successfully
-		return {LinkError::None, ""};
+		// construct the executable and we're good to go
+		try
+		{
+			exe.construct(text, rodata, data, bsslen);
+			return { LinkError::None, "" };
+		}
+		catch (const std::overflow_error&)
+		{
+			return { LinkError::FormatError, "Sum of segment sizes exceeded maximum size" };
+		}
 	}
 }

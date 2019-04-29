@@ -11,45 +11,31 @@ namespace CSX64
 	u64 op_exe_count[256];
 	#endif
 
-	void Computer::Initialize(const std::vector<u8> &exe, const std::vector<std::string> &args, u64 stacksize)
+	void Computer::Initialize(const Executable &exe, const std::vector<std::string> &args, u64 stacksize)
 	{
-		// read header
-		u64 text_seglen;
-		u64 rodata_seglen;
-		u64 data_seglen;
-		u64 bss_seglen;
-		if (!Read(exe, 0, 8, text_seglen) || !Read(exe, 8, 8, rodata_seglen) || !Read(exe, 16, 8, data_seglen) || !Read(exe, 24, 8, bss_seglen))
-			throw ExecutableFormatError("executable header missing");
+		// get size of memory we need to allocate
+		u64 size = exe.total_size() + stacksize;
+
+		// make sure we catch overflow from adding stacksize
+		if (size < stacksize) throw std::overflow_error("memory size overflow");
+		// make sure it's within max memory usage limits
+		if (size > max_mem_size) throw MemoryAllocException("executable size exceeded max memory");
 		
-		// make sure exe is well-formed
-		if (32 + text_seglen + rodata_seglen + data_seglen != exe.size())
-			throw ExecutableFormatError("executable header invalid");
+		// allocate the required space (we can safely discard any previous values)
+		if (!this->realloc(size, false)) throw MemoryAllocException("memory allocation failed");
 
-		// get size of memory and make sure it's within limits
-		u64 size = exe.size() - 32 + bss_seglen + stacksize;
-
-		// mark the minimum memory size (so we can't truncate off program code/data/stack/etc.)
+		// mark the minimum memory size (so client code can't truncate off program code/data/stack/etc.)
 		min_mem_size = size;
 
-		// make sure it's within max memory usage limits
-		if (size > max_mem_size)
-			throw MemoryAllocException("executable size exceeded max memory");
-		
-		// get new memory array (does not include header)
-		if (!this->realloc(size, false))
-			throw MemoryAllocException("memory allocation failed");
-
-		// copy over the text/rodata/data segments (not including header)
-		std::memcpy(mem, exe.data() + 32, exe.size() - 32);
+		// copy the executable content into our memory array
+		std::memcpy(mem, exe.content(), exe.content_size());
 		// zero the bss segment
-		std::memset(reinterpret_cast<char*>(mem) + (exe.size() - 32), 0, bss_seglen);
-		// randomize the stack segment
-		//for (u64 i = exe.size() - 32 + bss_seglen; i < Memory.size(); ++i) Memory[i] = Rand();
+		std::memset(reinterpret_cast<char*>(mem) + exe.content_size(), 0, exe.bss_seglen());
 
 		// set up memory barriers
-		ExeBarrier = text_seglen;
-		ReadonlyBarrier = text_seglen + rodata_seglen;
-		StackBarrier = text_seglen + rodata_seglen + data_seglen + bss_seglen;
+		ExeBarrier = exe.text_seglen();
+		ReadonlyBarrier = exe.text_seglen() + exe.rodata_seglen();
+		StackBarrier = exe.text_seglen() + exe.rodata_seglen() + exe.data_seglen() + exe.bss_seglen();
 
 		// set up cpu registers
 		for (int i = 0; i < 16; ++i) CPURegisters[i].x64() = Rand();

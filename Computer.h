@@ -20,7 +20,9 @@
 #include "ExeTypes.h"
 #include "Utility.h"
 #include "FastRng.h"
+#include "Executable.h"
 #include "ios-frstor/iosfrstor.h"
+#include "BiggerInts/BiggerInts.h"
 
 // macros for generating flag union expressions for use with a Computer object
 // __VA_ARGS__ was expanding non-standardly in VS, which is why the below macro recursion doesn't use it
@@ -57,9 +59,6 @@ namespace CSX64
 	class Computer
 	{
 	public: // -- info -- //
-
-		// the version of CSX64
-		static const u64 Version = 0x0500;
 
 		// the number of file descriptors available to this computer
 		static const int FDCount = 16;
@@ -288,15 +287,13 @@ namespace CSX64
 			}
 		}
 
-		/// <summary>
-		/// Initializes the computer for execution
-		/// </summary>
-		/// <param name="exe">the memory to load before starting execution (memory beyond this range is undefined)</param>
-		/// <param name="args">the command line arguments to provide to the computer. pass null or empty array for none</param>
-		/// <param name="stacksize">the amount of additional space to allocate for the program's stack</param>
-		/// throws ExecutableFormatError if the executable is not properly-formatted.
-		/// throws MemoryAllocException if attempting to exceed max memory settings or if allocation fails.
-		void Initialize(const std::vector<u8> &exe, const std::vector<std::string> &args, u64 stacksize = 2 * 1024 * 1024);
+		// Initializes the computer for execution
+		// exe       - the memory to load before starting execution (memory beyond this range is undefined)</param>
+		// args      - the command line arguments to provide to the computer. pass null or empty array for none</param>
+		// stacksize - the amount of additional space to allocate for the program's stack</param>
+		// throws std::overflow_error if the memory size calculation results in an overflow.
+		// throws MemoryAllocException if attempting to exceed max memory settings or if allocation fails.
+		void Initialize(const Executable &exe, const std::vector<std::string> &args, u64 stacksize = 2 * 1024 * 1024);
 
 		/// <summary>
 		/// Performs a single operation. Returns the number of successful operations.
@@ -1954,10 +1951,13 @@ namespace CSX64
 				CF() = OF() = EDX() != 0;
 				break;
 			case 3:
-				UnsignedMul(RAX(), a, RDX(), RAX());
+			{
+				auto _res = (BiggerInts::uint_t<128>)RAX() * (BiggerInts::uint_t<128>)a;
+				RDX() = _res.high; RAX() = _res.low;
 				CF() = OF() = RDX() != 0;
 				break;
 			}
+			} // end switch
 			
 			EFLAGS() ^= Rand() & MASK_UNION_4(SF, ZF, AF, PF);
 
@@ -1976,8 +1976,11 @@ namespace CSX64
 				CPURegisters[s1 >> 4].x32() = (u32)(res >> 32); CPURegisters[s2 & 15].x32() = (u32)res;
 				break;
 			case 3:
-				UnsignedMul(a, b, CPURegisters[s1 >> 4].x64(), CPURegisters[s2 & 15].x64());
+			{
+				auto _res = (BiggerInts::uint_t<128>)a * (BiggerInts::uint_t<128>)b;
+				CPURegisters[s1 >> 4].x64() = _res.high; CPURegisters[s2 & 15].x64() = _res.low;
 				break;
+			}
 
 			default: Terminate(ErrorCode::UndefinedBehavior); return false;
 			}
@@ -2027,10 +2030,13 @@ namespace CSX64
 				CF() = OF() = res != (i32)res;
 				break;
 			case 3:
-				SignedMul(RAX(), a, RDX(), RAX());
-				CF() = OF() = !TruncGood_128_64(RDX(), RAX());
+			{
+				auto _res = (BiggerInts::int_t<128>)(i64)RAX() * (BiggerInts::int_t<128>)a;
+				RDX() = _res.high; RAX() = _res.low;
+				CF() = OF() = _res != (i64)_res;
 				break;
 			}
+			} // end switch
 
 			EFLAGS() ^= Rand() & MASK_UNION_4(SF, ZF, AF, PF);
 
@@ -2064,10 +2070,13 @@ namespace CSX64
 				CF() = OF() = res != (i32)res;
 				break;
 			case 3:
-				SignedMul(a, b, (u64&)a, (u64&)res);
-				CF() = OF() = !TruncGood_128_64(a, res);
+			{
+				auto _res = (BiggerInts::int_t<128>)a * (BiggerInts::int_t<128>)b;
+				res = (i64)_res;
+				CF() = OF() = _res != res;
 				break;
 			}
+			} // end switch
 
 			EFLAGS() ^= Rand() & MASK_UNION_4(SF, ZF, AF, PF);
 
@@ -2101,10 +2110,13 @@ namespace CSX64
 				CF() = OF() = res != (i32)res;
 				break;
 			case 3:
-				SignedMul(a, b, (u64&)a, (u64&)res);
-				CF() = OF() = !TruncGood_128_64(a, res);
+			{
+				auto _res = (BiggerInts::int_t<128>)a * (BiggerInts::int_t<128>)b;
+				res = (i64)_res;
+				CF() = OF() = _res != res;
 				break;
 			}
+			} // end switch
 
 			EFLAGS() ^= Rand() & MASK_UNION_4(SF, ZF, AF, PF);
 
@@ -2126,27 +2138,30 @@ namespace CSX64
 			case 0:
 				full = AX();
 				quo = full / a; rem = full % a;
-				if (quo > 0xff) { Terminate(ErrorCode::ArithmeticError); return false; }
+				if (quo != (u8)quo) { Terminate(ErrorCode::ArithmeticError); return false; }
 				AL() = (u8)quo; AH() = (u8)rem;
 				break;
 			case 1:
 				full = ((u64)DX() << 16) | AX();
 				quo = full / a; rem = full % a;
-				if (quo > 0xffff) { Terminate(ErrorCode::ArithmeticError); return false; }
+				if (quo != (u16)quo) { Terminate(ErrorCode::ArithmeticError); return false; }
 				AX() = (u16)quo; DX() = (u16)rem;
 				break;
 			case 2:
 				full = ((u64)EDX() << 32) | EAX();
 				quo = full / a; rem = full % a;
-				if (quo > 0xffffffff) { Terminate(ErrorCode::ArithmeticError); return false; }
+				if (quo != (u32)quo) { Terminate(ErrorCode::ArithmeticError); return false; }
 				EAX() = (u32)quo; EDX() = (u32)rem;
 				break;
 			case 3:
-				UnsignedDiv(RDX(), RAX(), a, full, quo, rem);
-				if (full != 0) { Terminate(ErrorCode::ArithmeticError); return false; }
-				RAX() = quo; RDX() = rem;
+			{
+				BiggerInts::uint_t<128> Full; Full.high = RDX(); Full.low = RAX();
+				auto divmod = BiggerInts::divmod(Full, (BiggerInts::uint_t<128>)a);
+				if (divmod.first != (u64)divmod.first) { Terminate(ErrorCode::ArithmeticError); return false; }
+				RAX() = (u64)divmod.first; RDX() = (u64)divmod.second;
 				break;
 			}
+			} // end switch
 
 			EFLAGS() ^= Rand() & MASK_UNION_6(CF, OF, SF, ZF, AF, PF);
 
@@ -2187,11 +2202,14 @@ namespace CSX64
 				EAX() = (u32)quo; EDX() = (u32)rem;
 				break;
 			case 3:
-				SignedDiv(RDX(), RAX(), a, (u64&)full, (u64&)quo, (u64&)rem);
-				if (!TruncGood_128_64((u64&)full, (u64&)quo)) { Terminate(ErrorCode::ArithmeticError); return false; }
-				RAX() = quo; RDX() = rem;
+			{
+				BiggerInts::int_t<128> Full; Full.high = RDX(); Full.low = RAX();
+				auto divmod = BiggerInts::divmod(Full, (BiggerInts::int_t<128>)a);
+				if (divmod.first != (i64)divmod.first) { Terminate(ErrorCode::ArithmeticError); return false; }
+				RAX() = (u64)divmod.first; RDX() = (u64)divmod.second;
 				break;
 			}
+			} // end switch
 
 			EFLAGS() ^= Rand() & MASK_UNION_6(CF, OF, SF, ZF, AF, PF);
 

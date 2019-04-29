@@ -23,6 +23,10 @@
 
 namespace CSX64
 {
+	// -- versioning info -- //
+
+	const u64 Version = 0x500;
+
 	// -- arch encoding helpers -- //
 
 	// returns true iff the current system is little-endian
@@ -30,18 +34,6 @@ namespace CSX64
 	{
 		static constexpr u64 val = 0x0102030405060708;
 		return *reinterpret_cast<const unsigned char*>(&val) == 8; // aliasing is ok because casting to char tyoe
-	}
-
-	// returns true iff the current system uses bit-zero to represent floating zero for f32 and f64
-	inline bool IsBitZeroFP()
-	{
-		static constexpr f64 _f_64 = 0;
-		static constexpr u64 _i_64 = 0;
-
-		static constexpr f32 _f_32 = 0;
-		static constexpr u32 _i_32 = 0;
-
-		return std::memcmp(&_f_64, &_i_64, sizeof(u64)) == 0 && std::memcmp(&_f_32, &_i_32, sizeof(u32)) == 0;
 	}
 
 	// -- serialization -- //
@@ -66,24 +58,6 @@ namespace CSX64
 	std::ostream &BinWrite(std::ostream &ostr, const std::string &str);
 	// reads a binary representation of the string from the stream
 	std::istream &BinRead(std::istream &istr, std::string &str);
-
-	// -- math utilities -- //
-
-	// stores the 2's complement negative of high:low into high:low
-	void Neg_128(u64 &high, u64 &low);
-
-	// computes the full (unsigned) product of a * b and stores the result in high:low
-	void UnsignedMul(u64 a, u64 b, u64 &res_high, u64 &res_low);
-	// computes the full (signed) product of a * b and stores the result in high:low
-	void SignedMul(u64 a, u64 b, u64 &res_high, u64 &res_low);
-
-	// computes the (unsigned) division of num by denom and returns the quotient and remainder
-	void UnsignedDiv(u64 num_high, u64 num_low, u64 denom, u64 &quot_high, u64 &quot_low, u64 &rem);
-	// computes the (unsigned) division of num by denom and returns the quotient and remainder
-	void SignedDiv(u64 num_high, u64 num_low, u64 denom, u64 &quot_high, u64 &quot_low, u64 &rem);
-
-	// returns true if low is a lossless truncation of (signed) high:low
-	bool TruncGood_128_64(u64 high, u64 low);
 
 	// -- container utilities -- //
 
@@ -240,7 +214,7 @@ namespace CSX64
 	{
 		std::string res(std::forward<T>(str));
 		for (std::size_t i = 0; i < res.size(); ++i)
-			res[i] = std::toupper(res[i]);
+			res[i] = std::toupper((unsigned char)res[i]);
 		return res;
 	}
 	// converts a string to uppercase (via std::tolower for each char)
@@ -249,7 +223,7 @@ namespace CSX64
 	{
 		std::string res(std::forward<T>(str));
 		for (std::size_t i = 0; i < res.size(); ++i)
-			res[i] = std::tolower(res[i]);
+			res[i] = std::tolower((unsigned char)res[i]);
 		return res;
 	}
 
