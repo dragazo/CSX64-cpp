@@ -1,11 +1,10 @@
-#include <array>
+#include <iostream>
+#include <fstream>
 #include <vector>
 #include <cstdlib>
 #include <cstring>
 #include <exception>
 #include <stdexcept>
-#include <iostream>
-#include <fstream>
 #include <utility>
 
 #include "CoreTypes.h"
@@ -24,13 +23,19 @@ namespace CSX64
 
 		other.clear(); // make sure other is left in the empty state
 	}
-	Executable &Executable::operator=(Executable &&other)
+	Executable &Executable::operator=(Executable &&other) noexcept
+	{	
+		swap(*this, other); // just use the swapping idiom - this is safe on self-assignment
+	}
+
+	// ------------------------------------------------- //
+
+	void swap(Executable &a, Executable &b) noexcept
 	{
 		using std::swap;
 
-		// just use the swapping idiom - this is safe on self-assignment
-		swap(_seglens, other._seglens);
-		swap(_content, other._content);
+		swap(a._seglens, b._seglens);
+		swap(a._content, b._content);
 	}
 
 	// ------------------------------------------------- //
@@ -79,7 +84,7 @@ namespace CSX64
 
 	// ------------------------------------------------- //
 
-	const u8 header[] = { 'C', 'S', 'X', '6', '4', 'e', 'x', 'e' };
+	static const u8 header[] = { 'C', 'S', 'X', '6', '4', 'e', 'x', 'e' };
 
 	void Executable::save(const std::string &path) const
 	{
@@ -111,6 +116,8 @@ namespace CSX64
 		u8 header_temp[sizeof(header)];
 		u64 Version_temp;
 
+		// -- file validation -- //
+
 		// read the header from the file and make sure it matches - match failure is a type error, not a format error.
 		if (!file.read(reinterpret_cast<char*>(header_temp), sizeof(header)) || file.gcount() != sizeof(header)) goto err;
 		if (std::memcmp(header_temp, header, sizeof(header)))
@@ -127,6 +134,8 @@ namespace CSX64
 			throw VersionError("Executable was from an incompatible version of CSX64");
 		}
 
+		// -- read executable info -- //
+
 		// read the segment lengths - make sure we got everything
 		if (!file.read(reinterpret_cast<char*>(_seglens), sizeof(_seglens)) || file.gcount() != sizeof(_seglens)) goto err;
 
@@ -138,6 +147,8 @@ namespace CSX64
 
 		// make sure the file is the correct size
 		if (file_size != 48 + _seglens[0] + _seglens[1] + _seglens[2]) goto err;
+
+		// -- read executable content -- //
 
 		// allocate space to hold the executable content - if that fails set the exe to empty state and rethrow
 		_content.clear();

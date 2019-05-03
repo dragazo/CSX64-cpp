@@ -1,11 +1,13 @@
 #include <iostream>
+#include <fstream>
 
 #include "Assembly.h"
 #include "Utility.h"
+#include "csx_exceptions.h"
 
 namespace CSX64
 {
-	void ObjectFile::Clear()
+	void ObjectFile::clear() noexcept
 	{
 		_Clean = false;
 
@@ -29,179 +31,207 @@ namespace CSX64
 		BssLen = 0;
 	}
 
-	std::ostream &ObjectFile::WriteTo(std::ostream &writer, const ObjectFile &obj)
+	// -------------------------------------------------- //
+
+	static const u8 header[] = { 'C', 'S', 'X', '6', '4', 'o', 'b', 'j' };
+
+	void ObjectFile::save(const std::string &path) const
 	{
 		// ensure the object is clean
-		if (!obj.Clean()) throw std::invalid_argument("Attempt to use dirty object file");
+		if (!is_clean()) throw DirtyError("Attempt to save dirty object file");
+
+		std::ofstream file(path, std::ios::binary);
+		if (!file) throw FileOpenError("Failed to open file for saving object file");
+
+		// -- write header and CSX64 version number -- //
+
+		file.write(reinterpret_cast<const char*>(header), sizeof(header));
+		BinWrite(file, Version);
 
 		// -- write globals -- //
 
-		BinWrite<u32>(writer, (u32)obj.GlobalSymbols.size());
-		for (const std::string &symbol : obj.GlobalSymbols)
-			BinWrite(writer, symbol);
+		BinWrite<u64>(file, GlobalSymbols.size());
+		for (const std::string &symbol : GlobalSymbols)
+			BinWrite(file, symbol);
 		
 		// -- write externals -- //
 
-		BinWrite<u32>(writer, (u32)obj.ExternalSymbols.size());
-		for (const std::string &symbol : obj.ExternalSymbols)
-			BinWrite(writer, symbol);
+		BinWrite<u64>(file, ExternalSymbols.size());
+		for (const std::string &symbol : ExternalSymbols)
+			BinWrite(file, symbol);
 
 		// -- write symbols -- //
 
-		BinWrite<u32>(writer, (u32)obj.Symbols.size());
-		for(const auto &entry : obj.Symbols)
+		BinWrite<u64>(file, Symbols.size());
+		for(const auto &entry : Symbols)
 		{
-			BinWrite(writer, entry.first);
-			Expr::WriteTo(writer, entry.second);
+			BinWrite(file, entry.first);
+			Expr::WriteTo(file, entry.second);
 		}
 		
 		// -- write alignments -- //
 
-		BinWrite(writer, obj.TextAlign);
-		BinWrite(writer, obj.RodataAlign);
-		BinWrite(writer, obj.DataAlign);
-		BinWrite(writer, obj.BSSAlign);
+		BinWrite(file, TextAlign);
+		BinWrite(file, RodataAlign);
+		BinWrite(file, DataAlign);
+		BinWrite(file, BSSAlign);
 
 		// -- write segment holes -- //
 
-		BinWrite<u32>(writer, (u32)obj.TextHoles.size());
-		for (const HoleData &hole : obj.TextHoles) HoleData::WriteTo(writer, hole);
+		BinWrite<u64>(file, TextHoles.size());
+		for (const HoleData &hole : TextHoles) HoleData::WriteTo(file, hole);
 
-		BinWrite<u32>(writer, (u32)obj.RodataHoles.size());
-		for (const HoleData &hole : obj.RodataHoles) HoleData::WriteTo(writer, hole);
+		BinWrite<u64>(file, RodataHoles.size());
+		for (const HoleData &hole : RodataHoles) HoleData::WriteTo(file, hole);
 
-		BinWrite<u32>(writer, (u32)obj.DataHoles.size());
-		for (const HoleData &hole : obj.DataHoles) HoleData::WriteTo(writer, hole);
+		BinWrite<u64>(file, DataHoles.size());
+		for (const HoleData &hole : DataHoles) HoleData::WriteTo(file, hole);
 		
 		// -- write segments -- //
 
-		BinWrite<u64>(writer, obj.Text.size());
-		writer.write(reinterpret_cast<const char*>(obj.Text.data()), obj.Text.size()); // aliasing is ok because they're un/signed variants
+		BinWrite<u64>(file, Text.size());
+		file.write(reinterpret_cast<const char*>(Text.data()), Text.size());
 
-		BinWrite<u64>(writer, obj.Rodata.size());
-		writer.write(reinterpret_cast<const char*>(obj.Rodata.data()), obj.Rodata.size()); // aliasing is ok because we're going between signed/unsigned variants
+		BinWrite<u64>(file, Rodata.size());
+		file.write(reinterpret_cast<const char*>(Rodata.data()), Rodata.size());
 
-		BinWrite<u64>(writer, obj.Data.size());
-		writer.write(reinterpret_cast<const char*>(obj.Data.data()), obj.Data.size()); // aliasing is ok because we're going between signed/unsigned variants
+		BinWrite<u64>(file, Data.size());
+		file.write(reinterpret_cast<const char*>(Data.data()), Data.size());
 		
-		BinWrite<u64>(writer, obj.BssLen);
-		
-		// -- done -- //
+		BinWrite<u64>(file, BssLen);
 
-		return writer;
+		// -- validation -- //
+
+		// make sure the writes succeeded
+		if (!file) throw IOError("Failed to write object file to file");
 	}
-	std::istream &ObjectFile::ReadFrom(std::istream &reader, ObjectFile &obj)
+	void ObjectFile::load(const std::string &path)
 	{
+		std::ifstream file(path, std::ios::binary);
+		if (!file) throw FileOpenError("Failed to open file for loading object file");
+
 		// mark as initially dirty
-		obj._Clean = false;
+		_Clean = false;
 
-		u32 temp32;
-		u64 temp64;
-
+		u64 val;
 		std::string str;
 		Expr expr;
 		HoleData hole;
+		u8 header_temp[sizeof(header)];
+
+		// -- file validation -- //
+
+		// read header and make sure it matches - match failure is type error, not format error.
+		if (!file.read(reinterpret_cast<char*>(header_temp), sizeof(header)) || file.gcount() != sizeof(header)) goto err;
+		if (std::memcmp(header_temp, header, sizeof(header)))
+		{
+			throw TypeError("File was not a CSX64 executable");
+		}
+
+		// read the version number and make sure it matches - match failure is a version error, not a format error
+		if (!BinRead(file, val)) goto err;
+		if (val != Version)
+		{
+			throw VersionError("Executable was from an incompatible version of CSX64");
+		}
 
 		// -- read globals -- //
 
-		if (!BinRead(reader, temp32)) goto err;
-		obj.GlobalSymbols.clear();
-		obj.GlobalSymbols.reserve(temp32);
-		for (u64 i = 0; i < temp32; ++i)
+		if (!BinRead(file, val)) goto err;
+		GlobalSymbols.clear();
+		GlobalSymbols.reserve(val);
+		for (u64 i = 0; i < val; ++i)
 		{
-			if (!BinRead(reader, str)) goto err;
-			obj.GlobalSymbols.emplace(std::move(str));
+			if (!BinRead(file, str)) goto err;
+			GlobalSymbols.emplace(std::move(str));
 		}
 
 		// -- read externals -- //
 
-		if (!BinRead(reader, temp32)) goto err;
-		obj.ExternalSymbols.clear();
-		obj.ExternalSymbols.reserve(temp32);
-		for (u64 i = 0; i < temp32; ++i)
+		if (!BinRead(file, val)) goto err;
+		ExternalSymbols.clear();
+		ExternalSymbols.reserve(val);
+		for (u64 i = 0; i < val; ++i)
 		{
-			if (!BinRead(reader, str)) goto err;
-			obj.ExternalSymbols.emplace(std::move(str));
+			if (!BinRead(file, str)) goto err;
+			ExternalSymbols.emplace(std::move(str));
 		}
 
 		// -- read symbols -- //
 
-		if (!BinRead(reader, temp32)) goto err;
-		obj.Symbols.clear();
-		obj.Symbols.reserve(temp32);
-		for (u64 i = 0; i < temp32; ++i)
+		if (!BinRead(file, val)) goto err;
+		Symbols.clear();
+		Symbols.reserve(val);
+		for (u64 i = 0; i < val; ++i)
 		{
-			if (!BinRead(reader, str)) goto err;
-			if (!Expr::ReadFrom(reader, expr)) goto err;
-			obj.Symbols.emplace(std::move(str), std::move(expr));
+			if (!BinRead(file, str)) goto err;
+			if (!Expr::ReadFrom(file, expr)) goto err;
+			Symbols.emplace(std::move(str), std::move(expr));
 		}
 
 		// -- read alignments -- //
 
-		if (!BinRead(reader, obj.TextAlign)) goto err;
-		if (!BinRead(reader, obj.RodataAlign)) goto err;
-		if (!BinRead(reader, obj.DataAlign)) goto err;
-		if (!BinRead(reader, obj.BSSAlign)) goto err;
+		if (!BinRead(file, TextAlign)) goto err;
+		if (!BinRead(file, RodataAlign)) goto err;
+		if (!BinRead(file, DataAlign)) goto err;
+		if (!BinRead(file, BSSAlign)) goto err;
 
 		// -- read segment holes -- //
 
-		if (!BinRead(reader, temp32)) goto err;
-		obj.TextHoles.clear();
-		obj.TextHoles.reserve(temp32);
-		for (u64 i = 0; i < temp32; ++i)
+		if (!BinRead(file, val)) goto err;
+		TextHoles.clear();
+		TextHoles.reserve(val);
+		for (u64 i = 0; i < val; ++i)
 		{
-			if (!HoleData::ReadFrom(reader, hole)) goto err;
-			obj.TextHoles.emplace_back(std::move(hole));
+			if (!HoleData::ReadFrom(file, hole)) goto err;
+			TextHoles.emplace_back(std::move(hole));
 		}
 
-		if (!BinRead(reader, temp32)) goto err;
-		obj.RodataHoles.clear();
-		obj.RodataHoles.reserve(temp32);
-		for (u64 i = 0; i < temp32; ++i)
+		if (!BinRead(file, val)) goto err;
+		RodataHoles.clear();
+		RodataHoles.reserve(val);
+		for (u64 i = 0; i < val; ++i)
 		{
-			if (!HoleData::ReadFrom(reader, hole)) goto err;
-			obj.RodataHoles.emplace_back(std::move(hole));
+			if (!HoleData::ReadFrom(file, hole)) goto err;
+			RodataHoles.emplace_back(std::move(hole));
 		}
 
-		if (!BinRead(reader, temp32)) goto err;
-		obj.DataHoles.clear();
-		obj.DataHoles.reserve(temp32);
-		for (u64 i = 0; i < temp32; ++i)
+		if (!BinRead(file, val)) goto err;
+		DataHoles.clear();
+		DataHoles.reserve(val);
+		for (u64 i = 0; i < val; ++i)
 		{
-			if (!HoleData::ReadFrom(reader, hole)) goto err;
-			obj.DataHoles.emplace_back(std::move(hole));
+			if (!HoleData::ReadFrom(file, hole)) goto err;
+			DataHoles.emplace_back(std::move(hole));
 		}
 
 		// -- read segments -- //
 
-		if (!BinRead(reader, temp64)) goto err;
-		obj.Text.clear();
-		obj.Text.resize(temp64);
-		reader.read(reinterpret_cast<char*>(obj.Text.data()), temp64); // aliasing is ok because we're going between signed/unsigned variants
-		if ((u64)reader.gcount() != temp64) goto err;
+		if (!BinRead(file, val)) goto err;
+		Text.clear();
+		Text.resize(val);
+		if (!file.read(reinterpret_cast<char*>(Text.data()), val) || file.gcount() != val) goto err;
 
-		if (!BinRead(reader, temp64)) goto err;
-		obj.Rodata.clear();
-		obj.Rodata.resize(temp64);
-		reader.read(reinterpret_cast<char*>(obj.Rodata.data()), temp64); // aliasing is ok because we're going between signed/unsigned variants
-		if ((u64)reader.gcount() != temp64) goto err;
+		if (!BinRead(file, val)) goto err;
+		Rodata.clear();
+		Rodata.resize(val);
+		if (!file.read(reinterpret_cast<char*>(Rodata.data()), val) || file.gcount() != val) goto err;
 
-		if (!BinRead(reader, temp64)) goto err;
-		obj.Data.clear();
-		obj.Data.resize(temp64);
-		reader.read(reinterpret_cast<char*>(obj.Data.data()), temp64); // aliasing is ok because we're going between signed/unsigned variants
-		if ((u64)reader.gcount() != temp64) goto err;
+		if (!BinRead(file, val)) goto err;
+		Data.clear();
+		Data.resize(val);
+		if (!file.read(reinterpret_cast<char*>(Data.data()), val) || file.gcount() != val) goto err;
 
-		if (!BinRead(reader, temp64)) goto err;
-		obj.BssLen = temp64;
+		if (!BinRead(file, BssLen)) goto err;
 
 		// -- done -- //
 
 		// validate the object
-		obj._Clean = true;
-		return reader;
+		_Clean = true;
 
-		// error label we can jump to to avoid repetitive throws
-		err: throw std::runtime_error("Object file was corrupted");
+		return;
+
+	err:
+		throw FormatError("Object file was corrupted");
 	}
 }

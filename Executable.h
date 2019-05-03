@@ -1,18 +1,14 @@
 #ifndef DRAGAZO_CSX64_EXECUTABLE_H
 #define DRAGAZO_CSX64_EXECUTABLE_H
 
-#include <array>
 #include <vector>
 #include <string>
 #include <cstdlib>
 #include <cstring>
 #include <exception>
 #include <stdexcept>
-#include <iostream>
 
 #include "CoreTypes.h"
-#include "Utility.h"
-#include "csx_exceptions.h"
 
 namespace CSX64
 {
@@ -38,7 +34,12 @@ namespace CSX64
 		// move-constructs an executable - other is guaranteed to be empty after this operation.
 		Executable(Executable &&other) noexcept;
 		// move-assigns an executable - other is left in a valid but undefined state.
-		Executable &operator=(Executable &&other);
+		// self-assignment is safe.
+		Executable &operator=(Executable &&other) noexcept;
+
+	public: // -- swapping -- //
+
+		friend void swap(Executable &a, Executable &b) noexcept;
 
 	public: // -- construction -- //
 
@@ -69,11 +70,12 @@ namespace CSX64
 
 		// gets the content of the executable in proper segment order (und if empty) (does not include bss) (i.e. holds text, rodata, and data in that order).
 		const u8 *content() const& noexcept { return _content.data(); }
+		const u8 *content() && noexcept = delete;
 		// gets the size of the content array
 		std::size_t content_size() const noexcept { return _content.size(); }
 
 		// returns the total size of all segments (including bss) (>= content_size)
-		std::size_t total_size() const noexcept { return _seglens[0] + _seglens[1] + _seglens[2] + _seglens[3]; }
+		std::size_t total_size() const noexcept { return _content.size() + _seglens[3]; }
 
 	public: // -- IO -- //
 

@@ -24,6 +24,7 @@
 #include "AsmRouting.h"
 #include "AsmTables.h"
 #include "Executable.h"
+#include "csx_exceptions.h"
 
 namespace CSX64
 {
@@ -330,14 +331,18 @@ namespace CSX64
 	
 	AssembleResult Assemble(std::istream &code, ObjectFile &_file_)
 	{
-		AssembleArgs args;
+		// clear out the destination object file
+		_file_.clear();
+
+		// create the asm args for parsing - reference the (cleared) destination object file
+		AssembleArgs args(_file_);
 
 		// add all the predefined symbols
 		args.file.Symbols.insert(PredefinedSymbols.begin(), PredefinedSymbols.end());
 		
 		// -- add a few more that we create -- //
 		
-		//args.file.Symbols.insert(std::make_pair("__version__", Expr::CreateInt(Computer::Version)));
+		args.file.Symbols.insert(std::make_pair("__version__", Expr::CreateInt(Version)));
 
 		args.file.Symbols.insert(std::make_pair("__pinf__", Expr::CreateFloat(std::numeric_limits<double>::infinity())));
 		args.file.Symbols.insert(std::make_pair("__ninf__", Expr::CreateFloat(-std::numeric_limits<double>::infinity())));
@@ -456,16 +461,15 @@ namespace CSX64
 		if (!args.VerifyIntegrity()) return args.res;
 
 		// rename all the symbols we can shorten (done after verify to ensure there's no verify error messages with the renamed symbols)
-		for (int i = 0; i < (int)rename_symbols.size(); ++i) RenameSymbol(args.file, std::move(rename_symbols[i]), "^" + tohex(i));
+		for (std::size_t i = 0; i < rename_symbols.size(); ++i) RenameSymbol(args.file, std::move(rename_symbols[i]), "^" + tohex(i));
 		
-		// validate result
-		_file_ = std::move(args.file);
-		_file_._Clean = true;
+		// validate assembled result (referentially-bound to _file_ argument)
+		args.file._Clean = true;
 
 		// return no error
 		return {AssembleError::None, ""};
 	}
-	LinkResult Link(Executable &exe, std::vector<ObjectFile> &objs, std::string entry_point)
+	LinkResult Link(Executable &exe, std::vector<ObjectFile> &objs, const std::string &entry_point)
 	{
 		// parsing locations for evaluation
 		u64 _res;
@@ -482,8 +486,7 @@ namespace CSX64
 		if (objs.empty()) return {LinkError::EmptyResult, "Got no object files"};
 
 		// make sure all object files are starting out clean
-		for (std::size_t i = 0; i < objs.size(); ++i)
-			if (!objs[i].Clean()) throw std::invalid_argument{"Attempt to use dirty object file"};
+		for (const ObjectFile &obj : objs) if (!obj.is_clean()) throw DirtyError("Attempt to use dirty object file");
 
 		// -- validate _start file -- //
 
@@ -491,7 +494,7 @@ namespace CSX64
 		if (!Contains(objs[0].ExternalSymbols, "_start")) return LinkResult{LinkError::FormatError, "_start file must declare an external named \"_start\""};
 
 		// rename "_start" symbol in _start file to whatever the entry point is (makes _start dirty)
-		try { objs[0].MakeDirty(); RenameSymbol(objs[0], "_start", entry_point); }
+		try { objs[0].make_dirty(); RenameSymbol(objs[0], "_start", entry_point); }
 		catch (...) { return {LinkError::FormatError, "an error occured while renaming \"_start\" in the _start file"}; }
 
 		// -- define things -- //
@@ -557,7 +560,7 @@ namespace CSX64
 			ObjectFile *obj = include_queue.front();
 			include_queue.pop_front();
 			// all included files are dirty
-			obj->MakeDirty();
+			obj->make_dirty();
 
 			// account for alignment requirements
 			Align(text, obj->TextAlign);

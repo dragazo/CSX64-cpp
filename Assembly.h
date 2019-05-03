@@ -46,23 +46,47 @@ namespace CSX64
 
 	// -----------------------------
 
+	// represents a flag used to denote a clean state in e.g. an object file
+	class clean_flag_t
+	{
+	private: // -- data -- //
+
+		bool val;
+
+	public: // -- interface -- //
+
+		// provide conversions to bool
+		explicit operator bool() const noexcept { return val; }
+		bool operator!() const noexcept { return !val; }
+
+		// enable direct ctor/asgn for bool
+		clean_flag_t(bool v) noexcept : val(v) {}
+		clean_flag_t &operator=(bool v) noexcept { val = v; return *this; }
+
+		// copying copies the state
+		clean_flag_t(const clean_flag_t &other) noexcept : val(other.val) {}
+		clean_flag_t &operator=(const clean_flag_t &other) noexcept { val = other.val; return *this; }
+
+		// moving copies the state and makes the moved-from flag dirty
+		clean_flag_t(clean_flag_t &&other) noexcept : val(std::exchange(other.val, false)) {}
+		clean_flag_t &operator=(clean_flag_t &&other) noexcept { val = std::exchange(other.val, false); return *this; }
+	};
+
 	// Represents an assembled object file used to create an executable
 	class ObjectFile
 	{
-	private:
-		bool _Clean = false;
+	private: // -- private data -- //
+
+		clean_flag_t _Clean = false;
 
 		friend AssembleResult Assemble(std::istream &code, ObjectFile &file);
 
-	public:
+	public: // -- public data -- //
 
-		// The list of exported symbol names
-		std::unordered_set<std::string> GlobalSymbols;
-		// The list of imported symbol names
-		std::unordered_set<std::string> ExternalSymbols;
+		std::unordered_set<std::string> GlobalSymbols;   // The list of exported symbol names
+		std::unordered_set<std::string> ExternalSymbols; // The list of imported symbol names
 
-		// The symbols defined in the file
-		std::unordered_map<std::string, Expr> Symbols;
+		std::unordered_map<std::string, Expr> Symbols; // The symbols defined in the file
 
 		u32 TextAlign = 1;
 		u32 RodataAlign = 1;
@@ -78,28 +102,49 @@ namespace CSX64
 		std::vector<u8> Data;
 		u64 BssLen = 0;
 
-		// Marks that this object file is in a valid, usable state
-		bool Clean() const { return _Clean; }
+	public: // -- ctor / dtor / asgn -- //
+
+		// constructs an empty object file that is ready for use
+		ObjectFile() = default;
+
+		ObjectFile(const ObjectFile&) = default;
+		ObjectFile &operator=(const ObjectFile&) = default;
+
+		// move constructs a new object file. the contents of moved-from object are valid, but dirty and undefined.
+		ObjectFile(ObjectFile&&) noexcept = default;
+		// move assigns an object file. the contents of moved-from object are valid, but dirty and undefined.
+		// self-assignment is safe.
+		ObjectFile &operator=(ObjectFile&&) noexcept = default;
+
+	public: // -- state -- //
+
+		// checks if this object file is in a valid, usable state
+		bool is_clean() const noexcept { return (bool)_Clean; }
 		// marks the object file as dirty
-		void MakeDirty() { _Clean = false; }
+		void make_dirty() noexcept { _Clean = false; }
 
-		// clears the contents of the object file (result is dirty)
-		void Clear();
+		// checks if this object file is clean
+		explicit operator bool() const noexcept { return is_clean(); }
+		// checks if this object file is dirty (not clean)
+		bool operator!() const noexcept { return !is_clean(); }
 
-		// ---------------------------
+		// empties the contents of this file and effectively sets it to the newly-constructed state
+		void clear() noexcept;
 
-		/// <summary>
-		/// Writes a binary representation of an object file to the stream. Throws <see cref="std::invalid_argument"/> if file is dirty
-		/// </summary>
-		/// <param name="writer">the binary writer to use. must be clean</param>
-		/// <param name="obj">the object file to write</param>
-		static std::ostream &WriteTo(std::ostream &writer, const ObjectFile &obj);
-		/// <summary>
-		/// Reads a binary representation of an object file from the stream
-		/// </summary>
-		/// <param name="reader">the binary reader to use</param>
-		/// <param name="hole">the resulting object file</param>
-		static std::istream &ReadFrom(std::istream &reader, ObjectFile &obj);
+	public: // -- IO -- //
+
+		// saves this object file to a file located at (path).
+		// throws FileOpenError if the file cannot be opened (for writing).
+		// throws IOError if any write operation fails.
+		void save(const std::string &path) const;
+		// loads this object file wit the content of a file located at (path).
+		// throws FileOpenError if the file cannot be opened (for reading).
+		// throws TypeError if the file is not a CSX64 object file.
+		// throws VersionError if the file is of an incompatible version.
+		// throws FormatError if the object file is corrupted.
+		// throws any exception resulting from failed memory allocation.
+		// if an exception is throw, this object is left in an valid, but unclean and undefined state.
+		void load(const std::string &path);
 	};
 
 	// -----------------------------
@@ -155,7 +200,7 @@ namespace CSX64
 	/// <param name="objs">the object files to link. should all be clean. the first item in this array is the _start file</param>
 	/// <param name="entry_point">the raw starting file</param>
 	/// <exception cref="ArgumentException"></exception>
-	LinkResult Link(Executable &exe, std::vector<ObjectFile> &objs, std::string entry_point = "main");
+	LinkResult Link(Executable &exe, std::vector<ObjectFile> &objs, const std::string &entry_point = "main");
 }
 
 #endif

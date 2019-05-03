@@ -235,22 +235,57 @@ int LoadExecutable(const std::string &path, Executable &exe)
 // obj  - the object file to save.
 int SaveObjectFile(const std::string &path, const ObjectFile &obj)
 {
-	std::ofstream f(path, std::ios::binary);
-	if (!f) { std::cerr << "Failed to open " << path << " for writing\n"; return (int)AsmLnkErrorExt::FailOpen; }
-
-	if (!ObjectFile::WriteTo(f, obj)) { std::cerr << "Failed to write object file " << path << '\n'; return (int)AsmLnkErrorExt::IOError; }
-	return 0;
+	try
+	{
+		obj.save(path);
+		return 0;
+	}
+	catch (const FileOpenError&)
+	{
+		std::cerr << "Failed to open " << path << " for writing\n";
+		return (int)AsmLnkErrorExt::FailOpen;
+	}
+	catch (const IOError&)
+	{
+		std::cerr << "An IO error occurred while saving object file to " << path << '\n';
+		return (int)AsmLnkErrorExt::IOError;
+	}
 }
 // Loads an object file from a file.
 // path - the source file to read from.
 // obj  - the resulting object file (on success).
 int LoadObjectFile(const std::string &path, ObjectFile &obj)
 {
-	std::ifstream f(path, std::ios::binary);
-	if (!f) { std::cerr << "Failed to open " << path << " for reading\n"; return (int)AsmLnkErrorExt::FailOpen; }
-
-	if (!ObjectFile::ReadFrom(f, obj)) { std::cerr << "Failed to read object file " << path << '\n'; return (int)AsmLnkErrorExt::IOError; }
-	return 0;
+	try
+	{
+		obj.load(path);
+		return 0;
+	}
+	catch (const FileOpenError&)
+	{
+		std::cerr << "Failed to open " << path << " for reading\n";
+		return (int)AsmLnkErrorExt::FailOpen;
+	}
+	catch (const TypeError&)
+	{
+		std::cerr << path << " is not a CSX64 object file\n";
+		return (int)AsmLnkErrorExt::FormatError;
+	}
+	catch (const VersionError&)
+	{
+		std::cerr << "Object file " << path << " is of an incompatible version of CSX64\n";
+		return (int)AsmLnkErrorExt::FormatError;
+	}
+	catch (const FormatError&)
+	{
+		std::cerr << "Object file " << path << " is of an unrecognized format\n";
+		return (int)AsmLnkErrorExt::FormatError;
+	}
+	catch (const std::bad_alloc&)
+	{
+		std::cerr << "Failed to allocate space for object file\n";
+		return (int)AsmLnkErrorExt::MemoryAllocError;
+	}
 }
 
 // Loads the .o (obj) files from a directory and adds them to the list.
@@ -610,7 +645,7 @@ bool cmdln_pack::parse(int _argc, const char *const *_argv)
 
 // -------------------- //
 
-int main(int argc, char *argv[])
+int main(int argc, char *argv[]) try
 {
 	// we make a lot of assumptions about the current platform being little-endian (in fact some code still artificially simulates it)
 	// however, the majority isn't simulated since that'd be ridiculously-slow - so we need to make sure this system is really little-endian.
@@ -720,4 +755,14 @@ int main(int argc, char *argv[])
 	} // end switch
 
 	return 0;
+}
+catch (const std::exception &ex)
+{
+	std::cerr << "UNHANDLED EXCEPTION:\n" << ex.what() << '\n';
+	return -666;
+}
+catch (...)
+{
+	std::cerr << "UNHANDLED NON-STANDARD EXCEPTION\n";
+	return -999;
 }

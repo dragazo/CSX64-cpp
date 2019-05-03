@@ -17,7 +17,7 @@ namespace CSX64
 	{
 	public: // -- data -- //
 
-		ObjectFile file;
+		ObjectFile &file;
 
 		AsmSegment current_seg = AsmSegment::INVALID;
 		AsmSegment done_segs = AsmSegment::INVALID;
@@ -35,7 +35,7 @@ namespace CSX64
 
 	public: // -- ctor/dtor -- //
 
-		AssembleArgs() = default;
+		AssembleArgs(ObjectFile &dest) : file(dest) {}
 		
 		AssembleArgs(const AssembleArgs&) = delete;
 		AssembleArgs(AssembleArgs&&) = delete;
