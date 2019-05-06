@@ -88,6 +88,8 @@ namespace CSX64
 
 	void Executable::save(const std::string &path) const
 	{
+		if (empty()) throw EmptyError("Attempt to save empty executable");
+
 		std::ofstream file(path, std::ios::binary);
 		if (!file) throw FileOpenError("Failed to open file for saving Executable");
 
@@ -107,7 +109,11 @@ namespace CSX64
 	void Executable::load(const std::string &path)
 	{
 		std::ifstream file(path, std::ios::binary | std::ios::ate);
-		if (!file) throw FileOpenError("Failed to open file for loading Executable");
+		if (!file)
+		{
+			clear(); // if we throw an exception we must set to the empty state first
+			throw FileOpenError("Failed to open file for loading Executable");
+		}
 
 		// get the file size and seek back to the beginning
 		const u64 file_size = file.tellg();

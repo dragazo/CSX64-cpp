@@ -68,7 +68,7 @@ namespace CSX64
 		// attempt to write from memory to the file - success = num written, fail = -1
 		try { RAX() = (u64)fd->Write(reinterpret_cast<char*>(mem) + RCX(), (i64)RDX()) ? RDX() : ~(u64)0; } // aliasing is ok because casting to char type
 		catch (...) { RAX() = ~(u64)0; }
-
+		
 		return true;
 	}
 

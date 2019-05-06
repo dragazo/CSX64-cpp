@@ -171,10 +171,10 @@ namespace CSX64
 
 		// -- read alignments -- //
 
-		if (!BinRead(file, TextAlign)) goto err;
-		if (!BinRead(file, RodataAlign)) goto err;
-		if (!BinRead(file, DataAlign)) goto err;
-		if (!BinRead(file, BSSAlign)) goto err;
+		if (!BinRead(file, TextAlign) || !IsPowerOf2(TextAlign)) goto err;
+		if (!BinRead(file, RodataAlign) || !IsPowerOf2(RodataAlign)) goto err;
+		if (!BinRead(file, DataAlign) || !IsPowerOf2(DataAlign)) goto err;
+		if (!BinRead(file, BSSAlign) || !IsPowerOf2(BSSAlign)) goto err;
 
 		// -- read segment holes -- //
 
