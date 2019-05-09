@@ -210,17 +210,17 @@ namespace CSX64
 		if (!BinRead(file, val)) goto err;
 		Text.clear();
 		Text.resize(val);
-		if (!file.read(reinterpret_cast<char*>(Text.data()), val) || file.gcount() != val) goto err;
+		if (!file.read(reinterpret_cast<char*>(Text.data()), val) || (std::size_t)file.gcount() != val) goto err;
 
 		if (!BinRead(file, val)) goto err;
 		Rodata.clear();
 		Rodata.resize(val);
-		if (!file.read(reinterpret_cast<char*>(Rodata.data()), val) || file.gcount() != val) goto err;
+		if (!file.read(reinterpret_cast<char*>(Rodata.data()), val) || (std::size_t)file.gcount() != val) goto err;
 
 		if (!BinRead(file, val)) goto err;
 		Data.clear();
 		Data.resize(val);
-		if (!file.read(reinterpret_cast<char*>(Data.data()), val) || file.gcount() != val) goto err;
+		if (!file.read(reinterpret_cast<char*>(Data.data()), val) || (std::size_t)file.gcount() != val) goto err;
 
 		if (!BinRead(file, BssLen)) goto err;
 

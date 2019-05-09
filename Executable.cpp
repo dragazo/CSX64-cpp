@@ -24,8 +24,9 @@ namespace CSX64
 		other.clear(); // make sure other is left in the empty state
 	}
 	Executable &Executable::operator=(Executable &&other) noexcept
-	{	
+	{
 		swap(*this, other); // just use the swapping idiom - this is safe on self-assignment
+		return *this;
 	}
 
 	// ------------------------------------------------- //
@@ -162,7 +163,7 @@ namespace CSX64
 		catch (...) { clear(); throw; }
 
 		// read the content - make sure we got everything
-		if (!file.read(reinterpret_cast<char*>(_content.data()), _content.size()) || file.gcount() != _content.size()) goto err;
+		if (!file.read(reinterpret_cast<char*>(_content.data()), _content.size()) || (std::size_t)file.gcount() != _content.size()) goto err;
 
 		return;
 
