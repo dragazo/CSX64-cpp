@@ -28,6 +28,7 @@ namespace CSX64
 		std::string last_nonlocal_label;
 
 		std::string label_def;
+		i64 times;
 		std::string op;
 		std::vector<std::string> args; // must be array for ref params
 
@@ -45,11 +46,23 @@ namespace CSX64
 
 	public: // -- Assembly Functions -- //
 
+		// updates current line positioning variables.
+		// must be called before TryExtractLineHeader() and at the start of each TIMES assembly iteration (before SplitLine()).
+		void UpdateLinePos();
+
+		/// <summary>
+		/// Attempts to extract the header information from a raw line of source code. Should be called after UpdateLinePos() and before SplitLine().
+		/// this->label_def - receives the label definition for this line (if any)
+		/// this->times     - recieves the number of times to repeat the instruction (or 1 if not specified).
+		/// </summary>
+		/// <param name="rawline">the raw line to extract header information from</param>
+		bool TryExtractLineHeader(std::string &rawline);
+
 		/// <summary>
 		/// Splits the raw line into its separate components. The raw line should not have a comment section.
 		/// </summary>
 		/// <param name="rawline">the raw line to parse</param>
-		bool SplitLine(std::string rawline);
+		bool SplitLine(const std::string &rawline);
 
 		static bool IsValidName(const std::string &token, std::string &err);
 		bool MutateName(std::string &label);
@@ -66,7 +79,16 @@ namespace CSX64
 		bool TryAlign(u64 size);
 		bool TryPad(u64 size);
 
-		bool __TryParseImm(const std::string &token, std::unique_ptr<Expr> &expr);
+		// attempts to extract an expression from str.
+		// str      - the string containing an expression.
+		// beg/end  - begin/end indicies in the string to examine (full string would be 0, len).
+		// expr     - the extracted expression (on success).
+		// aft      - the index immediately after the parsed expression (on success).
+		bool TryExtractExpr(const std::string &str, int beg, int end, std::unique_ptr<Expr> &expr, int &aft);
+		// attempts to extract an expression from str.
+		// equivalent to calling TryExtractExpr() from 0,len and guaranteeing aft==len.
+		bool TryExtractExpr(const std::string &str, std::unique_ptr<Expr> &expr);
+
 		bool TryParseImm(std::string token, Expr &expr, u64 &sizecode, bool &explicit_size);
 		bool TryParseInstantImm(std::string token, u64 &val, bool &floating, u64 &sizecode, bool &explicit_size);
 
@@ -108,7 +130,6 @@ namespace CSX64
 		// -- misc -- //
 
 		bool IsReservedSymbol(std::string symbol);
-		bool TryProcessLabel();
 
 		bool TryProcessAlignXX(u64 size);
 		bool TryProcessAlign();
@@ -120,6 +141,8 @@ namespace CSX64
 		bool TryProcessReserve(u64 size);
 
 		bool TryProcessEQU();
+
+		bool TryProcessStaticAssert();
 
 		bool TryProcessSegment();
 

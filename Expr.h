@@ -91,7 +91,8 @@ namespace CSX64
 		void Clear();
 
 		// returns a pointer to the unevaluated token or null if there is none (i.e. not a leaf or already evaluated)
-		const std::string *Token() const { return _Token.empty() ? nullptr : &_Token; }
+		const std::string *Token() const& { return _Token.empty() ? nullptr : &_Token; }
+		const std::string *Token() && = delete;
 		// assigns this node the specified token to be evaluated - may not be an empty string
 		template<typename T>
 		void Token(T &&val)

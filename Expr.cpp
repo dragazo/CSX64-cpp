@@ -125,8 +125,7 @@ namespace CSX64
 		// switch through op
 		switch (OP)
 		{
-			// value
-		case OPs::None:
+		case OPs::None: // -- value -- //
 			tok = Token();
 
 			// if this has already been evaluated, return the cached result
@@ -187,7 +186,7 @@ namespace CSX64
 				res = 0; // zero res just in case that's removed from the top of the function later on
 
 				// build the value
-				for (int i = 0; i < (int)chars.size(); ++i) res |= (chars[i] & 0xff) << (i * 8);
+				for (int i = 0; i < (int)chars.size(); ++i) res |= (u64)(chars[i] & 0xff) << (i * 8);
 
 				break;
 			}
@@ -197,7 +196,7 @@ namespace CSX64
 				visited.push_back((*tok)); // mark token as visited
 
 				// if we can't evaluate it, fail
-				if (!expr->__Evaluate__(symbols, res, floating, err, visited)) { err = "Failed to evaluate referenced symbol \"" + (*tok) + "\"\n-> {err}"; return false; }
+				if (!expr->__Evaluate__(symbols, res, floating, err, visited)) { err = "Failed to evaluate referenced symbol \"" + (*tok) + "\"\n-> " + err; return false; }
 
 				visited.pop_back(); // unmark token (must be done for diamond expressions i.e. a=b+c, b=d, c=d, d=0)
 
@@ -206,9 +205,7 @@ namespace CSX64
 			// otherwise we can't evaluate it
 			else { err = "Failed to evaluate \"" + (*tok) + "\""; return false; }
 
-			// -- operators -- //
-
-			// binary ops
+		// -- binary operators -- //
 
 		case OPs::Mul:
 			if (!Left->__Evaluate__(symbols, L, LF, err, visited)) ret = false;
@@ -337,7 +334,7 @@ namespace CSX64
 			if (!Left->__Evaluate__(symbols, L, LF, err, visited)) ret = false;
 			if (!Right->__Evaluate__(symbols, R, RF, err, visited)) ret = false;
 			if (ret == false) return false;
-
+			
 			res = L << R; floating = LF || RF;
 			break;
 		case OPs::SR:
@@ -425,14 +422,14 @@ namespace CSX64
 			if (!Right->__Evaluate__(symbols, R, RF, err, visited)) ret = false;
 			if (ret == false) return false;
 
-			res = L != 0 ? 1 : 0ul;
+			res = !IsZero(L, LF) && !IsZero(R, RF) ? 1 : 0ul;
 			break;
 		case OPs::LogOr:
 			if (!Left->__Evaluate__(symbols, L, LF, err, visited)) ret = false;
 			if (!Right->__Evaluate__(symbols, R, RF, err, visited)) ret = false;
 			if (ret == false) return false;
 
-			res = L != 0 ? 1 : 0ul;
+			res = !IsZero(L, LF) || !IsZero(R, RF) ? 1 : 0ul;
 			break;
 
 			// unary ops
@@ -450,8 +447,9 @@ namespace CSX64
 		case OPs::LogNot:
 			if (!Left->__Evaluate__(symbols, L, LF, err, visited)) return false;
 
-			res = L == 0 ? 1 : 0ul;
+			res = IsZero(L, LF) ? 1 : 0ul;
 			break;
+
 		case OPs::Int:
 			if (!Left->__Evaluate__(symbols, L, LF, err, visited)) return false;
 
@@ -464,15 +462,15 @@ namespace CSX64
 			floating = true;
 			break;
 
-			// misc
+		// -- misc operators -- //
 
 		case OPs::NullCoalesce:
 			if (!Left->__Evaluate__(symbols, L, LF, err, visited)) ret = false;
 			if (!Right->__Evaluate__(symbols, R, RF, err, visited)) ret = false;
 			if (ret == false) return false;
 
-			res = L != 0 ? L : R;
-			floating = L != 0 ? LF : RF;
+			if (!IsZero(L, LF)) { res = L; floating = LF; }
+			else /*          */ { res = R; floating = RF; }
 			break;
 		case OPs::Condition:
 			if (!Left->__Evaluate__(symbols, Aux, AuxF, err, visited)) ret = false;
@@ -480,8 +478,8 @@ namespace CSX64
 			if (!Right->Right->__Evaluate__(symbols, R, RF, err, visited)) ret = false;
 			if (ret == false) return false;
 
-			res = Aux != 0 ? L : R;
-			floating = Aux != 0 ? LF : RF;
+			if (!IsZero(Aux, AuxF)) { res = L; floating = LF; }
+			else /*              */ { res = R; floating = RF; }
 			break;
 
 		default: err = "Unknown operation"; return false;

@@ -392,31 +392,30 @@ namespace CSX64
 				rawline.clear();
 			}
 
-			// split the line and prepare for parsing
-			if (!args.SplitLine(std::move(rawline))) return args.res;
+			// must update current line pos before TryExtractLineHeader() (because it may introduce labels)
+			args.UpdateLinePos();
 
-			// update current line pos
-			switch (args.current_seg)
+			// extract line header info
+			if (!args.TryExtractLineHeader(rawline)) return args.res;
+
+			// assemble this line a number of times equal to args.times (updated by calling TryExtractLineHeader() above)
+			for (i64 times_i = 0; times_i < args.times; ++times_i)
 			{
-			case AsmSegment::TEXT: args.line_pos_in_seg = args.file.Text.size(); break;
-			case AsmSegment::RODATA: args.line_pos_in_seg = args.file.Rodata.size(); break;
-			case AsmSegment::DATA: args.line_pos_in_seg = args.file.Data.size(); break;
-			case AsmSegment::BSS: args.line_pos_in_seg = args.file.BssLen; break;
+				// must update current line pos before each TIMES assembly iteration (because each TIMES iteration is like a new line)
+				args.UpdateLinePos();
 
-			default:; // default does nothing - (nothing to update)
-			}
+				// split the line and prepare for parsing
+				if (!args.SplitLine(rawline)) return args.res;
 
-			// process marked label
-			if (!args.TryProcessLabel()) return args.res;
+				// empty lines are ignored
+				if (!args.op.empty())
+				{
+					// try to get the router
+					if (!TryGetValue(asm_routing_table, ToUpper(args.op), router)) return { AssembleError::UnknownOp, "line " + tostr(args.line) + ": Unknown instruction" };
 
-			// empty lines are ignored
-			if (!args.op.empty())
-			{
-				// try to get the router
-				if (!TryGetValue(asm_routing_table, ToUpper(args.op), router)) return {AssembleError::UnknownOp, "line " + tostr(args.line) + ": Unknown instruction"};
-
-				// perform the assembly action
-				if (!(*router)(args)) return args.res;
+					// perform the assembly action
+					if (!(*router)(args)) return args.res;
+				}
 			}
 		}
 
@@ -453,7 +452,7 @@ namespace CSX64
 			}
 		}
 		// remove all the symbols we can eliminate
-		for(std::string &elim : elim_symbols) args.file.Symbols.erase(elim);
+		for (const auto &elim : elim_symbols) args.file.Symbols.erase(elim);
 
 		// -- finalize -- //
 

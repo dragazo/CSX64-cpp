@@ -298,6 +298,8 @@ namespace CSX64
 
 	{"EQU", asm_router_EQU},
 
+	{"STATIC_ASSERT", asm_router_STATIC_ASSERT},
+
 	{"SEGMENT", asm_router_SEGMENT},
 	{"SECTION", asm_router_SEGMENT},
 

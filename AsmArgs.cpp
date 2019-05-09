@@ -8,22 +8,31 @@
 
 namespace CSX64
 {
-bool AssembleArgs::SplitLine(std::string rawline)
+void AssembleArgs::UpdateLinePos()
 {
-	// (label:) (op (arg, arg, ...))
+	// update current line pos
+	switch (current_seg)
+	{
+	case AsmSegment::TEXT: line_pos_in_seg = file.Text.size(); break;
+	case AsmSegment::RODATA: line_pos_in_seg = file.Rodata.size(); break;
+	case AsmSegment::DATA: line_pos_in_seg = file.Data.size(); break;
+	case AsmSegment::BSS: line_pos_in_seg = file.BssLen; break;
 
-	int pos = 0, end; // position in line parsing
-	int quote;        // index of openning quote in args
+	default:; // default does nothing - (nothing to update)
+	}
+}
 
-	// empty args from last line
-	args.clear();
+bool AssembleArgs::TryExtractLineHeader(std::string &rawline)
+{
+	// (label:) (times/if imm) (op (arg, arg, ...))
 
-	// -- parse label and op -- //
+	int pos, end; // position in line parsing
 
-	// skip leading white space
-	for (; pos < (int)rawline.size() && std::isspace(rawline[pos]); ++pos);
-	// get a white space-delimited token
-	for (end = pos; end < (int)rawline.size() && !std::isspace(rawline[end]); ++end);
+	// -- parse label prefix -- //
+
+	// find the first white space delimited token
+	for (pos = 0; pos < (int)rawline.size() && std::isspace((unsigned char)rawline[pos]); ++pos);
+	for (end = pos; end < (int)rawline.size() && !std::isspace((unsigned char)rawline[end]); ++end);
 
 	// if we got a label
 	if (pos < (int)rawline.size() && rawline[end - 1] == LabelDefChar)
@@ -31,15 +40,115 @@ bool AssembleArgs::SplitLine(std::string rawline)
 		// set as label def
 		label_def = rawline.substr(pos, end - pos - 1);
 
-		// get another token for op to use
-
-		// skip leading white space
-		for (pos = end; pos < (int)rawline.size() && std::isspace(rawline[pos]); ++pos);
-		// get a white space-delimited token
-		for (end = pos; end < (int)rawline.size() && !std::isspace(rawline[end]); ++end);
+		// get another white space delimited token
+		for (pos = end; pos < (int)rawline.size() && std::isspace((unsigned char)rawline[pos]); ++pos);
+		for (end = pos; end < (int)rawline.size() && !std::isspace((unsigned char)rawline[end]); ++end);
 	}
 	// otherwise there's no label for this line
 	else label_def.clear();
+
+	// -- parse times prefix -- //
+
+	std::unique_ptr<Expr> rep_expr;
+	std::string err;
+
+	// extract the found token (as upper case)
+	std::string tok = ToUpper(rawline.substr(pos, end - pos));
+
+	// decode tok 0 is no TIMES/IF prefix, 1 is TIMES prefix, 2 is IF prefix
+	const int rep_code = tok == "TIMES" ? 1 : tok == "IF" ? 2 : 0;
+
+	// if we got a TIMES/IF prefix (nonzero rep code)
+	if (rep_code != 0)
+	{
+		// extract an expression starting at end (the number of times to repeat the instruction) (store aft index into end)
+		if (!TryExtractExpr(rawline, end, (int)rawline.size(), rep_expr, end)) { res = {AssembleError::UsageError, "line " + tostr(line) + ": TIMES/IF expected an expression\n-> " + res.ErrorMsg}; return false; }
+
+		// make sure we didn't consume the whole line (that would mean there was a times prefix with nothing to augment)
+		if (end == (int)rawline.size()) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Encountered TIMES/IF prefix with no instruction to augment"}; return false; }
+
+		// get the next white space delimited token
+		for (pos = end; pos < (int)rawline.size() && std::isspace((unsigned char)rawline[pos]); ++pos);
+		for (end = pos; end < (int)rawline.size() && !std::isspace((unsigned char)rawline[end]); ++end);
+	}
+	// otherwise there's no times prefix for this line
+	else times = 1;
+		
+	// -- process label -- //
+
+	// if we defined a label for this line, insert it now
+	if (!label_def.empty())
+	{
+		// if it's not a local, mark as last non-local label
+		if (label_def[0] != '.') last_nonlocal_label = label_def;
+
+		// mutate and test result for legality
+		if (!MutateName(label_def)) return false;
+		if (!IsValidName(label_def, err)) { res = { AssembleError::InvalidLabel, "line " + tostr(line) + ": " + err }; return false; }
+
+		// it can't be a reserved symbol
+		if (IsReservedSymbol(label_def)) { res = { AssembleError::InvalidLabel, "line " + tostr(line) + ": Symbol name is reserved: " + label_def }; return false; }
+
+		// ensure we don't define an external
+		if (Contains(file.ExternalSymbols, label_def)) { res = { AssembleError::SymbolRedefinition, "line " + tostr(line) + ": Cannot define external symbol internally: " + label_def }; return false; }
+
+		// if this line isn't an EQU directive, inject a label (EQU will handle the insertion otherwise - prevents erroneous ptrdiff simplifications if first defined as a label)
+		if (ToUpper(rawline.substr(pos, end - pos)) != "EQU")
+		{
+			// ensure we don't redefine a symbol. not outside this if because we definitely insert a symbol here, but EQU might not (e.g. if TIMES = 0) - so let EQU decide how to handle that.
+			if (ContainsKey(file.Symbols, label_def)) { res = { AssembleError::SymbolRedefinition, "line " + tostr(line) + ": Symbol was already defined: " + label_def }; return false; }
+
+			// addresses must be in a valid segment
+			if (current_seg == AsmSegment::INVALID) { res = { AssembleError::FormatError, "line " + tostr(line) + ": Attempt to address outside of a segment" }; return false; }
+
+			Expr temp;
+			temp.OP = Expr::OPs::Add;
+			temp.Left = Expr::NewToken(SegOffsets.at(current_seg));
+			temp.Right = Expr::NewInt(line_pos_in_seg);
+			file.Symbols.emplace(label_def, std::move(temp));
+		}
+	}
+
+	// -- process times -- //
+
+	// if there was a times directive for this line
+	if (rep_expr)
+	{
+		// make sure the repeat count is an instant imm (critical expression)
+		u64 val;
+		bool floating;
+		if (!rep_expr->Evaluate(file.Symbols, val, floating, err)) { res = { AssembleError::UsageError, "line " + tostr(line) + ": TIMES prefix requires a critical expression\n-> " + err }; return false; }
+
+		// if using a TIMES prefix and the imm is floating, that's an error
+		if (rep_code == 1 && floating) { res = { AssembleError::UsageError, "line " + tostr(line) + ": TIMES prefix requires an integral expression" }; return false; }
+
+		// use the evaluated expression as the times count (account for TIMES vs IF prefix logic)
+		times = rep_code == 2 ? !IsZero(val, floating) ? 1 : 0 : (i64)val;
+	}
+
+	// -- finalize -- //
+
+	// chop off everything we consumed (pos currently points to the start of op)
+	rawline = rawline.substr(pos);
+
+	return true;
+}
+
+bool AssembleArgs::SplitLine(const std::string &rawline)
+{
+	// (op (arg, arg, ...))
+
+	int pos = 0, end; // position in line parsing
+	int quote;        // index of openning quote in args
+
+	// discard args from last line
+	args.clear();
+
+	// -- parse op -- //
+
+	// get the first white space delimited token
+	for (; pos < (int)rawline.size() && std::isspace(rawline[pos]); ++pos);
+	for (end = pos; end < (int)rawline.size() && !std::isspace(rawline[end]); ++end);
 
 	// if we got something, record as op, otherwise is empty string
 	if (pos < (int)rawline.size()) op = rawline.substr(pos, end - pos);
@@ -62,12 +171,12 @@ bool AssembleArgs::SplitLine(std::string rawline)
 			else if (quote < 0 && rawline[end] == ',') break; // comma marks end of token
 		}
 		// make sure we closed any quotations
-		if (quote >= 0) { res = {AssembleError::FormatError, std::string() + "line " + tostr(line) + ": Unmatched quotation encountered in argument list"}; return false; }
+		if (quote >= 0) { res = { AssembleError::FormatError, std::string() + "line " + tostr(line) + ": Unmatched quotation encountered in argument list" }; return false; }
 
 		// get the arg (remove leading/trailing white space - some logic requires them not be there e.g. address parser)
 		std::string arg = Trim(rawline.substr(pos, end - pos));
 		// make sure arg isn't empty
-		if (arg.empty()) { res = {AssembleError::FormatError, "line " + tostr(line) + ": Empty operation argument encountered"}; return false; }
+		if (arg.empty()) { res = { AssembleError::FormatError, "line " + tostr(line) + ": Empty operation argument encountered" }; return false; }
 		// add this token
 		args.emplace_back(std::move(arg));
 	}
@@ -231,13 +340,15 @@ bool AssembleArgs::TryPad(u64 size)
 	}
 }
 
-bool AssembleArgs::__TryParseImm(const std::string &token, std::unique_ptr<Expr> &expr)
+bool AssembleArgs::TryExtractExpr(const std::string &str, const int str_begin, const int str_end, std::unique_ptr<Expr> &expr, int &aft)
 {
-	expr = nullptr; // initially-nulled result
+	// give default values to out params
+	expr = nullptr;
+	aft = str_begin;
 
 	std::unique_ptr<Expr> temp, _temp; // temporary for node creation
 
-	int pos = 0, end; // position in token
+	int pos = str_begin, end; // position in token
 
 	bool binPair = false;          // marker if tree contains complete binary pairs (i.e. N+1 values and N binary ops)
 	int unpaired_conditionals = 0; // number of unpaired conditional ops
@@ -255,74 +366,78 @@ bool AssembleArgs::__TryParseImm(const std::string &token, std::unique_ptr<Expr>
 	stack.push_back(nullptr); // stack will always have a null at its base (simplifies code slightly)
 
 	// skip white space
-	for (; pos < (int)token.size() && std::isspace(token[pos]); ++pos);
-	// if we're past the end, token was empty
-	if (pos >= (int)token.size()) { res = {AssembleError::FormatError, "line " + tostr(line) + ": Empty expression encountered"}; return false; }
+	for (; pos < str_end && std::isspace(str[pos]); ++pos);
+	// if we're past the end, str was empty
+	if (pos >= str_end) { res = {AssembleError::FormatError, "line " + tostr(line) + ": Empty expression encountered"}; return false; }
 
 	while (true)
 	{
 		// -- read (unary op...)[operand](binary op) -- //
 
 		// consume unary ops (allows white space)
-		for (; pos < (int)token.size(); ++pos)
+		for (; pos < str_end; ++pos)
 		{
-			if (Contains(UnaryOps, token[pos])) unaryOps.push_back(token[pos]); // absorb unary ops
-			else if (!std::isspace(token[pos])) break; // non-white is start of operand
+			if (Contains(UnaryOps, str[pos])) unaryOps.push_back(str[pos]); // absorb unary ops
+			else if (!std::isspace(str[pos])) break; // non-white is start of operand
 		}
 		// if we're past the end, there were unary ops with no operand
-		if (pos >= (int)token.size()) { res = {AssembleError::FormatError, "line " + tostr(line) + ": Unary ops encountered without an operand"}; return false; }
+		if (pos >= str_end) { res = {AssembleError::FormatError, "line " + tostr(line) + ": Unary ops encountered without an operand"}; return false; }
 
 		int depth = 0;  // parens depth - initially 0
 		int quote = -1; // index of current quote char - initially not in one
 
-		bool numeric = std::isdigit(token[pos]); // flag if this is a numeric literal
+		bool numeric = std::isdigit(str[pos]); // flag if this is a numeric literal
 
 		// move end to next logical separator (white space or binary op)
-		for (end = pos; end < (int)token.size(); ++end)
+		for (end = pos; end < str_end; ++end)
 		{
 			// if we're not in a quote
 			if (quote < 0)
 			{
 				// account for important characters
-				if (token[end] == '(') ++depth;
-				else if (token[end] == ')') --depth; // depth control
-				else if (numeric && (token[end] == 'e' || token[end] == 'E') && end + 1 < (int)token.size() && (token[end + 1] == '+' || token[end + 1] == '-')) ++end; // make sure an exponent sign won't be parsed as binary + or - by skipping it
-				else if (token[end] == '"' || token[end] == '\'' || token[end] == '`') quote = end; // quotes mark start of a string
-				else if (depth == 0 && (std::isspace(token[end]) || TryGetOp(token, end, op, oplen))) break; // break on white space or binary op
+				if (str[end] == '(') ++depth;
+				else if (str[end] == ')') --depth; // depth control
+				else if (numeric && (str[end] == 'e' || str[end] == 'E') && end + 1 < str_end && (str[end + 1] == '+' || str[end + 1] == '-')) ++end; // make sure an exponent sign won't be parsed as binary + or - by skipping it
+				else if (str[end] == '"' || str[end] == '\'' || str[end] == '`') quote = end; // quotes mark start of a string
+				else if (depth == 0 && (std::isspace(str[end]) || TryGetOp(str, end, op, oplen))) break; // break on white space or binary op
 
 				// can't ever have negative depth
-				if (depth < 0) { res = {AssembleError::FormatError, "line " + tostr(line) + ": Mismatched parenthesis: " + token}; return false; }
+				if (depth < 0) { res = {AssembleError::FormatError, "line " + tostr(line) + ": Mismatched parenthesis in expression"}; return false; }
 			}
 			// otherwise we're in a quote
 			else
 			{
 				// if we have a matching quote, break out of quote mode
-				if (token[end] == token[quote]) quote = -1;
+				if (str[end] == str[quote]) quote = -1;
 			}
 		}
 		// if depth isn't back to 0, there was a parens mismatch
-		if (depth != 0) { res = {AssembleError::FormatError, "line " + tostr(line) + ": Mismatched parenthesis: " + token}; return false; }
+		if (depth != 0) { res = {AssembleError::FormatError, "line " + tostr(line) + ": Mismatched parenthesis in expression"}; return false; }
 		// if quote isn't back to -1, there was a quote mismatch
-		if (quote >= 0) { res = {AssembleError::FormatError, "line " + tostr(line) + ": Mismatched quotation: " + token}; return false; }
+		if (quote >= 0) { res = {AssembleError::FormatError, "line " + tostr(line) + ": Mismatched quotation in expression"}; return false; }
 		// if pos == end we'll have an empty token (e.g. expression was just a binary op)
-		if (pos == end) { res = {AssembleError::FormatError, "line " + tostr(line) + ": Empty token encountered in expression: " + token}; return false; }
+		if (pos == end) { res = {AssembleError::FormatError, "line " + tostr(line) + ": Empty token encountered in expression"}; return false; }
 
 		// -- convert to expression tree -- //
 
 		// if sub-expression
-		if (token[pos] == '(')
+		if (str[pos] == '(')
 		{
 			// parse the inside into temp
-			if (!__TryParseImm(token.substr(pos + 1, end - pos - 2), temp)) return false;
+			int sub_aft;
+			if (!TryExtractExpr(str, pos + 1, end - 1, temp, sub_aft)) return false;
+
+			// if the sub expression didn't capture the entire parenthetical region then the interior was not a (single) expression
+			if (sub_aft != end - 1) { res = {AssembleError::FormatError, "line " + tostr(line) + ": Interior of parenthesis is not an expression"}; return false; }
 		}
 		// otherwise is value
 		else
 		{
 			// get the value to insert
-			std::string val = token.substr(pos, end - pos);
+			std::string val = str.substr(pos, end - pos);
 
 			// mutate it
-			if (!MutateName(val)) { res = {AssembleError::FormatError, "line " + tostr(line) + ": Failed to parse imm \"" + token + "\"\n-> " + res.ErrorMsg}; return false; }
+			if (!MutateName(val)) { res = {AssembleError::FormatError, "line " + tostr(line) + ": Failed to parse imm\n-> " + res.ErrorMsg}; return false; }
 
 			// if it's the current line macro
 			if (val == CurrentLineMacro)
@@ -350,10 +465,7 @@ bool AssembleArgs::__TryParseImm(const std::string &token, std::unique_ptr<Expr>
 				temp = Expr::NewToken(val);
 
 				// it either needs to be evaluatable or a valid label name
-				if (!temp->Evaluatable(file.Symbols) && !IsValidName(val, err))
-				{
-					res = {AssembleError::FormatError, "line " + tostr(line) + ": Failed to resolve token as a valid imm or symbol name: " + val + "\n-> " + err}; return false;
-				}
+				if (!temp->Evaluatable(file.Symbols) && !IsValidName(val, err)) { res = {AssembleError::FormatError, "line " + tostr(line) + ": Failed to resolve token as a valid imm or symbol name: " + val + "\n-> " + err}; return false; }
 			}
 		}
 
@@ -392,14 +504,14 @@ bool AssembleArgs::__TryParseImm(const std::string &token, std::unique_ptr<Expr>
 		// -- get binary op -- //
 
 		// we may have stopped token parsing on white space, so wind up to find a binary op
-		for (; end < (int)token.size(); ++end)
+		for (; end < str_end; ++end)
 		{
-			if (TryGetOp(token, end, op, oplen)) break; // break when we find an op
-			// if we hit a non-white character, there are tokens with no binary ops between them
-			else if (!std::isspace(token[end])) { res = {AssembleError::FormatError, "line " + tostr(line) + ": Encountered two tokens with no binary op between them: " + token}; return false; }
+			if (TryGetOp(str, end, op, oplen)) break; // break when we find an op
+			// if we hit a non-white character, there are tokens with no binary ops between them - that's the end of the expression
+			else if (!std::isspace(str[end])) goto stop_parsing;
 		}
 		// if we didn't find any binary ops, we're done
-		if (end >= (int)token.size()) break;
+		if (end >= str_end) break;
 
 		// -- process binary op -- //
 
@@ -409,7 +521,7 @@ bool AssembleArgs::__TryParseImm(const std::string &token, std::unique_ptr<Expr>
 			// seek out nearest conditional without a pair
 			for (; stack.back() && (stack.back()->OP != Expr::OPs::Condition || stack.back()->Right->OP == Expr::OPs::Pair); stack.pop_back());
 			// if we didn't find anywhere to put it, this is an error
-			if (stack.back() == nullptr) { res = {AssembleError::FormatError, "line " + tostr(line) + ": Expression contained a ternary conditional pair without a corresponding condition: " + token}; return false; }
+			if (stack.back() == nullptr) { res = {AssembleError::FormatError, "line " + tostr(line) + ": Expression contained a ternary conditional pair without a corresponding condition: "}; return false; }
 		}
 		// right-to-left operators
 		else if (op == Expr::OPs::Condition)
@@ -451,9 +563,14 @@ bool AssembleArgs::__TryParseImm(const std::string &token, std::unique_ptr<Expr>
 		if (op == Expr::OPs::Condition) ++unpaired_conditionals;
 		else if (op == Expr::OPs::Pair) --unpaired_conditionals;
 
-		// pass last delimiter
-		pos = end + oplen;
+		// pass last delimiter and skip white space (end + oplen points just after the binary op)
+		for (pos = end + oplen; pos < str_end && std::isspace((unsigned char)str[pos]); ++pos);
+
+		// if pos is now out of bounds, there was a binary op with no second operand
+		if (pos >= str_end) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Binary op encountered without a second operand"}; return false; }
 	}
+
+	stop_parsing:
 
 	// handle binary pair mismatch
 	if (!binPair) { res = {AssembleError::FormatError, "line " + tostr(line) + ": Expression contained a mismatched binary op"}; return false; }
@@ -463,8 +580,23 @@ bool AssembleArgs::__TryParseImm(const std::string &token, std::unique_ptr<Expr>
 	// run ptrdiff logic on result
 	expr = Ptrdiff(std::move(expr));
 
+	// update the aft index (most recent end index during parsing)
+	aft = end;
+
 	return true;
 }
+bool AssembleArgs::TryExtractExpr(const std::string &str, std::unique_ptr<Expr> &expr)
+{
+	// try to extract an expr from 0,len
+	int aft;
+	if (!TryExtractExpr(str, 0, (int)str.length(), expr, aft)) return false;
+
+	// ensure that the entire string was consumed
+	if (aft != (int)str.length()) { res = {AssembleError::FormatError, "line " + tostr(line) + ": Failed to parse \"" + str + "\" as an expression"}; return false; }
+
+	return true;
+}
+	
 bool AssembleArgs::TryParseImm(std::string token, Expr &expr, u64 &sizecode, bool &explicit_size)
 {
 	sizecode = 3; explicit_size = false; // initially no explicit size
@@ -478,7 +610,7 @@ bool AssembleArgs::TryParseImm(std::string token, Expr &expr, u64 &sizecode, boo
 
 	// refer to helper (and iron out the pointer stuff for the caller)
 	std::unique_ptr<Expr> ptr;
-	if (!__TryParseImm(token, ptr)) return false;
+	if (!TryExtractExpr(token, ptr)) return false;
 	expr = std::move(*ptr);
 
 	return true;
@@ -1009,44 +1141,7 @@ bool AssembleArgs::IsReservedSymbol(std::string symbol)
 	return ContainsKey(CPURegisterInfo, symbol) || ContainsKey(FPURegisterInfo, symbol)
 		|| ContainsKey(VPURegisterInfo, symbol) || Contains(AdditionalReservedSymbols, symbol);
 }
-bool AssembleArgs::TryProcessLabel()
-{
-	if (!label_def.empty())
-	{
-		std::string err;
-
-		// if it's not a local, mark as last non-local label
-		if (label_def[0] != '.') last_nonlocal_label = label_def;
-
-		// mutate and test result for legality
-		if (!MutateName(label_def)) return false;
-		if (!IsValidName(label_def, err)) { res = {AssembleError::InvalidLabel, "line " + tostr(line) + ": " + err}; return false; }
-
-		// it can't be a reserved symbol
-		if (IsReservedSymbol(label_def)) { res = {AssembleError::InvalidLabel, "line " + tostr(line) + ": Symbol name is reserved: " + label_def}; return false; }
-
-		// ensure we don't redefine a symbol
-		if (ContainsKey(file.Symbols, label_def)) { res = {AssembleError::SymbolRedefinition, "line " + tostr(line) + ": Symbol was already defined: " + label_def}; return false; }
-		// ensure we don't define an external
-		if (Contains(file.ExternalSymbols, label_def)) { res = {AssembleError::SymbolRedefinition, "line " + tostr(line) + ": Cannot define external symbol internally: " + label_def}; return false; }
-
-		// if it's not an EQU expression, inject a label
-		if (ToUpper(op) != "EQU")
-		{
-			// addresses must be in a valid segment
-			if (current_seg == AsmSegment::INVALID) { res = {AssembleError::FormatError, "line " + tostr(line) + ": Attempt to address outside of a segment"}; return false; }
-
-			Expr temp;
-			temp.OP = Expr::OPs::Add;
-			temp.Left = Expr::NewToken(SegOffsets.at(current_seg));
-			temp.Right = Expr::NewInt(line_pos_in_seg);
-			file.Symbols.emplace(std::move(label_def), std::move(temp));
-		}
-	}
-
-	return true;
-}
-
+	
 bool AssembleArgs::TryProcessAlignXX(u64 size)
 {
 	if (args.size() != 0) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Expected no operands"}; return false; }
@@ -1073,7 +1168,7 @@ bool AssembleArgs::TryProcessGlobal()
 	if (args.size() == 0) { res = {AssembleError::ArgCount, "line " + tostr(line) + ": Expected at least one symbol to export"}; return false; }
 
 	std::string err;
-	for (std::string &symbol : args)
+	for (const std::string &symbol : args)
 	{
 		// special error message for using global on local labels
 		if (symbol[0] == '.') { res = {AssembleError::ArgError, "line " + tostr(line) + ": Cannot export local symbols without their full declaration"}; return false; }
@@ -1086,7 +1181,7 @@ bool AssembleArgs::TryProcessGlobal()
 		if (Contains(file.ExternalSymbols, symbol)) { res = {AssembleError::SymbolRedefinition, "line " + tostr(line) + ": Cannot define external \"" + symbol + "\" as global"}; return false; }
 
 		// add it to the globals list
-		file.GlobalSymbols.emplace(std::move(symbol));
+		file.GlobalSymbols.emplace(symbol);
 	}
 
 	return true;
@@ -1096,7 +1191,7 @@ bool AssembleArgs::TryProcessExtern()
 	if (args.size() == 0) { res = {AssembleError::ArgCount, "line " + tostr(line) + ": Expected at least one symbol to import"}; return false; }
 
 	std::string err;
-	for (std::string &symbol : args)
+	for (const std::string &symbol : args)
 	{
 		// special error message for using extern on local labels
 		if (symbol[0] == '.') { res = {AssembleError::ArgError, "line " + tostr(line) + ": Cannot import local symbols"}; return false; }
@@ -1112,7 +1207,7 @@ bool AssembleArgs::TryProcessExtern()
 		if (Contains(file.GlobalSymbols, symbol)) { res = {AssembleError::SymbolRedefinition, "line " + tostr(line) + ": Cannot define global \"" + symbol + "\" as external"}; return false; }
 
 		// add it to the external list
-		file.ExternalSymbols.emplace(std::move(symbol));
+		file.ExternalSymbols.emplace(symbol);
 	}
 
 	return true;
@@ -1177,10 +1272,30 @@ bool AssembleArgs::TryProcessReserve(u64 size)
 
 bool AssembleArgs::TryProcessEQU()
 {
-	if (args.size() != 1) { res = {AssembleError::ArgCount, "line " + tostr(line) + ": Expected 1 operand"}; return false; }
+	if (args.size() != 1) { res = { AssembleError::ArgCount, "line " + tostr(line) + ": Expected 1 operand" }; return false; }
 
 	// make sure we have a label on this line
-	if (label_def.empty()) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Expected a label declaration to link to the value"}; return false; }
+	if (label_def.empty()) { res = { AssembleError::UsageError, "line " + tostr(line) + ": Expected a label declaration to link to the value" }; return false; }
+
+	// get the expression
+	Expr expr;
+	u64 sizecode;
+	bool explicit_size;
+	if (!TryParseImm(args[0], expr, sizecode, explicit_size)) return false;
+	if (explicit_size) { res = { AssembleError::UsageError, "line " + tostr(line) + ": A size directive in this context is not allowed" }; return false; }
+
+	// make sure the symbol isn't already defined (this could be the case for a TIMES prefix on an EQU directive)
+	if (ContainsKey(file.Symbols, label_def)) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Symbol " + label_def + " was already defined"}; return false; }
+
+	// inject the symbol - TryExtractLineHeader() ensures we do this exactly once (no TIMES prefix allowed), so we can move from label_def
+	file.Symbols.emplace(label_def, std::move(expr));
+
+	return true;
+}
+
+bool AssembleArgs::TryProcessStaticAssert()
+{
+	if (args.size() != 1 && args.size() != 2) { res = {AssembleError::ArgCount, "line " + tostr(line) + ": Expected an expression and an optional assertion message"}; return false; }
 
 	// get the expression
 	Expr expr;
@@ -1189,8 +1304,18 @@ bool AssembleArgs::TryProcessEQU()
 	if (!TryParseImm(args[0], expr, sizecode, explicit_size)) return false;
 	if (explicit_size) { res = {AssembleError::UsageError, "line " + tostr(line) + ": A size directive in this context is not allowed"}; return false; }
 
-	// inject the symbol
-	file.Symbols.emplace(std::move(label_def), std::move(expr));
+	// it must be a critical expression - get its value
+	u64 val;
+	bool floating;
+	std::string err;
+	if (!expr.Evaluate(file.Symbols, val, floating, err)) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Expected a critical expression\n-> " + err}; return false; }
+
+	// get the assertion message
+	std::string msg;
+	if (args.size() == 2 && !TryExtractStringChars(args[1], msg, err)) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Second (optional) argument was not a string\n-> " + err}; return false; }
+
+	// if the assertion failed, assembly fails
+	if (IsZero(val, floating)) { res = { AssembleError::Assertion, "line " + tostr(line) + ": Assertion failed" + (args.size() == 2 ? " - " : "") + msg }; return false; }
 
 	return true;
 }
@@ -1200,7 +1325,7 @@ bool AssembleArgs::TryProcessSegment()
 	if (args.size() != 1) { res = {AssembleError::ArgCount, "line " + tostr(line) + ": Expected 1 operand"}; return false; }
 
 	// get the segment we're going to
-	std::string useg = ToUpper(std::move(args[0]));
+	std::string useg = ToUpper(args[0]);
 	if (useg == ".TEXT") current_seg = AsmSegment::TEXT;
 	else if (useg == ".RODATA") current_seg = AsmSegment::RODATA;
 	else if (useg == ".DATA") current_seg = AsmSegment::DATA;
@@ -3035,7 +3160,7 @@ bool AssembleArgs::TryProcessVPUCVT_packed_i2f(OPCode op, bool single)
 }
 bool AssembleArgs::TryProcessVPUCVT_packed_f2f(OPCode op, bool extend)
 {
-	if (args.size() != 2) { res = {AssembleError::ArgCount, "line " + tostr(line) + ": Expected 2 operands"}; return false; }
+	if (args.size() != 2) { res = { AssembleError::ArgCount, "line " + tostr(line) + ": Expected 2 operands" }; return false; }
 
 	u8 mode = extend ? 49 : 46; // decoded vpucvt mode
 
@@ -3056,7 +3181,7 @@ bool AssembleArgs::TryProcessVPUCVT_packed_f2f(OPCode op, bool extend)
 		if (extend)
 		{
 			// validate operand sizes
-			if (src_sizecode != (dest_sizecode == 4 ? 4 : dest_sizecode - 1)) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Specified operand size combination not supported"}; return false; }
+			if (src_sizecode != (dest_sizecode == 4 ? 4 : dest_sizecode - 1)) { res = { AssembleError::UsageError, "line " + tostr(line) + ": Specified operand size combination not supported" }; return false; }
 
 			// decode size and get number of elements
 			mode += (u8)dest_sizecode - 4;
@@ -3065,7 +3190,7 @@ bool AssembleArgs::TryProcessVPUCVT_packed_f2f(OPCode op, bool extend)
 		else
 		{
 			// validate operand sizes
-			if (dest_sizecode != (src_sizecode == 4 ? 4 : src_sizecode - 1)) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Specified operand size combination not supported"}; return false; }
+			if (dest_sizecode != (src_sizecode == 4 ? 4 : src_sizecode - 1)) { res = { AssembleError::UsageError, "line " + tostr(line) + ": Specified operand size combination not supported" }; return false; }
 
 			// decode size and get number of elements
 			mode += (u8)src_sizecode - 4;
@@ -3087,7 +3212,7 @@ bool AssembleArgs::TryProcessVPUCVT_packed_f2f(OPCode op, bool extend)
 		if (extend)
 		{
 			// validate operand sizes
-			if (src_explicit && src_sizecode != dest_sizecode - 1) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Specified operand size combination not supported"}; return false; }
+			if (src_explicit && src_sizecode != dest_sizecode - 1) { res = { AssembleError::UsageError, "line " + tostr(line) + ": Specified operand size combination not supported" }; return false; }
 
 			// decode size and get number of elements
 			mode += (u8)dest_sizecode - 4;
@@ -3096,7 +3221,7 @@ bool AssembleArgs::TryProcessVPUCVT_packed_f2f(OPCode op, bool extend)
 		else
 		{
 			// validate operand sizes
-			if (src_explicit && dest_sizecode != src_sizecode - 1) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Specified operand size combination not supported"}; return false; }
+			if (src_explicit && dest_sizecode != src_sizecode - 1) { res = { AssembleError::UsageError, "line " + tostr(line) + ": Specified operand size combination not supported" }; return false; }
 
 			// we can't tell 2 vs 4 elements since they both use xmm dest - we need explicit source size
 			if (src_explicit)
@@ -3110,15 +3235,14 @@ bool AssembleArgs::TryProcessVPUCVT_packed_f2f(OPCode op, bool extend)
 				mode += 2;
 				elem_count = 8;
 			}
-			else { res = {AssembleError::UsageError, "line " + tostr(line) + ": Could not deduce operand size"}; return false; }
+			else { res = { AssembleError::UsageError, "line " + tostr(line) + ": Could not deduce operand size" }; return false; }
 		}
 
 		// write the data
 		if (!__TryProcessVPUCVT_packed_formatter_mem(op, mode, elem_count, dest, mask.get(), zmask, a, b, std::move(ptr_base))) return false;
 	}
-	else { res = {AssembleError::UsageError, "line " + tostr(line) + ": Expected a VPU register or memory value as second operand"}; return false; }
+	else { res = { AssembleError::UsageError, "line " + tostr(line) + ": Expected a VPU register or memory value as second operand" }; return false; }
 
 	return true;
 }
-
 }
