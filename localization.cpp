@@ -1,3 +1,6 @@
+// this file adds implementations for platform-specific driver functions.
+// CSX64 itself is cross-platform, but the driver may need certain key pieces of information about the system to function properly.
+
 // this file needs language extensions enabled in VisualStudio (i.e. no /Za build option).
 // language extension are disabled for all the other files so that they only use standard-conforming C++.
 // if you start getting mysterious compile errors from library code, make sure this file has them enabled.
@@ -42,7 +45,6 @@ const char *exe_dir()
 	return obj.res;
 }
 
-// this handles all unix stuff
 #elif defined(unix) || defined(__unix__) || defined(__unix)
 
 // ---------- //

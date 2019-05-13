@@ -8,11 +8,10 @@
 #include <unordered_map>
 #include <experimental/filesystem>
 
-#include "CoreTypes.h"
-#include "Computer.h"
-#include "Assembly.h"
-#include "Utility.h"
-#include "ExeDir.h"
+#include "include/CoreTypes.h"
+#include "include/Computer.h"
+#include "include/Assembly.h"
+#include "include/Utility.h"
 
 using namespace CSX64;
 
@@ -48,6 +47,12 @@ enum class AsmLnkErrorExt
 
 	UnknownError = 199
 };
+
+// ---------------------------------
+
+// on success, returns a (non-null) C-style string - path to the directory containing this executable.
+// on failure, returns null.
+const char *exe_dir();
 
 // ---------------------------------
 

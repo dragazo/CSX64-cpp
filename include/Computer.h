@@ -16,13 +16,14 @@
 #include <type_traits>
 #include <ctime>
 
+#include "../ios-frstor/iosfrstor.h"
+#include "../BiggerInts/BiggerInts.h"
+
 #include "CoreTypes.h"
 #include "ExeTypes.h"
 #include "Utility.h"
 #include "FastRng.h"
 #include "Executable.h"
-#include "ios-frstor/iosfrstor.h"
-#include "BiggerInts/BiggerInts.h"
 
 // macros for generating flag union expressions for use with a Computer object
 // __VA_ARGS__ was expanding non-standardly in VS, which is why the below macro recursion doesn't use it

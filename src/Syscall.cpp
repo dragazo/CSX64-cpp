@@ -3,7 +3,7 @@
 #include <cstdio>
 #include <sstream>
 
-#include "Computer.h"
+#include "../include/Computer.h"
 
 // !! CHANGE THIS ONCE VISUAL STUDIO IS UPDATED !! //
 namespace fs = std::experimental::filesystem;

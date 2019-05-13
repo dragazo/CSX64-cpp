@@ -17,9 +17,10 @@
 #include <unordered_set>
 #include <memory>
 
-#include "Utility.h"
-#include "BiggerInts/BiggerInts.h"
-#include "ios-frstor/iosfrstor.h"
+#include "../BiggerInts/BiggerInts.h"
+#include "../ios-frstor/iosfrstor.h"
+
+#include "../include/Utility.h"
 
 namespace CSX64
 {

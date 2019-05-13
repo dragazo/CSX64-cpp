@@ -2,11 +2,11 @@
 #include <unordered_map>
 #include <unordered_set>
 
-#include "AsmTables.h"
-#include "AsmRouting.h"
-#include "Expr.h"
-#include "Assembly.h"
-#include "AsmArgs.h"
+#include "../include/AsmTables.h"
+#include "../include/AsmRouting.h"
+#include "../include/Expr.h"
+#include "../include/Assembly.h"
+#include "../include/AsmArgs.h"
 
 namespace CSX64
 {

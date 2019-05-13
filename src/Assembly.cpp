@@ -18,13 +18,13 @@
 #include <limits>
 #include <memory>
 
-#include "Assembly.h"
-#include "Utility.h"
-#include "Expr.h"
-#include "AsmRouting.h"
-#include "AsmTables.h"
-#include "Executable.h"
-#include "csx_exceptions.h"
+#include "../include/Assembly.h"
+#include "../include/Utility.h"
+#include "../include/Expr.h"
+#include "../include/AsmRouting.h"
+#include "../include/AsmTables.h"
+#include "../include/Executable.h"
+#include "../include/csx_exceptions.h"
 
 namespace CSX64
 {

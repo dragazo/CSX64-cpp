@@ -1,9 +1,9 @@
 #include <iostream>
 #include <fstream>
 
-#include "Assembly.h"
-#include "Utility.h"
-#include "csx_exceptions.h"
+#include "../include/Assembly.h"
+#include "../include/Utility.h"
+#include "../include/csx_exceptions.h"
 
 namespace CSX64
 {

@@ -7,11 +7,11 @@
 #include <stdexcept>
 #include <utility>
 
-#include "CoreTypes.h"
-#include "Utility.h"
-#include "csx_exceptions.h"
+#include "../include/CoreTypes.h"
+#include "../include/Utility.h"
+#include "../include/csx_exceptions.h"
 
-#include "Executable.h"
+#include "../include/Executable.h"
 
 namespace CSX64
 {

@@ -1,8 +1,9 @@
 #include <iostream>
 #include <iomanip>
 
-#include "Computer.h"
-#include "ios-frstor/iosfrstor.h"
+#include "../ios-frstor/iosfrstor.h"
+
+#include "../include/Computer.h"
 
 namespace CSX64
 {

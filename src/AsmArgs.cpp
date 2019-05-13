@@ -1,10 +1,11 @@
 #include <string>
+#include <cctype>
 #include <vector>
 
-#include "AsmTables.h"
-#include "AsmArgs.h"
-#include "CoreTypes.h"
-#include "Utility.h"
+#include "../include/AsmTables.h"
+#include "../include/AsmArgs.h"
+#include "../include/CoreTypes.h"
+#include "../include/Utility.h"
 
 namespace CSX64
 {
@@ -437,7 +438,7 @@ bool AssembleArgs::TryExtractExpr(const std::string &str, const int str_begin, c
 			std::string val = str.substr(pos, end - pos);
 
 			// mutate it
-			if (!MutateName(val)) { res = {AssembleError::FormatError, "line " + tostr(line) + ": Failed to parse imm\n-> " + res.ErrorMsg}; return false; }
+			if (!MutateName(val)) { res = {AssembleError::FormatError, "line " + tostr(line) + ": Failed to parse expression\n-> " + res.ErrorMsg}; return false; }
 
 			// if it's the current line macro
 			if (val == CurrentLineMacro)
@@ -521,7 +522,7 @@ bool AssembleArgs::TryExtractExpr(const std::string &str, const int str_begin, c
 			// seek out nearest conditional without a pair
 			for (; stack.back() && (stack.back()->OP != Expr::OPs::Condition || stack.back()->Right->OP == Expr::OPs::Pair); stack.pop_back());
 			// if we didn't find anywhere to put it, this is an error
-			if (stack.back() == nullptr) { res = {AssembleError::FormatError, "line " + tostr(line) + ": Expression contained a ternary conditional pair without a corresponding condition: "}; return false; }
+			if (stack.back() == nullptr) { res = {AssembleError::FormatError, "line " + tostr(line) + ": Expression contained a ternary conditional pair without a corresponding condition"}; return false; }
 		}
 		// right-to-left operators
 		else if (op == Expr::OPs::Condition)
@@ -1287,7 +1288,7 @@ bool AssembleArgs::TryProcessEQU()
 	// make sure the symbol isn't already defined (this could be the case for a TIMES prefix on an EQU directive)
 	if (ContainsKey(file.Symbols, label_def)) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Symbol " + label_def + " was already defined"}; return false; }
 
-	// inject the symbol - TryExtractLineHeader() ensures we do this exactly once (no TIMES prefix allowed), so we can move from label_def
+	// inject the symbol
 	file.Symbols.emplace(label_def, std::move(expr));
 
 	return true;

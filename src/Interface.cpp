@@ -1,7 +1,7 @@
 #include <iostream>
 #include <iomanip>
 
-#include "Computer.h"
+#include "../include/Computer.h"
 
 #define __OPCODE_COUNTS 0
 

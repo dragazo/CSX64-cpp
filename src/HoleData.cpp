@@ -1,5 +1,5 @@
-#include "HoleData.h"
-#include "Utility.h"
+#include "../include/HoleData.h"
+#include "../include/Utility.h"
 
 namespace CSX64
 {

@@ -15,99 +15,90 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="main.cpp">
+    <ClCompile Include="src\AsmArgs.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Assembly.cpp">
+    <ClCompile Include="src\AsmTables.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Interface.cpp">
+    <ClCompile Include="src\Assembly.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Syscall.cpp">
+    <ClCompile Include="src\CompIO.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Utility.cpp">
+    <ClCompile Include="src\Executable.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Expr.cpp">
+    <ClCompile Include="src\ExeTables.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="OFile.cpp">
+    <ClCompile Include="src\Expr.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="HoleData.cpp">
+    <ClCompile Include="src\HoleData.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="AsmArgs.cpp">
+    <ClCompile Include="src\Interface.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="AsmTables.cpp">
+    <ClCompile Include="src\OFile.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="ExeDir.cpp">
+    <ClCompile Include="src\Syscall.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="ExeTables.cpp">
+    <ClCompile Include="src\Utility.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="CompIO.cpp">
+    <ClCompile Include="driver.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Executable.cpp">
+    <ClCompile Include="localization.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Utility.h">
+    <ClInclude Include="include\AsmArgs.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Assembly.h">
+    <ClInclude Include="include\AsmRouting.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Expr.h">
+    <ClInclude Include="include\AsmTables.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="AsmRouting.h">
+    <ClInclude Include="include\Assembly.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="HoleData.h">
+    <ClInclude Include="include\Computer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="AsmArgs.h">
+    <ClInclude Include="include\CoreTypes.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="ExeTypes.h">
+    <ClInclude Include="include\csx_exceptions.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="AsmTables.h">
+    <ClInclude Include="include\Executable.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="CoreTypes.h">
+    <ClInclude Include="include\ExeTypes.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Computer.h">
+    <ClInclude Include="include\Expr.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="ExeDir.h">
+    <ClInclude Include="include\FastRng.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="BiggerInts\BiggerInts.h">
+    <ClInclude Include="include\HoleData.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="ios-frstor\iosfrstor.h">
+    <ClInclude Include="include\punning.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="FastRng.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="punning.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="csx_exceptions.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Executable.h">
+    <ClInclude Include="include\Utility.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
