@@ -16,6 +16,7 @@ namespace CSX64
 
 	extern const std::string CurrentLineMacro;
 	extern const std::string StartOfSegMacro;
+	extern const std::string TimesIterIdMacro;
 
 	extern const std::unordered_map<Expr::OPs, int> Precedence;
 

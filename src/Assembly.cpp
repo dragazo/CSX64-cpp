@@ -399,7 +399,7 @@ namespace CSX64
 			if (!args.TryExtractLineHeader(rawline)) return args.res;
 
 			// assemble this line a number of times equal to args.times (updated by calling TryExtractLineHeader() above)
-			for (i64 times_i = 0; times_i < args.times; ++times_i)
+			for (args.times_i = 0; args.times_i < args.times; ++args.times_i)
 			{
 				// must update current line pos before each TIMES assembly iteration (because each TIMES iteration is like a new line)
 				args.UpdateLinePos();

@@ -459,6 +459,11 @@ bool AssembleArgs::TryExtractExpr(const std::string &str, const int str_begin, c
 
 				temp = Expr::NewToken(SegOrigins.at(current_seg));
 			}
+			// if it's the TIMES iter id macro
+			else if (val == TimesIterIdMacro)
+			{
+				temp = Expr::NewInt(times_i);
+			}
 			// otherwise it's a normal value/symbol
 			else
 			{
@@ -1220,36 +1225,33 @@ bool AssembleArgs::TryProcessDeclare(u64 size)
 
 	Expr expr;
 	std::string chars, err;
+	u64 sizecode;
+	bool explicit_size;
 
 	// for each argument (not using foreach because order is incredibly important and i'm paranoid)
 	for (int i = 0; i < (int)args.size(); ++i)
 	{
 		// if it's a string
-		if (args[i][0] == '"' || args[i][0] == '\'' || args[i][0] == '`')
+		if (TryExtractStringChars(args[i], chars, err))
 		{
-			// get its chars
-			if (!TryExtractStringChars(args[i], chars, err)) { res = {AssembleError::FormatError, "line " + tostr(line) + ": Invalid string literal: " + args[i] + "\n-> " + err}; return false; }
-
 			// dump into memory (one byte each)
 			for (int j = 0; j < (int)chars.size(); ++j) if (!TryAppendByte((u8)chars[j])) return false;
 			// make sure we write a multiple of size
 			if (!TryPad(AlignOffset((u64)chars.size(), size))) return false;
 		}
-		// otherwise it's a value
-		else
+		// if it's a value (imm)
+		else if (TryParseImm(args[i], expr, sizecode, explicit_size))
 		{
 			// can only use standard sizes
 			if (size > 8) { res = {AssembleError::FormatError, "line " + tostr(line) + ": Attempt to write a numeric value in an unsuported format"}; return false; }
-			
-			// get the value
-			u64 sizecode;
-			bool explicit_size;
-			if (!TryParseImm(args[i], expr, sizecode, explicit_size)) return false;
+			// we're given a size we have to use, so don't allow explicit operand sizes as well
 			if (explicit_size) { res = {AssembleError::UsageError, "line " + tostr(line) + ": A size directive in this context is not allowed"}; return false; }
 
 			// write the value
 			if (!TryAppendExpr(size, std::move(expr))) return false;
 		}
+		// otherwise we failed to parse it
+		else { res = {AssembleError::FormatError, "line " + tostr(line) + ": Failed to parse operand as a string or imm: " + args[i] + "\n-> " + res.ErrorMsg}; return false; }
 	}
 
 	return true;

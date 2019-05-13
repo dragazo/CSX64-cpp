@@ -28,7 +28,7 @@ namespace CSX64
 		std::string last_nonlocal_label;
 
 		std::string label_def;
-		i64 times;
+		i64 times, times_i; // the TIMES upper bound and current loop index (i)
 		std::string op;
 		std::vector<std::string> args; // must be array for ref params
 

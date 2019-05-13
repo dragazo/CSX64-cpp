@@ -15,6 +15,7 @@ namespace CSX64
 
 	const std::string CurrentLineMacro = "$";
 	const std::string StartOfSegMacro = "$$";
+	const std::string TimesIterIdMacro = "$i";
 
 	const std::unordered_map<Expr::OPs, int> Precedence
 	{
