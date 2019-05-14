@@ -146,6 +146,8 @@ namespace CSX64
 
 		bool TryProcessSegment();
 
+		bool TryProcessINCBIN();
+
 		// -- x86 op formats -- //
 
 		bool TryProcessTernaryOp(OPCode op, bool has_ext_op = false, u8 ext_op = 0, u64 sizemask = 15);

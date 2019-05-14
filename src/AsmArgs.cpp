@@ -1,6 +1,9 @@
 #include <string>
 #include <cctype>
 #include <vector>
+#include <iostream>
+#include <fstream>
+#include <cstdlib>
 
 #include "../include/AsmTables.h"
 #include "../include/AsmArgs.h"
@@ -1342,6 +1345,54 @@ bool AssembleArgs::TryProcessSegment()
 
 	// we don't want to have cross-segment local symbols
 	last_nonlocal_label.clear();
+
+	return true;
+}
+
+bool AssembleArgs::TryProcessINCBIN()
+{
+	if (args.size() == 0) { res = { AssembleError::ArgCount, "line " + tostr(line) + ": Expected one or more binaries to inject" }; return false; }
+
+	std::string path;
+	std::string err;
+
+	std::vector<u8> *seg; // the segment to append to
+
+	// get the current segment
+	switch (current_seg)
+	{
+	case AsmSegment::TEXT: seg = &file.Text; break;
+	case AsmSegment::RODATA: seg = &file.Rodata; break;
+	case AsmSegment::DATA: seg = &file.Data; break;
+	case AsmSegment::BSS: res = { AssembleError::UsageError, "line " + tostr(line) + ": Attempt to write initialized data to the BSS segment" }; return false;
+
+	default: res = { AssembleError::UsageError, "line " + tostr(line) + ": Attempt to write outside of a segment" }; return false;
+	}
+
+	// for each argument
+	for (std::size_t i = 0; i < args.size(); ++i)
+	{
+		// ensure it's a string
+		if (!TryExtractStringChars(args[i], path, err)) { res = { AssembleError::UsageError, "line " + tostr(line) + ": Failed to parse " + args[i] + " as a string\n-> " + err}; return false; }
+
+		// open the binary
+		std::ifstream bin(path, std::ios::binary | std::ios::ate);
+		if (!bin) { res = {AssembleError::ArgError, "line " + tostr(line) + ": Failed to open " + path + " for reading"}; return false; }
+		
+		// get its size
+		std::streamsize sz = bin.tellg();
+		bin.seekg(0);
+
+		// mark current segment position
+		std::size_t seglen = seg->size();
+
+		// make room for the entire binary in the current segment
+		try { seg->resize(seg->size() + (std::size_t)sz); }
+		catch (const std::bad_alloc&) { res = {AssembleError::Failure, "line " + tostr(line) + ": Failed to allocate space for binary " + args[i]}; return false; }
+
+		// copy the binary into the segment
+		if (!bin.read(reinterpret_cast<char*>(seg->data()) + seglen, sz) || bin.gcount() != sz) { res = {AssembleError::Failure, "line " + tostr(line) + ": Failed to read binary " + args[i]}; return false; }
+	}
 
 	return true;
 }

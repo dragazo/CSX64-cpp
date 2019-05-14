@@ -304,6 +304,8 @@ namespace CSX64
 	{"SEGMENT", asm_router_SEGMENT},
 	{"SECTION", asm_router_SEGMENT},
 
+	{"INCBIN", asm_router_INCBIN},
+
 	// -------------- //
 
 	// -- unmapped -- //

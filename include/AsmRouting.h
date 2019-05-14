@@ -49,7 +49,9 @@ namespace CSX64
 
 	inline bool asm_router_STATIC_ASSERT(AssembleArgs &args) { return args.TryProcessStaticAssert(); }
 
-	inline bool asm_router_SEGMENT(AssembleArgs &args) { return args.TryProcessSegment(); } // SECTION
+	inline bool asm_router_SEGMENT(AssembleArgs &args) { return args.TryProcessSegment(); }
+
+	inline bool asm_router_INCBIN(AssembleArgs &args) { return args.TryProcessINCBIN(); }
 
 	// -------------- //
 
