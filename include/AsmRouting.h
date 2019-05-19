@@ -229,10 +229,10 @@ namespace CSX64
 
 	inline bool asm_router_CMP(AssembleArgs &args)
 	{
-		// if there are 2 args and the second one is an instant 0, we can make this a CMPZ instruction
+		// if there are 2 args and the second one is an instant imm 0 and it doesn't have a strict specifier, we can make this a CMPZ instruction
 		u64 a, b;
-		bool floating, btemp;
-		if (args.args.size() == 2 && args.TryParseInstantImm(args.args[1], a, floating, b, btemp) && a == 0)
+		bool floating, btemp, strict;
+		if (args.args.size() == 2 && args.TryParseInstantImm(args.args[1], a, floating, b, btemp, strict) && a == 0 && !strict)
 		{
 			// set new args for the unary version
 			args.args.resize(1);

@@ -622,6 +622,29 @@ namespace CSX64
 			return true;
 		}
 
+		// get a compact imm and advances the execution pointer. returns true on success.
+		bool GetCompactImmAdv(u64 &res)
+		{
+			// [1: fill][5:][2: size]   [size: imm]
+
+			u8 prefix;
+			u64 imm;
+
+			// read the prefix byte
+			if (!GetByteAdv(prefix)) return false;
+
+			// read the (raw) imm and handle sign extension
+			switch (prefix & 3)
+			{
+			case 0: if (!GetMemAdv<u8>(imm)) return false;  if (prefix & 0x80) imm |= (u64)0xffffffffffffff00; break;
+			case 1: if (!GetMemAdv<u16>(imm)) return false; if (prefix & 0x80) imm |= (u64)0xffffffffffff0000; break;
+			case 2: if (!GetMemAdv<u32>(imm)) return false; if (prefix & 0x80) imm |= (u64)0xffffffff00000000; break;
+			case 3: if (!GetMemAdv<u64>(imm)) return false; break;
+			}
+
+			return true;
+		}
+
 		// gets an address and advances the execution pointer. returns true on success
 		bool GetAddressAdv(u64 &res)
 		{
@@ -991,10 +1014,8 @@ namespace CSX64
 
 		/*
 		[4: dest][2: size][1:dh][1: mem]   [size: imm]
-		mem = 0: [1: sh][3:][4: src]
-		dest <- f(reg, imm)
-		mem = 1: [address]
-		dest <- f(M[address], imm)
+		mem = 0: [1: sh][3:][4: src]    dest <- f(reg, imm)
+		mem = 1: [address]              dest <- f(M[address], imm)
 		(dh and sh mark AH, BH, CH, or DH for dest or src)
 		*/
 		inline bool FetchTernaryOpFormat(u64 &s, u64 &a, u64 &b)

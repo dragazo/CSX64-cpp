@@ -89,8 +89,8 @@ namespace CSX64
 		// equivalent to calling TryExtractExpr() from 0,len and guaranteeing aft==len.
 		bool TryExtractExpr(const std::string &str, std::unique_ptr<Expr> &expr);
 
-		bool TryParseImm(std::string token, Expr &expr, u64 &sizecode, bool &explicit_size);
-		bool TryParseInstantImm(std::string token, u64 &val, bool &floating, u64 &sizecode, bool &explicit_size);
+		bool TryParseImm(const std::string &token, Expr &expr, u64 &sizecode, bool &explicit_size, bool &strict);
+		bool TryParseInstantImm(const std::string &token, u64 &val, bool &floating, u64 &sizecode, bool &explicit_size, bool &strict);
 
 		/// <summary>
 		/// Attempts to extract the numeric portion of a standard label: val in (#base + val). Returns true on success
@@ -111,7 +111,7 @@ namespace CSX64
 		/// <param name="prefix">the prefix the imm is required to have</param>
 		/// <param name="val">resulting value</param>
 		/// <param name="floating">results in true if val is floating-point</param>
-		bool TryParseInstantPrefixedImm(const std::string &token, const std::string &prefix, u64 &val, bool &floating, u64 &sizecode, bool &explicit_size);
+		bool TryParseInstantPrefixedImm(const std::string &token, const std::string &prefix, u64 &val, bool &floating, u64 &sizecode, bool &explicit_size, bool &strict);
 
 		bool TryParseCPURegister(const std::string &token, u64 &reg, u64 &sizecode, bool &high);
 		bool TryParseFPURegister(const std::string &token, u64 &reg);

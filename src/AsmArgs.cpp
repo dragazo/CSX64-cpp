@@ -606,30 +606,59 @@ bool AssembleArgs::TryExtractExpr(const std::string &str, std::unique_ptr<Expr> 
 	return true;
 }
 	
-bool AssembleArgs::TryParseImm(std::string token, Expr &expr, u64 &sizecode, bool &explicit_size)
+bool AssembleArgs::TryParseImm(const std::string &token, Expr &expr, u64 &sizecode, bool &explicit_size, bool &strict)
 {
-	sizecode = 3; explicit_size = false; // initially no explicit size
+	// (STRICT) (BYTE/WORD/DWORD/QWORD) expr
 
-	// handle explicit sizes directives
-	std::string utoken = ToUpper(token);
-	if (StartsWithToken(utoken, "BYTE")) { sizecode = 0; explicit_size = true; token = TrimStart(token.substr(4)); }
-	else if (StartsWithToken(utoken, "WORD")) { sizecode = 1; explicit_size = true; token = TrimStart(token.substr(4)); }
-	else if (StartsWithToken(utoken, "DWORD")) { sizecode = 2; explicit_size = true; token = TrimStart(token.substr(5)); }
-	else if (StartsWithToken(utoken, "QWORD")) { sizecode = 3; explicit_size = true; token = TrimStart(token.substr(5)); }
+	int pos, end;
 
-	// refer to helper (and iron out the pointer stuff for the caller)
+	// get the first white space delimited token
+	for (pos = 0; pos < token.size() && std::isspace((unsigned char)token[pos]); ++pos);
+	for (end = pos; end < token.size() && !std::isspace((unsigned char)token[end]); ++end);
+
+	// if that's a STRICT specifier
+	if (ToUpper(token.substr(pos, end - pos)) == "STRICT")
+	{
+		strict = true;
+
+		// get the next white space delimited token
+		for (pos = end; pos < token.size() && std::isspace((unsigned char)token[pos]); ++pos);
+		for (end = pos; end < token.size() && !std::isspace((unsigned char)token[end]); ++end);
+	}
+	// otherwise no STRICT specifier
+	else strict = false;
+
+	// extract that token (as upper case)
+	std::string ut = ToUpper(token.substr(pos, end - pos));
+
+	// handle explicit size specifiers
+	if (ut == "BYTE") { sizecode = 0; explicit_size = true; }
+	else if (ut == "WORD") { sizecode = 1; explicit_size = true; }
+	else if (ut == "DWORD") { sizecode = 2; explicit_size = true; }
+	else if (ut == "QWORD") { sizecode = 3; explicit_size = true; }
+	// otherwise no explicit size specifier
+	else { sizecode = 3; explicit_size = false; }
+
+	// if there was a size specifier, wind pos up to the next non-white char after the (size) token
+	if (explicit_size) for (pos = end; pos < token.size() && std::isspace((unsigned char)token[pos]); ++pos);
+
+	// parse the rest of the string as an expression - rest of string starts at index pos - place aft index into end
 	std::unique_ptr<Expr> ptr;
-	if (!TryExtractExpr(token, ptr)) return false;
+	if (!TryExtractExpr(token, pos, (int)token.size(), ptr, end)) return false;
+	// make sure the entire rest of the string was consumed
+	if (end != token.size()) { res = {AssembleError::FormatError, "line " + tostr(line) + ": Failed to parse as an expression: " + token.substr(pos)}; return false; }
+
+	// migrate parsed expression from by-pointer to by-value
 	expr = std::move(*ptr);
 
 	return true;
 }
-bool AssembleArgs::TryParseInstantImm(std::string token, u64 &val, bool &floating, u64 &sizecode, bool &explicit_size)
+bool AssembleArgs::TryParseInstantImm(const std::string &token, u64 &val, bool &floating, u64 &sizecode, bool &explicit_size, bool &strict)
 {
 	std::string err; // error location for evaluation
 
 	Expr hole;
-	if (!TryParseImm(std::move(token), hole, sizecode, explicit_size)) return false;
+	if (!TryParseImm(token, hole, sizecode, explicit_size, strict)) return false;
 	if (!hole.Evaluate(file.Symbols, val, floating, err)) { res = {AssembleError::ArgError, "line " + tostr(line) + ": Failed to evaluate instant imm: " + token + "\n-> " + err}; return false; }
 
 	return true;
@@ -744,7 +773,7 @@ std::unique_ptr<Expr> AssembleArgs::Ptrdiff(std::unique_ptr<Expr> expr)
 	}
 }
 
-bool AssembleArgs::TryParseInstantPrefixedImm(const std::string &token, const std::string &prefix, u64 &val, bool &floating, u64 &sizecode, bool &explicit_size)
+bool AssembleArgs::TryParseInstantPrefixedImm(const std::string &token, const std::string &prefix, u64 &val, bool &floating, u64 &sizecode, bool &explicit_size, bool &strict)
 {
 	val = sizecode = 0;
 	floating = explicit_size = false;
@@ -782,7 +811,7 @@ bool AssembleArgs::TryParseInstantPrefixedImm(const std::string &token, const st
 	if (end != (int)token.size()) { res = {AssembleError::FormatError, "line " + tostr(line) + ": Compound expressions used as prefixed expressions must be parenthesized \"" + token}; return false; }
 
 	// prefix index must be instant imm
-	if (!TryParseInstantImm(token.substr(prefix.size()), val, floating, sizecode, explicit_size)) { res = {AssembleError::ArgError, "line " + tostr(line) + ": Failed to parse instant prefixed imm \"" + token + "\"\n-> " + res.ErrorMsg}; return false; }
+	if (!TryParseInstantImm(token.substr(prefix.size()), val, floating, sizecode, explicit_size, strict)) { res = {AssembleError::ArgError, "line " + tostr(line) + ": Failed to parse instant prefixed imm \"" + token + "\"\n-> " + res.ErrorMsg}; return false; }
 
 	return true;
 }
@@ -1022,12 +1051,13 @@ bool AssembleArgs::TryParseAddress(std::string token, u64 &a, u64 &b, Expr &ptr_
 
 	u64 m1 = 0, r1 = 666, r2 = 666, sz; // final register info - 666 denotes no value - m1 must default to 0 - sz defaults to 64-bit in the case that there's only an imm ptr_base
 	bool explicit_sz; // denotes that the ptr_base sizecode is explicit
+	bool strict; // denotes that the ptr_base is has a STRICT specifier (inhibit compact imm size optimization)
 
 	// extract the address internals
 	token = token.substr(1, token.size() - 2);
 
 	// turn into an expression
-	if (!TryParseImm(token, ptr_base, sz, explicit_sz)) { res = {AssembleError::FormatError, "line " + tostr(line) + ": Failed to parse address expression\n-> " + res.ErrorMsg}; return false; }
+	if (!TryParseImm(token, ptr_base, sz, explicit_sz, strict)) { res = {AssembleError::FormatError, "line " + tostr(line) + ": Failed to parse address expression\n-> " + res.ErrorMsg}; return false; }
 
 	// look through all the register names
 	for (const auto &entry : CPURegisterInfo)
@@ -1161,12 +1191,18 @@ bool AssembleArgs::TryProcessAlign()
 {
 	if (args.size() != 1) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Expected 1 operand"}; return false; }
 
+	// parse the alignment value (critical expression)
 	u64 val, sizecode;
-	bool floating, explicit_size;
-	if (!TryParseInstantImm(args[0], val, floating, sizecode, explicit_size)) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Alignment value must be instant\n-> " + res.ErrorMsg}; return false; }
+	bool floating, explicit_size, strict;
+	if (!TryParseInstantImm(args[0], val, floating, sizecode, explicit_size, strict)) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Alignment value must be instant\n-> " + res.ErrorMsg}; return false; }
+	
+	// it doesn't really make sense to give size information to an alignment value
+	if (explicit_size) { res = {AssembleError::UsageError, "line " + tostr(line) + ": A size directive in this context is not allowed"}; return false; }
+	if (strict) { res = {AssembleError::UsageError, "line " + tostr(line) + ": A STRICT specifier in this context is not allowed"}; return false; }
+	
+	// alignment must be an integer power of 2
 	if (floating) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Alignment value cannot be floating-point"}; return false; }
 	if (val == 0) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Attempt to align to a multiple of zero"}; return false; }
-
 	if (!IsPowerOf2(val)) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Alignment value must be a power of 2. Got " + tostr(val)}; return false; }
 
 	return TryAlign(val);
@@ -1229,7 +1265,7 @@ bool AssembleArgs::TryProcessDeclare(u64 size)
 	Expr expr;
 	std::string chars, err;
 	u64 sizecode;
-	bool explicit_size;
+	bool explicit_size, strict;
 
 	// for each argument (not using foreach because order is incredibly important and i'm paranoid)
 	for (int i = 0; i < (int)args.size(); ++i)
@@ -1243,12 +1279,14 @@ bool AssembleArgs::TryProcessDeclare(u64 size)
 			if (!TryPad(AlignOffset((u64)chars.size(), size))) return false;
 		}
 		// if it's a value (imm)
-		else if (TryParseImm(args[i], expr, sizecode, explicit_size))
+		else if (TryParseImm(args[i], expr, sizecode, explicit_size, strict))
 		{
 			// can only use standard sizes
-			if (size > 8) { res = {AssembleError::FormatError, "line " + tostr(line) + ": Attempt to write a numeric value in an unsuported format"}; return false; }
+			if (size > 8) { res = { AssembleError::FormatError, "line " + tostr(line) + ": Attempt to write a numeric value in an unsuported format" }; return false; }
 			// we're given a size we have to use, so don't allow explicit operand sizes as well
-			if (explicit_size) { res = {AssembleError::UsageError, "line " + tostr(line) + ": A size directive in this context is not allowed"}; return false; }
+			if (explicit_size) { res = { AssembleError::UsageError, "line " + tostr(line) + ": A size directive in this context is not allowed" }; return false; }
+			// in this context, we're writing user-readable binary data, so compacting is not allowed, so explicitly using a STRICT specifier should not be allowed either
+			if (strict) { res = {AssembleError::UsageError, "line " + tostr(line) + ": A STRICT specifier in this context is not allowed"}; return false; }
 
 			// write the value
 			if (!TryAppendExpr(size, std::move(expr))) return false;
@@ -1265,10 +1303,15 @@ bool AssembleArgs::TryProcessReserve(u64 size)
 
 	// parse the number to reserve
 	u64 count, sizecode;
-	bool floating, explicit_size;
-	if (!TryParseInstantImm(args[0], count, floating, sizecode, explicit_size)) return false;
-	if (floating) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Reserve count cannot be floating-point"}; return false; }
+	bool floating, explicit_size, strict;
+	if (!TryParseInstantImm(args[0], count, floating, sizecode, explicit_size, strict)) return false;
+	
+	// it doesn't really make sense to give size information to the length of an array
 	if (explicit_size) { res = {AssembleError::UsageError, "line " + tostr(line) + ": A size directive in this context is not allowed"}; return false; }
+	if (strict) { res = {AssembleError::UsageError, "line " + tostr(line) + ": A STRICT specifier in this context is not allowed"}; return false; }
+
+	// must be an integer
+	if (floating) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Reserve count cannot be floating-point"}; return false; }
 
 	// reserve the space
 	if (!TryReserve(count * size)) return false;
@@ -1286,9 +1329,10 @@ bool AssembleArgs::TryProcessEQU()
 	// get the expression
 	Expr expr;
 	u64 sizecode;
-	bool explicit_size;
-	if (!TryParseImm(args[0], expr, sizecode, explicit_size)) return false;
+	bool explicit_size, strict;
+	if (!TryParseImm(args[0], expr, sizecode, explicit_size, strict)) return false;
 	if (explicit_size) { res = { AssembleError::UsageError, "line " + tostr(line) + ": A size directive in this context is not allowed" }; return false; }
+	if (strict) { res = {AssembleError::UsageError, "line " + tostr(line) + ": A STRICT specifier in this context is not allowed"}; return false; }
 
 	// make sure the symbol isn't already defined (this could be the case for a TIMES prefix on an EQU directive)
 	if (ContainsKey(file.Symbols, label_def)) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Symbol " + label_def + " was already defined"}; return false; }
@@ -1306,9 +1350,10 @@ bool AssembleArgs::TryProcessStaticAssert()
 	// get the expression
 	Expr expr;
 	u64 sizecode;
-	bool explicit_size;
-	if (!TryParseImm(args[0], expr, sizecode, explicit_size)) return false;
+	bool explicit_size, strict;
+	if (!TryParseImm(args[0], expr, sizecode, explicit_size, strict)) return false;
 	if (explicit_size) { res = {AssembleError::UsageError, "line " + tostr(line) + ": A size directive in this context is not allowed"}; return false; }
+	if (strict) { res = {AssembleError::UsageError, "line " + tostr(line) + ": A STRICT specifier in this context is not allowed"}; return false; }
 
 	// it must be a critical expression - get its value
 	u64 val;
@@ -1370,10 +1415,14 @@ bool AssembleArgs::TryProcessINCBIN()
 	if (args.size() > 1)
 	{
 		u64 val, sizecode;
-		bool floating, explicit_size;
-		if (!TryParseInstantImm(args[1], val, floating, sizecode, explicit_size)) return false;
+		bool floating, explicit_size, strict;
+		if (!TryParseInstantImm(args[1], val, floating, sizecode, explicit_size, strict)) return false;
 
-		if (explicit_size) { res = {AssembleError::UsageError, "line " + tostr(line) + ": An explicit sizecode in this context is not allowed"}; return false; }
+		// it doesn't really make sense to give size information to a file position
+		if (explicit_size) { res = {AssembleError::UsageError, "line " + tostr(line) + ": A size directive in this context is not allowed"}; return false; }
+		if (strict) { res = {AssembleError::UsageError, "line " + tostr(line) + ": A STRICT specifier in this context is not allowed"}; return false; }
+
+		// must be an integer
 		if (floating) { res = {AssembleError::ArgError, "line " + tostr(line) + ": Expected an integer expression as second arg"}; return false; }
 
 		bin_pos = (std::streamsize)val;
@@ -1384,10 +1433,14 @@ bool AssembleArgs::TryProcessINCBIN()
 	if (args.size() > 2)
 	{
 		u64 val, sizecode;
-		bool floating, explicit_size;
-		if (!TryParseInstantImm(args[1], val, floating, sizecode, explicit_size)) return false;
+		bool floating, explicit_size, strict;
+		if (!TryParseInstantImm(args[1], val, floating, sizecode, explicit_size, strict)) return false;
 
-		if (explicit_size) { res = { AssembleError::UsageError, "line " + tostr(line) + ": An explicit sizecode in this context is not allowed" }; return false; }
+		// it doesn't really make sense to give size information to the size of an array
+		if (explicit_size) { res = { AssembleError::UsageError, "line " + tostr(line) + ": A size directive in this context is not allowed" }; return false; }
+		if (strict) { res = {AssembleError::UsageError, "line " + tostr(line) + ": A STRICT specifier in this context is not allowed"}; return false; }
+
+		// must be an integer
 		if (floating) { res = { AssembleError::ArgError, "line " + tostr(line) + ": Expected an integer expression as third arg" }; return false; }
 
 		bin_maxlen = (std::streamsize)val;
@@ -1447,10 +1500,10 @@ bool AssembleArgs::TryProcessTernaryOp(OPCode op, bool has_ext_op, u8 ext_op, u6
 	if (has_ext_op) { if (!TryAppendByte(ext_op)) return false; }
 
 	u64 dest, a_sizecode, imm_sz;
-	bool dest_high, imm_sz_explicit;
+	bool dest_high, imm_sz_explicit, imm_strict;
 	Expr imm;
 	if (!TryParseCPURegister(args[0], dest, a_sizecode, dest_high)) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Expected cpu register as first operand"}; return false; }
-	if (!TryParseImm(args[2], imm, imm_sz, imm_sz_explicit)) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Expected imm as third operand"}; return false; }
+	if (!TryParseImm(args[2], imm, imm_sz, imm_sz_explicit, imm_strict)) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Expected imm as third operand"}; return false; }
 
 	if (imm_sz_explicit && imm_sz != a_sizecode) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Operand size mismatch"}; return false; }
 	if ((Size(a_sizecode) & sizemask) == 0) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Specified size is not supported"}; return false; }
@@ -1528,8 +1581,8 @@ bool AssembleArgs::TryProcessBinaryOp(OPCode op, bool has_ext_op, u8 ext_op, u64
 		else
 		{
 			Expr imm;
-			bool explicit_size;
-			if (!TryParseImm(args[1], imm, b_sizecode, explicit_size)) return false;
+			bool explicit_size, strict;
+			if (!TryParseImm(args[1], imm, b_sizecode, explicit_size, strict)) return false;
 
 			// fix up size codes
 			if (_force_b_imm_sizecode == -1)
@@ -1571,8 +1624,8 @@ bool AssembleArgs::TryProcessBinaryOp(OPCode op, bool has_ext_op, u8 ext_op, u64
 		else
 		{
 			Expr imm;
-			bool b_explicit;
-			if (!TryParseImm(args[1], imm, b_sizecode, b_explicit)) return false;
+			bool b_explicit, b_strict;
+			if (!TryParseImm(args[1], imm, b_sizecode, b_explicit, b_strict)) return false;
 
 			// fix up the size codes
 			if (_force_b_imm_sizecode == -1)
@@ -1673,8 +1726,8 @@ bool AssembleArgs::TryProcessIMMRM(OPCode op, bool has_ext_op, u8 ext_op, u64 si
 	else
 	{
 		Expr imm;
-		bool explicit_size;
-		if (!TryParseImm(args[0], imm, a_sizecode, explicit_size)) return false;
+		bool explicit_size, strict;
+		if (!TryParseImm(args[0], imm, a_sizecode, explicit_size, strict)) return false;
 
 		if (!explicit_size)
 		{
@@ -1919,8 +1972,12 @@ bool AssembleArgs::__TryProcessShift_mid()
 	else
 	{
 		Expr imm;
-		bool explicit_size;
-		if (!TryParseImm(args[1], imm, b_sizecode, explicit_size)) return false;
+		bool explicit_size, strict;
+		if (!TryParseImm(args[1], imm, b_sizecode, explicit_size, strict)) return false;
+
+		// we're forcing this to be encoded in 1 byte, so don't allow explicit size or strict specifiers (for the imm we just parsed)
+		if (explicit_size) { res = {AssembleError::UsageError, "line " + tostr(line) + ": A size directive in this context is not allowed"}; return false; }
+		if (strict) { res = {AssembleError::UsageError, "line " + tostr(line) + ": A STRICT specifier in this context is not allowed"}; return false; }
 
 		// mask the shift count to 6 bits (we just need to make sure it can't set the CL flag)
 		imm.Left = std::make_unique<Expr>(std::move(imm));
@@ -2633,9 +2690,13 @@ bool AssembleArgs::TryExtractVPUMask(std::string &arg, std::unique_ptr<Expr> &ma
 
 		// parse the mask expression
 		u64 sizecode;
-		bool explicit_size;
+		bool explicit_size, strict;
 		Expr _mask;
-		if (!TryParseImm(innards, _mask, sizecode, explicit_size)) return false;
+		if (!TryParseImm(innards, _mask, sizecode, explicit_size, strict)) return false;
+
+		// depending on the vpu register size being used, we're locked into a mask size, so don't allow size directives or strict specifiers
+		if (explicit_size) { res = {AssembleError::UsageError, "line " + tostr(line) + ": A size directive in this context is not allowed"}; return false; }
+		if (strict) { res = {AssembleError::UsageError, "line " + tostr(line) + ": A STRICT specifier in this context is not allowed"}; return false; }
 
 		// we now need to return it as a dynamic object - handle with care
 		mask = std::make_unique<Expr>(std::move(_mask));
@@ -2926,12 +2987,18 @@ bool AssembleArgs::TryProcessVPUBinary_2arg(OPCode op, u64 elem_sizecode, bool m
 bool AssembleArgs::TryProcessVPU_FCMP(OPCode op, u64 elem_sizecode, bool maskable, bool aligned, bool scalar)
 {
 	// has the 2-3 args + 1 for the comparison predicate
-	if (args.size() != 3 && args.size() != 4) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Expected 3 or 4 operands"}; return false; }
+	if (args.size() != 3 && args.size() != 4) { res = { AssembleError::UsageError, "line " + tostr(line) + ": Expected 3 or 4 operands" }; return false; }
 
 	// last arg must be the comarison predicate imm - instant integral imm [0-31]
 	u64 pred, sizecode;
-	bool floating, explicit_sizecode;
-	if (!TryParseInstantImm(args.back(), pred, floating, sizecode, explicit_sizecode)) return false;
+	bool floating, explicit_sizecode, strict;
+	if (!TryParseInstantImm(args.back(), pred, floating, sizecode, explicit_sizecode, strict)) return false;
+
+	// we're forcing this quantity to be of a specific encoding format, so it doesn't make sense to allow specifying size information to the predicate expression
+	if (explicit_sizecode) { res = { AssembleError::UsageError, "line " + tostr(line) + ": A size directive in this context is not allowed" }; return false; }
+	if (strict) { res = {AssembleError::UsageError, "line " + tostr(line) + ": A STRICT specifier in this context is not allowed"}; return false; }
+
+	// must be integral (and in bounds)
 	if (floating) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Comparison predicate must be an integer"}; return false; }
 	if (pred >= 32) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Comparison predicate out of range"}; return false; }
 
