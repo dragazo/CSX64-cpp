@@ -1351,14 +1351,52 @@ bool AssembleArgs::TryProcessSegment()
 
 bool AssembleArgs::TryProcessINCBIN()
 {
-	if (args.size() == 0) { res = { AssembleError::ArgCount, "line " + tostr(line) + ": Expected one or more binaries to inject" }; return false; }
+	if (args.size() < 1 || args.size() > 3) { res = { AssembleError::ArgCount, "line " + tostr(line) + ": Expected 1-3 arguments" }; return false; }
 
-	std::string path;
+	std::string path; // the specified path to the binary file to inject
 	std::string err;
 
-	std::vector<u8> *seg; // the segment to append to
+	std::streamsize bin_pos = 0; // starting position in the file to include (in bytes)
+	std::streamsize bin_maxlen = std::numeric_limits<std::streamsize>::max(); // max number of bytes to include (starting at bin_pos)
 
-	// get the current segment
+	std::vector<u8> *seg; // the current segment (to which to append binary data)
+
+	// --------------------------------------------------------------------------------------------
+
+	// ensure the first (required) argument is a string
+	if (!TryExtractStringChars(args[0], path, err)) { res = { AssembleError::UsageError, "line " + tostr(line) + ": Failed to parse " + args[0] + " as a string\n-> " + err}; return false; }
+
+	// if there was a second argument, parse it as bin_pos
+	if (args.size() > 1)
+	{
+		u64 val, sizecode;
+		bool floating, explicit_size;
+		if (!TryParseInstantImm(args[1], val, floating, sizecode, explicit_size)) return false;
+
+		if (explicit_size) { res = {AssembleError::UsageError, "line " + tostr(line) + ": An explicit sizecode in this context is not allowed"}; return false; }
+		if (floating) { res = {AssembleError::ArgError, "line " + tostr(line) + ": Expected an integer expression as second arg"}; return false; }
+
+		bin_pos = (std::streamsize)val;
+		if (bin_pos < 0) { res = {AssembleError::ArgError, "line " + tostr(line) + ": Binary file starting position (arg 2) cannot be negative"}; return false; }
+	}
+
+	// if there was a third argument, parse it as bin_maxlen
+	if (args.size() > 2)
+	{
+		u64 val, sizecode;
+		bool floating, explicit_size;
+		if (!TryParseInstantImm(args[1], val, floating, sizecode, explicit_size)) return false;
+
+		if (explicit_size) { res = { AssembleError::UsageError, "line " + tostr(line) + ": An explicit sizecode in this context is not allowed" }; return false; }
+		if (floating) { res = { AssembleError::ArgError, "line " + tostr(line) + ": Expected an integer expression as third arg" }; return false; }
+
+		bin_maxlen = (std::streamsize)val;
+		if (bin_maxlen < 0) { res = {AssembleError::ArgError, "line " + tostr(line) + ": Binary file max include length (arg 3) cannot be negative"}; return false; }
+	}
+
+	// --------------------------------------------------------------------------------------------
+
+	// get the current segment (we append the binary file to the current segment)
 	switch (current_seg)
 	{
 	case AsmSegment::TEXT: seg = &file.Text; break;
@@ -1369,30 +1407,33 @@ bool AssembleArgs::TryProcessINCBIN()
 	default: res = { AssembleError::UsageError, "line " + tostr(line) + ": Attempt to write outside of a segment" }; return false;
 	}
 
-	// for each argument
-	for (std::size_t i = 0; i < args.size(); ++i)
-	{
-		// ensure it's a string
-		if (!TryExtractStringChars(args[i], path, err)) { res = { AssembleError::UsageError, "line " + tostr(line) + ": Failed to parse " + args[i] + " as a string\n-> " + err}; return false; }
+	// open the binary file and get its size
+	std::ifstream bin(path, std::ios::binary | std::ios::ate);
+	if (!bin) { res = { AssembleError::ArgError, "line " + tostr(line) + ": Failed to open " + path + " for reading" }; return false; }
+	const std::streamsize bin_size = bin.tellg();
 
-		// open the binary
-		std::ifstream bin(path, std::ios::binary | std::ios::ate);
-		if (!bin) { res = {AssembleError::ArgError, "line " + tostr(line) + ": Failed to open " + path + " for reading"}; return false; }
-		
-		// get its size
-		std::streamsize sz = bin.tellg();
-		bin.seekg(0);
+	// if bin_pos is out of bounds, we include nothing and can stop here (success)
+	if (bin_pos >= bin_size) return true;
+	// otherwise seek to the starting position
+	bin.seekg(bin_pos);
 
-		// mark current segment position
-		std::size_t seglen = seg->size();
+	// compute the include length - taking into account bin_maxlen
+	const std::streamsize inc_len = std::min(bin_size - bin_pos, bin_maxlen);
+	// if that's zero we include nothing and can stop here (success)
+	if (inc_len <= 0) return true;
 
-		// make room for the entire binary in the current segment
-		try { seg->resize(seg->size() + (std::size_t)sz); }
-		catch (const std::bad_alloc&) { res = {AssembleError::Failure, "line " + tostr(line) + ": Failed to allocate space for binary " + args[i]}; return false; }
+	// mark current seglen and comute new seglen
+	std::size_t old_seglen = seg->size();
+	std::size_t new_seglen = old_seglen + (std::size_t)inc_len;
+	// make sure new_seglen computation didn't overflow
+	if (new_seglen < old_seglen) { res = {AssembleError::Failure, "line " + tostr(line) + ": Including binary file contents exceeded maximum segment length"}; return false; }
 
-		// copy the binary into the segment
-		if (!bin.read(reinterpret_cast<char*>(seg->data()) + seglen, sz) || bin.gcount() != sz) { res = {AssembleError::Failure, "line " + tostr(line) + ": Failed to read binary " + args[i]}; return false; }
-	}
+	// make room for the entire included portion of the binary file in the current segment
+	try { seg->resize(new_seglen); }
+	catch (const std::bad_alloc&) { res = { AssembleError::Failure, "line " + tostr(line) + ": Failed to allocate space for binary file"}; return false; }
+
+	// copy the binary into the segment
+	if (!bin.read(reinterpret_cast<char*>(seg->data()) + old_seglen, inc_len) || bin.gcount() != inc_len) { res = { AssembleError::Failure, "line " + tostr(line) + ": Failed to read binary file"}; return false; }
 
 	return true;
 }
