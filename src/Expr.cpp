@@ -37,8 +37,23 @@ namespace CSX64
 		{Expr::OPs::Neg, "-"},
 		{Expr::OPs::BitNot, "~"},
 		{Expr::OPs::LogNot, "!"},
-		{Expr::OPs::Int, "(int)"},
-		{Expr::OPs::Float, "(float)"},
+
+		{Expr::OPs::Int, "int"},
+		{Expr::OPs::Float, "float"},
+
+		{Expr::OPs::Floor, "floor"},
+		{Expr::OPs::Ceil, "ceil"},
+		{Expr::OPs::Round, "round"},
+		{Expr::OPs::Trunc, "trunc"},
+
+		{Expr::OPs::Repr64, "repr64"},
+		{Expr::OPs::Repr32, "repr32"},
+
+		{Expr::OPs::Float64, "float64"},
+		{Expr::OPs::Float32, "float32"},
+
+		{Expr::OPs::Prec64, "prec64"},
+		{Expr::OPs::Prec32, "prec32"},
 
 		{Expr::OPs::Condition, "?"},
 		{Expr::OPs::Pair, ":"},
@@ -453,12 +468,92 @@ namespace CSX64
 		case OPs::Int:
 			if (!Left->__Evaluate__(symbols, L, LF, err, visited)) return false;
 
+			// float converts to int, otherwise pass-through
 			res = LF ? (u64)(i64)AsDouble(L) : L;
 			break;
 		case OPs::Float:
 			if (!Left->__Evaluate__(symbols, L, LF, err, visited)) return false;
 
+			// int converts to float, otherwise pass-through
 			res = LF ? L : DoubleAsUInt64((double)(i64)L);
+			floating = true;
+			break;
+
+		case OPs::Floor:
+			if (!Left->__Evaluate__(symbols, L, LF, err, visited)) return false;
+
+			// floor the result - results in a float
+			res = DoubleAsUInt64(std::floor(LF ? AsDouble(L) : (double)(i64)L));
+			floating = true;
+			break;
+		case OPs::Ceil:
+			if (!Left->__Evaluate__(symbols, L, LF, err, visited)) return false;
+
+			// ceil the result - results in a float
+			res = DoubleAsUInt64(std::ceil(LF ? AsDouble(L) : (double)(i64)L));
+			floating = true;
+			break;
+		case OPs::Round:
+			if (!Left->__Evaluate__(symbols, L, LF, err, visited)) return false;
+
+			// round the result - results in a float
+			res = DoubleAsUInt64(std::round(LF ? AsDouble(L) : (double)(i64)L));
+			floating = true;
+			break;
+		case OPs::Trunc:
+			if (!Left->__Evaluate__(symbols, L, LF, err, visited)) return false;
+
+			// trunc the result - results in a float
+			res = DoubleAsUInt64(std::trunc(LF ? AsDouble(L) : (double)(i64)L));
+			floating = true;
+			break;
+
+		case OPs::Repr64:
+			if (!Left->__Evaluate__(symbols, L, LF, err, visited)) return false;
+			if (!LF) { err = "REPR64 requires a floating-point argument"; return false; }
+
+			// convert the float to a 64-bit representation (already storing as 64-bit representation)
+			res = L;
+			break;
+		case OPs::Repr32:
+			if (!Left->__Evaluate__(symbols, L, LF, err, visited)) return false;
+			if (!LF) { err = "REPR32 requires a floating-point argument"; return false; }
+
+			// convert the float to a 32-bit representation
+			res = FloatAsUInt64((float)AsDouble(L));
+			break;
+
+		case OPs::Float64:
+			if (!Left->__Evaluate__(symbols, L, LF, err, visited)) return false;
+			if (LF) { err = "FLOAT64 requires an integer argument"; return false; }
+
+			// convert the 64-bit representation to a float
+			res = L;
+			floating = true;
+			break;
+		case OPs::Float32:
+			if (!Left->__Evaluate__(symbols, L, LF, err, visited)) return false;
+			if (LF) { err = "FLOAT32 requires an integer argument"; return false; }
+
+			// convert the 32-bit representation to a float
+			res = DoubleAsUInt64((double)AsFloat((u32)L));
+			floating = true;
+			break;
+
+		case OPs::Prec64:
+			if (!Left->__Evaluate__(symbols, L, LF, err, visited)) return false;
+			if (!LF) { err = "PREC64 requires a floating-point argument"; return false; }
+
+			// truncate the precision to 64 bits (already storing in 64-bit floating point, so that would be no-op)
+			res = L;
+			floating = true;
+			break;
+		case OPs::Prec32:
+			if (!Left->__Evaluate__(symbols, L, LF, err, visited)) return false;
+			if (!LF) { err = "PREC32 requires a floating-point argument"; return false; }
+
+			// truncate the precision to 32 bits (stored as a 64-bit floating, just chop off some precision from the end)
+			res = L & (u64)0xffffffffe0000000;
 			floating = true;
 			break;
 

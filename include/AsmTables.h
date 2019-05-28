@@ -20,7 +20,7 @@ namespace CSX64
 
 	extern const std::unordered_map<Expr::OPs, int> Precedence;
 
-	extern const std::unordered_set<char> UnaryOps;
+	extern const std::unordered_map<std::string, Expr::OPs> FunctionOperator_to_OP;
 
 	extern const std::unordered_map<AsmSegment, std::string> SegOffsets;
 	extern const std::unordered_map<AsmSegment, std::string> SegOrigins;

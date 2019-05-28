@@ -37,7 +37,17 @@ namespace CSX64
 
 			// unary ops
 
-			Neg, BitNot, LogNot, Int, Float,
+			Neg,
+			BitNot, LogNot,
+			
+			// function-like operators
+
+			Int, Float, // convert int <-> float
+			Floor, Ceil, Round, Trunc,
+
+			Repr64, Repr32,   // interpret float as IEEE-754 encoded int
+			Float64, Float32, // interpret IEEE-754 encoded int as float
+			Prec64, Prec32,   // explicit precision truncations
 
 			// special
 

@@ -617,7 +617,7 @@ namespace CSX64
 		Pad(rodata, AlignOffset(text.size() + rodata.size(), dataalign));
 		Pad(data, AlignOffset(text.size() + rodata.size() + data.size(), bssalign));
 		bsslen += AlignOffset(text.size() + rodata.size() + data.size() + bsslen, 2); // the whole executable is 16-bit aligned (for stack)
-
+		
 		// now that we're done merging we need to define segment offsets in the result
 		for (auto &entry : included)
 		{

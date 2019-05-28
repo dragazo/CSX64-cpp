@@ -258,6 +258,42 @@ bool AssembleArgs::TryAppendByte(u8 val)
 	}
 }
 
+u8 AssembleArgs::GetCompactImmPrefix(u64 val)
+{
+	if ((val & (u64)0xffffffffffffff00) == 0) return (u8)0x00;
+	if ((~val & (u64)0xffffffffffffff00) == 0) return (u8)0x10;
+	
+	if ((val & (u64)0xffffffffffff0000) == 0) return (u8)0x01;
+	if ((~val & (u64)0xffffffffffff0000) == 0) return (u8)0x11;
+
+	if ((val & (u64)0xffffffff00000000) == 0) return (u8)0x02;
+	if ((~val & (u64)0xffffffff00000000) == 0) return (u8)0x12;
+
+	return (u8)0x03;
+}
+
+bool AssembleArgs::TryAppendCompactImm(Expr &&expr, u64 sizecode, bool strict)
+{
+	u64 res;
+	bool floating;
+	std::string err;
+
+	// if we can evaluate it immediately
+	if (expr.Evaluate(file.Symbols, res, floating, err))
+	{
+		// get the prefix byte - taking into account strict flag and potentially-default sizecode
+		u8 prefix = strict ? (u8)(sizecode) : GetCompactImmPrefix(res);
+
+		// write the prefix byte and its appropriately-sized compact imm
+		return TryAppendByte(prefix) && TryAppendVal(Size(prefix & 3), res);
+	}
+	// otherwise it'll need to be a dynamic hole
+	else
+	{
+		
+	}
+}
+
 bool AssembleArgs::TryAppendExpr(u64 size, Expr &&expr, std::vector<HoleData> &holes, std::vector<u8> &segment)
 {
 	std::string err; // evaluation error parsing location
@@ -346,31 +382,29 @@ bool AssembleArgs::TryPad(u64 size)
 
 bool AssembleArgs::TryExtractExpr(const std::string &str, const int str_begin, const int str_end, std::unique_ptr<Expr> &expr, int &aft)
 {
-	// give default values to out params
-	expr = nullptr;
-	aft = str_begin;
+	int pos, end; // position in str
 
-	std::unique_ptr<Expr> temp, _temp; // temporary for node creation
+	std::unique_ptr<Expr>  term_root; // holds the root of the current term tree
+	Expr                  *term_leaf; // holds the leaf of the current term tree (a valid Expr node to be filled out)
 
-	int pos = str_begin, end; // position in token
+	std::vector<Expr*> stack; // the stack used to manage operator precedence rules
+	                          // top of stack shall be refered to as current
 
-	bool binPair = false;          // marker if tree contains complete binary pairs (i.e. N+1 values and N binary ops)
-	int unpaired_conditionals = 0; // number of unpaired conditional ops
+	Expr::OPs op;    // extracted binary op (initialized so compiler doesn't complain)
+	int       oplen; // length of operator found (in characters)
 
-	Expr::OPs op = Expr::OPs::None; // extracted binary op (initialized so compiler doesn't complain)
-	int oplen = 0;                  // length of operator found (in characters)
+	int unpaired_conditionals = 0; // number of unpaired conditional ops - i.e. number of ?: operators with the 3rd component
 
 	std::string err; // error location for hole evaluation
 
-	std::vector<char> unaryOps; // holds unary ops for processing
-	std::vector<Expr*> stack;   // the stack used to manage operator precedence rules
+	// ----------------------------------------------------------------------------------
 
-	// top of stack shall be refered to as current
+	expr = nullptr; // null expr so we know it's currently empty
 
 	stack.push_back(nullptr); // stack will always have a null at its base (simplifies code slightly)
 
 	// skip white space
-	for (; pos < str_end && std::isspace(str[pos]); ++pos);
+	for (pos = str_begin; pos < str_end && std::isspace(str[pos]); ++pos);
 	// if we're past the end, str was empty
 	if (pos >= str_end) { res = {AssembleError::FormatError, "line " + tostr(line) + ": Empty expression encountered"}; return false; }
 
@@ -378,12 +412,26 @@ bool AssembleArgs::TryExtractExpr(const std::string &str, const int str_begin, c
 	{
 		// -- read (unary op...)[operand](binary op) -- //
 
+		// create a new term tree and mark its root/leaf
+		term_root = std::make_unique<Expr>();
+		term_leaf = term_root.get();
+
 		// consume unary ops (allows white space)
 		for (; pos < str_end; ++pos)
 		{
-			if (Contains(UnaryOps, str[pos])) unaryOps.push_back(str[pos]); // absorb unary ops
-			else if (!std::isspace(str[pos])) break; // non-white is start of operand
+			switch (str[pos])
+			{
+			case '+': break; // unary plus does nothing - don't even store it
+			case '-': term_leaf->OP = Expr::OPs::Neg;    term_leaf = (term_leaf->Left = std::make_unique<Expr>()).get(); break;
+			case '~': term_leaf->OP = Expr::OPs::BitNot; term_leaf = (term_leaf->Left = std::make_unique<Expr>()).get(); break;
+			case '!': term_leaf->OP = Expr::OPs::LogNot; term_leaf = (term_leaf->Left = std::make_unique<Expr>()).get(); break;
+
+			default:
+				if (std::isspace(str[pos])) break; // allow white space
+				goto unary_op_loop_aft; // unrecognized non-white is start of operand
+			}
 		}
+		unary_op_loop_aft:
 		// if we're past the end, there were unary ops with no operand
 		if (pos >= str_end) { res = {AssembleError::FormatError, "line " + tostr(line) + ": Unary ops encountered without an operand"}; return false; }
 
@@ -411,7 +459,7 @@ bool AssembleArgs::TryExtractExpr(const std::string &str, const int str_begin, c
 			// otherwise we're in a quote
 			else
 			{
-				// if we have a matching quote, break out of quote mode
+				// if we have a matching quote, end quote mode
 				if (str[end] == str[quote]) quote = -1;
 			}
 		}
@@ -424,17 +472,40 @@ bool AssembleArgs::TryExtractExpr(const std::string &str, const int str_begin, c
 
 		// -- convert to expression tree -- //
 
-		// if sub-expression
+		// if it's a sub-expression
 		if (str[pos] == '(')
 		{
-			// parse the inside into temp
+			// parse the inside into the term leaf
 			int sub_aft;
-			if (!TryExtractExpr(str, pos + 1, end - 1, temp, sub_aft)) return false;
+			std::unique_ptr<Expr> sub_expr;
+			if (!TryExtractExpr(str, pos + 1, end - 1, sub_expr, sub_aft)) return false;
+			*term_leaf = std::move(*sub_expr);
 
 			// if the sub expression didn't capture the entire parenthetical region then the interior was not a (single) expression
 			if (sub_aft != end - 1) { res = {AssembleError::FormatError, "line " + tostr(line) + ": Interior of parenthesis is not an expression"}; return false; }
 		}
-		// otherwise is value
+		// if it's a function call (uses the fact that the above case failed)
+		else if (str[end - 1] == ')')
+		{
+			// get the index of the first paren (we're guaranteed one exists because there's one at the end and it already passed the paren mismatch test)
+			int first_paren;
+			for (first_paren = pos; str[first_paren] != '('; ++first_paren);
+
+			// the string [pos, first_paren) represents the function name - extract it (uppercase since we're case invariant)
+			std::string fn_name = ToUpper(str.substr(pos, first_paren - pos));
+
+			// the interior of the parenthesis (first_paren, end - 1) represents the function argument (expression) - extract it into temp's left branch
+			int fn_arg_aft;
+			if (!TryExtractExpr(str, first_paren + 1, end - 1, term_leaf->Left, fn_arg_aft)) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Failed to parse function-like-operator argument: " + str.substr(first_paren+1, (end-1)-(first_paren+1)) + "\n-> " + res.ErrorMsg}; return false; }
+			// make sure we consumed the entire parenthesis interior
+			if (fn_arg_aft != end - 1) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Interior of function-like-operator was not an expression"}; return false; }
+
+			// get the op to apply to said argument
+			const Expr::OPs *it;
+			if (!TryGetValue(FunctionOperator_to_OP, fn_name, it)) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Unknown function-like-operator: " + fn_name}; return false; }
+			term_leaf->OP = *it; // all we need to do is set it - everything else is already done
+		}
+		// otherwise it's a value
 		else
 		{
 			// get the value to insert
@@ -449,10 +520,9 @@ bool AssembleArgs::TryExtractExpr(const std::string &str, const int str_begin, c
 				// must be in a segment
 				if (current_seg == AsmSegment::INVALID) { res = {AssembleError::FormatError, "line " + tostr(line) + ": Attempt to take an address outside of a segment"}; return false; }
 
-				temp = std::make_unique<Expr>();
-				temp->OP = Expr::OPs::Add;
-				temp->Left = Expr::NewToken(SegOffsets.at(current_seg));
-				temp->Right = Expr::NewInt(line_pos_in_seg);
+				term_leaf->OP = Expr::OPs::Add;
+				term_leaf->Left = Expr::NewToken(SegOffsets.at(current_seg));
+				term_leaf->Right = Expr::NewInt(line_pos_in_seg);
 			}
 			// if it's the start of segment macro
 			else if (val == StartOfSegMacro)
@@ -460,55 +530,34 @@ bool AssembleArgs::TryExtractExpr(const std::string &str, const int str_begin, c
 				// must be in a segment
 				if (current_seg == AsmSegment::INVALID) { res = {AssembleError::FormatError, "line " + tostr(line) + ": Attempt to take an address outside of a segment"}; return false; }
 
-				temp = Expr::NewToken(SegOrigins.at(current_seg));
+				term_leaf->Token(SegOrigins.at(current_seg));
 			}
 			// if it's the TIMES iter id macro
 			else if (val == TimesIterIdMacro)
 			{
-				temp = Expr::NewInt(times_i);
+				term_leaf->IntResult(times_i);
 			}
 			// otherwise it's a normal value/symbol
 			else
 			{
 				// create the hole for it
-				temp = Expr::NewToken(val);
+				term_leaf->Token(val);
 
 				// it either needs to be evaluatable or a valid label name
-				if (!temp->Evaluatable(file.Symbols) && !IsValidName(val, err)) { res = {AssembleError::FormatError, "line " + tostr(line) + ": Failed to resolve token as a valid imm or symbol name: " + val + "\n-> " + err}; return false; }
-			}
-		}
-
-		// handle parsed unary ops (stack provides right-to-left evaluation)
-		while (unaryOps.size() > 0)
-		{
-			char uop = unaryOps.back(); unaryOps.pop_back();
-
-			switch (uop)
-			{
-			case '+': break; // unary plus does nothing
-			case '-': _temp = std::make_unique<Expr>(); _temp->OP = Expr::OPs::Neg; /*   */ _temp->Left = std::move(temp); temp = std::move(_temp); break;
-			case '~': _temp = std::make_unique<Expr>(); _temp->OP = Expr::OPs::BitNot; /**/ _temp->Left = std::move(temp); temp = std::move(_temp); break;
-			case '!': _temp = std::make_unique<Expr>(); _temp->OP = Expr::OPs::LogNot; /**/ _temp->Left = std::move(temp); temp = std::move(_temp); break;
-			case '*': _temp = std::make_unique<Expr>(); _temp->OP = Expr::OPs::Float; /* */ _temp->Left = std::move(temp); temp = std::move(_temp); break;
-			case '/': _temp = std::make_unique<Expr>(); _temp->OP = Expr::OPs::Int; /*   */ _temp->Left = std::move(temp); temp = std::move(_temp); break;
-
-			default: throw std::runtime_error("unary op \'" + tostr(uop) + "\' not implemented");
+				if (!term_leaf->Evaluatable(file.Symbols) && !IsValidName(val, err)) { res = {AssembleError::FormatError, "line " + tostr(line) + ": Failed to resolve token as a valid imm or symbol name: " + val + "\n-> " + err}; return false; }
 			}
 		}
 
 		// -- append subtree to main tree --
 
 		// if no tree yet, use this one
-		if (expr == nullptr) expr = std::move(temp);
+		if (expr == nullptr) expr = std::move(term_root);
 		// otherwise append to current (guaranteed to be defined by second pass)
 		else
 		{
 			// put it in the right (guaranteed by this algorithm to be empty)
-			stack.back()->Right = std::move(temp);
+			stack.back()->Right = std::move(term_root);
 		}
-
-		// flag as a valid binary pair (i.e. every binary op now has 2 operands)
-		binPair = true;
 
 		// -- get binary op -- //
 
@@ -520,7 +569,7 @@ bool AssembleArgs::TryExtractExpr(const std::string &str, const int str_begin, c
 			else if (!std::isspace(str[end])) goto stop_parsing;
 		}
 		// if we didn't find any binary ops, we're done
-		if (end >= str_end) break;
+		if (end >= str_end) goto stop_parsing;
 
 		// -- process binary op -- //
 
@@ -549,7 +598,7 @@ bool AssembleArgs::TryExtractExpr(const std::string &str, const int str_begin, c
 		if (stack.back())
 		{
 			// splice in the new operator, moving current's right sub-tree to left of new node
-			_temp = std::make_unique<Expr>();
+			auto _temp = std::make_unique<Expr>();
 			_temp->OP = op;
 			_temp->Left = std::move(stack.back()->Right);
 			stack.back()->Right = std::move(_temp);
@@ -559,14 +608,12 @@ bool AssembleArgs::TryExtractExpr(const std::string &str, const int str_begin, c
 		else
 		{
 			// splice in the new operator, moving entire tree to left of new node
-			_temp = std::make_unique<Expr>();
+			auto _temp = std::make_unique<Expr>();
 			_temp->OP = op;
 			_temp->Left = std::move(expr);
 			expr = std::move(_temp);
 			stack.push_back(expr.get());
 		}
-
-		binPair = false; // flag as invalid binary pair
 
 		// update unpaired conditionals
 		if (op == Expr::OPs::Condition) ++unpaired_conditionals;
@@ -581,8 +628,6 @@ bool AssembleArgs::TryExtractExpr(const std::string &str, const int str_begin, c
 
 	stop_parsing:
 
-	// handle binary pair mismatch
-	if (!binPair) { res = {AssembleError::FormatError, "line " + tostr(line) + ": Expression contained a mismatched binary op"}; return false; }
 	// make sure all conditionals were matched
 	if (unpaired_conditionals != 0) { res = {AssembleError::FormatError, "line " + tostr(line) + ": Expression contained incomplete ternary conditionals"}; return false; }
 
