@@ -498,9 +498,9 @@ namespace CSX64
 			// return number of bytes read
 			return (i64)len;
 		}
-		virtual i64 Write(const void *buf, i64 len) override { throw FileWrapperPermissionsException("FileWrapper not flagged for writing"); }
+		virtual i64 Write(const void*, i64) override { throw FileWrapperPermissionsException("FileWrapper not flagged for writing"); }
 
-		virtual i64 Seek(i64 off, std::ios::seekdir dir) override { throw FileWrapperPermissionsException("FileWrapper not flagged for seeking"); }
+		virtual i64 Seek(i64, std::ios::seekdir) override { throw FileWrapperPermissionsException("FileWrapper not flagged for seeking"); }
 	};
 
 	// a file wrapper that holds any ostream object, optionally managing its lifetime internally.
@@ -547,14 +547,14 @@ namespace CSX64
 
 		virtual bool CanSeek() const override { return false; }
 
-		virtual i64 Read(void *buf, i64 cap) override { throw FileWrapperPermissionsException("FileWrapper not flagged for reading"); }
+		virtual i64 Read(void*, i64) override { throw FileWrapperPermissionsException("FileWrapper not flagged for reading"); }
 		virtual i64 Write(const void *buf, i64 len) override
 		{
 			f->write(reinterpret_cast<const char*>(buf), (std::streamsize)len); // alias ok because casting to char type
 			return len;
 		}
 
-		virtual i64 Seek(i64 off, std::ios::seekdir dir) override { throw FileWrapperPermissionsException("FileWrapper not flagged for seeking"); }
+		virtual i64 Seek(i64, std::ios::seekdir) override { throw FileWrapperPermissionsException("FileWrapper not flagged for seeking"); }
 	};
 }
 

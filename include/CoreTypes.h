@@ -1,9 +1,7 @@
 #ifndef CSX64_CORETYPES_H
 #define CSX64_CORETYPES_H
 
-#include <cstddef>
 #include <cstdint>
-#include <type_traits>
 #include <climits>
 
 namespace CSX64

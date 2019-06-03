@@ -1,4 +1,7 @@
+# custom stuff
 *.o
+makefile
+temp*
 
 # Created by https://www.gitignore.io/api/c++,windows,notepadpp,visualstudio
 

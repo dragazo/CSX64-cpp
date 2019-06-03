@@ -8,7 +8,6 @@
 #include "CoreTypes.h"
 #include "Assembly.h"
 #include "Expr.h"
-#include "HoleData.h"
 
 namespace CSX64
 {
@@ -93,7 +92,7 @@ namespace CSX64
 		// beg/end  - begin/end indicies in the string to examine (full string would be 0, len).
 		// expr     - the extracted expression (on success).
 		// aft      - the index immediately after the parsed expression (on success).
-		bool TryExtractExpr(const std::string &str, int beg, int end, std::unique_ptr<Expr> &expr, int &aft);
+		bool TryExtractExpr(const std::string &str, std::size_t beg, std::size_t end, std::unique_ptr<Expr> &expr, std::size_t &aft);
 		// attempts to extract an expression from str.
 		// equivalent to calling TryExtractExpr() from 0,len and guaranteeing aft==len.
 		bool TryExtractExpr(const std::string &str, std::unique_ptr<Expr> &expr);

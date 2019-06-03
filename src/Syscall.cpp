@@ -12,6 +12,30 @@ namespace fs = std::experimental::filesystem;
 
 namespace CSX64
 {
+	bool Computer::ProcessSYSCALL()
+	{
+		switch ((SyscallCode)RAX())
+		{
+		case SyscallCode::sys_exit: Exit((int)RBX()); return true;
+
+		case SyscallCode::sys_read: return Process_sys_read();
+		case SyscallCode::sys_write: return Process_sys_write();
+		case SyscallCode::sys_open: return Process_sys_open();
+		case SyscallCode::sys_close: return Process_sys_close();
+		case SyscallCode::sys_lseek: return Process_sys_lseek();
+
+		case SyscallCode::sys_brk: return Process_sys_brk();
+
+		case SyscallCode::sys_rename: return Process_sys_rename();
+		case SyscallCode::sys_unlink: return Process_sys_unlink();
+		case SyscallCode::sys_mkdir: return Process_sys_mkdir();
+		case SyscallCode::sys_rmdir: return Process_sys_rmdir();
+
+			// otherwise syscall not found
+		default: Terminate(ErrorCode::UnhandledSyscall); return false;
+		}
+	}
+
 	bool Computer::Process_sys_read()
 	{
 		// get fd index

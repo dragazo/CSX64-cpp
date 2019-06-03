@@ -11,12 +11,15 @@
 #include <iomanip>
 #include <vector>
 #include <list>
+#include <deque>
 #include <exception>
+#include <stdexcept>
 #include <cctype>
 #include <iostream>
-#include <random>
 #include <unordered_map>
 #include <unordered_set>
+#include <algorithm>
+#include <type_traits>
 
 #include "CoreTypes.h"
 #include "punning.h"
@@ -30,70 +33,38 @@ namespace CSX64
 	// -- arch encoding helpers -- //
 
 	// returns true iff the current system is little-endian
-	inline bool IsLittleEndian()
-	{
-		static constexpr u64 val = 0x0102030405060708;
-		return *reinterpret_cast<const unsigned char*>(&val) == 8; // aliasing is ok because casting to char tyoe
-	}
+	bool IsLittleEndian();
 
 	// -- serialization -- //
 
-	// writes the value's binary representation verbatim
-	template<typename T>
-	std::ostream &BinWrite(std::ostream &ostr, const T &val)
-	{
-		ostr.write(reinterpret_cast<const char*>(&val), sizeof(T)); // aliasing is ok because casting to char type
-		return ostr;
-	}
-	// reads the value's binary representation verbatim
-	template<typename T>
-	std::istream &BinRead(std::istream &istr, T &val)
-	{
-		istr.read(reinterpret_cast<char*>(&val), sizeof(T)); // aliasing is ok because casting to char type
-		if (istr.gcount() != sizeof(T)) istr.setstate(std::ios::failbit);
-		return istr;
-	}
+	// writes count bytes from the buffer to the stream.
+	std::ostream &BinWrite(std::ostream &ostr, const char *p, std::size_t count);
+	// reads count bytes from the stream to the buffer.
+	// if this fails to extract exactly count bytes, sets the stream's failbit.
+	std::istream &BinRead(std::istream &istr, char *p, std::size_t count);
 
-	// writes a binary representation of the string to the stream
+	// writes a binary representation of val to the stream.
+	template<typename T, std::enable_if_t<std::is_trivial<T>::value, int> = 0>
+	std::ostream &BinWrite(std::ostream &ostr, const T &val)
+	{ return BinWrite(ostr, reinterpret_cast<const char*>(&val), sizeof(T)); }
+	// reads a binary representation of val from the stream.
+	template<typename T, std::enable_if_t<std::is_trivial<T>::value, int> = 0>
+	std::istream &BinRead(std::istream &istr, T &val)
+	{ return BinRead(istr, reinterpret_cast<char*>(&val), sizeof(T)); }
+
+	// writes a binary representation of str to the stream.
 	std::ostream &BinWrite(std::ostream &ostr, const std::string &str);
-	// reads a binary representation of the string from the stream
+	// reads a binary representation of str from the stream.
 	std::istream &BinRead(std::istream &istr, std::string &str);
 
 	// -- container utilities -- //
 
 	// returns true if the container has at least one entry equal to val
-	template<typename T>
-	bool Contains(const std::vector<T> &container, const T &val)
-	{
-		for (const auto &entry : container)
-			if (entry == val) return true;
+	template<typename T, typename U> bool Contains(const std::vector<T> &c, const U &val) { return std::find(c.begin(), c.end(), val) != c.end(); }
+	template<typename T, typename U> bool Contains(const std::deque<T> &c, const U &val) { return std::find(c.begin(), c.end(), val) != c.end(); }
 
-		return false;
-	}
-	template<typename T>
-	bool Contains(const std::list<T> &container, const T &val)
-	{
-		for (const auto &entry : container)
-			if (entry == val) return true;
-
-		return false;
-	}
-
-	// returns a pointer to the node with specified key if it exists, otherwise null
 	template<typename T, typename U>
-	bool TryGetValue(const std::unordered_map<T, U> &map, const T &key, const U *&ptr)
-	{
-		auto iter = map.find(key);
-		ptr = (iter == map.end() ? nullptr : &iter->second);
-		return ptr;
-	}
-	template<typename T, typename U>
-	bool TryGetValue(std::unordered_map<T, U> &map, const T &key, U *&ptr)
-	{
-		auto iter = map.find(key);
-		ptr = (iter == map.end() ? nullptr : &iter->second);
-		return ptr;
-	}
+	bool Contains(const std::unordered_set<T> &set, const U &value) { return set.find(value) != set.end(); }
 
 	// returns true if the map contains a node with the specified key
 	template<typename T, typename U>
@@ -107,22 +78,28 @@ namespace CSX64
 	}
 
 	// returns a pointer to the node with specified key if it exists, otherwise null
-	template<typename T>
-	bool TryGetValue(const std::unordered_set<T> &set, const T &value, T *&ptr)
+	template<typename T, typename V>
+	bool TryGetValue(const std::unordered_set<T> &set, const V &value, T *&ptr)
 	{
 		auto iter = set.find(value);
 		return ptr = (iter == set.end() ? nullptr : &*iter);
 	}
-	// returns true if the set contains an entry with the specified value
-	template<typename T, typename U>
-	bool Contains(const std::unordered_set<T> &set, const U &value) { return set.find(value) != set.end(); }
 
-	// gets a new string where all instances of the specified character have been removed
-	std::string remove_ch(const std::string &str, char ch);
-
-	std::string ToString(long double val);
-
-	u64 Rand64(std::default_random_engine &engine);
+	// returns a pointer to the node with specified key if it exists, otherwise null
+	template<typename T, typename U, typename K>
+	bool TryGetValue(const std::unordered_map<T, U> &map, const K &key, const U *&ptr)
+	{
+		auto iter = map.find(key);
+		ptr = (iter == map.end() ? nullptr : &iter->second);
+		return ptr;
+	}
+	template<typename T, typename U, typename K>
+	bool TryGetValue(std::unordered_map<T, U> &map, const K &key, U *&ptr)
+	{
+		auto iter = map.find(key);
+		ptr = (iter == map.end() ? nullptr : &iter->second);
+		return ptr;
+	}
 
 	// -- memory utilities -- //
 
@@ -201,7 +178,7 @@ namespace CSX64
 	}
 	// converts the argument into a hexx string via operator<<
 	template<typename T>
-	std::string tohex(T val)
+	std::string tohex(const T &val)
 	{
 		std::ostringstream ostr;
 		ostr << std::hex << val;
@@ -213,8 +190,7 @@ namespace CSX64
 	std::string ToUpper(T &&str)
 	{
 		std::string res(std::forward<T>(str));
-		for (std::size_t i = 0; i < res.size(); ++i)
-			res[i] = std::toupper((unsigned char)res[i]);
+		for (char &i : res) i = std::toupper((unsigned char)i);
 		return res;
 	}
 	// converts a string to uppercase (via std::tolower for each char)
@@ -222,8 +198,7 @@ namespace CSX64
 	std::string ToLower(T &&str)
 	{
 		std::string res(std::forward<T>(str));
-		for (std::size_t i = 0; i < res.size(); ++i)
-			res[i] = std::tolower((unsigned char)res[i]);
+		for (char &i : res) i = std::tolower((unsigned char)i);
 		return res;
 	}
 
@@ -234,6 +209,9 @@ namespace CSX64
 	std::string TrimEnd(std::string &&str);
 	// removes leading and trailing white space (std::isspace)
 	std::string Trim(const std::string &str);
+
+	// gets a new string where all instances of the specified character have been removed
+	std::string remove_ch(const std::string &str, char ch);
 
 	// extracts the characters that a quoted assembly string token would yield
 	bool TryExtractStringChars(const std::string &token, std::string &chars, std::string &err);

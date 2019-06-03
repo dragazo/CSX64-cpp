@@ -30,23 +30,23 @@ bool AssembleArgs::TryExtractLineHeader(std::string &rawline)
 {
 	// (label:) (times/if imm) (op (arg, arg, ...))
 
-	int pos, end; // position in line parsing
+	std::size_t pos, end; // position in line parsing
 
 	// -- parse label prefix -- //
 
 	// find the first white space delimited token
-	for (pos = 0; pos < (int)rawline.size() && std::isspace((unsigned char)rawline[pos]); ++pos);
-	for (end = pos; end < (int)rawline.size() && !std::isspace((unsigned char)rawline[end]); ++end);
+	for (pos = 0; pos < rawline.size() && std::isspace((unsigned char)rawline[pos]); ++pos);
+	for (end = pos; end < rawline.size() && !std::isspace((unsigned char)rawline[end]); ++end);
 
 	// if we got a label
-	if (pos < (int)rawline.size() && rawline[end - 1] == LabelDefChar)
+	if (pos < rawline.size() && rawline[end - 1] == LabelDefChar)
 	{
 		// set as label def
 		label_def = rawline.substr(pos, end - pos - 1);
 
 		// get another white space delimited token
-		for (pos = end; pos < (int)rawline.size() && std::isspace((unsigned char)rawline[pos]); ++pos);
-		for (end = pos; end < (int)rawline.size() && !std::isspace((unsigned char)rawline[end]); ++end);
+		for (pos = end; pos < rawline.size() && std::isspace((unsigned char)rawline[pos]); ++pos);
+		for (end = pos; end < rawline.size() && !std::isspace((unsigned char)rawline[end]); ++end);
 	}
 	// otherwise there's no label for this line
 	else label_def.clear();
@@ -66,14 +66,14 @@ bool AssembleArgs::TryExtractLineHeader(std::string &rawline)
 	if (rep_code != 0)
 	{
 		// extract an expression starting at end (the number of times to repeat the instruction) (store aft index into end)
-		if (!TryExtractExpr(rawline, end, (int)rawline.size(), rep_expr, end)) { res = {AssembleError::UsageError, "line " + tostr(line) + ": TIMES/IF expected an expression\n-> " + res.ErrorMsg}; return false; }
+		if (!TryExtractExpr(rawline, end, rawline.size(), rep_expr, end)) { res = {AssembleError::UsageError, "line " + tostr(line) + ": TIMES/IF expected an expression\n-> " + res.ErrorMsg}; return false; }
 
 		// make sure we didn't consume the whole line (that would mean there was a times prefix with nothing to augment)
-		if (end == (int)rawline.size()) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Encountered TIMES/IF prefix with no instruction to augment"}; return false; }
+		if (end == rawline.size()) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Encountered TIMES/IF prefix with no instruction to augment"}; return false; }
 
 		// get the next white space delimited token
-		for (pos = end; pos < (int)rawline.size() && std::isspace((unsigned char)rawline[pos]); ++pos);
-		for (end = pos; end < (int)rawline.size() && !std::isspace((unsigned char)rawline[end]); ++end);
+		for (pos = end; pos < rawline.size() && std::isspace((unsigned char)rawline[pos]); ++pos);
+		for (end = pos; end < rawline.size() && !std::isspace((unsigned char)rawline[end]); ++end);
 	}
 	// otherwise there's no times prefix for this line
 	else times = 1;
@@ -274,24 +274,26 @@ u8 AssembleArgs::GetCompactImmPrefix(u64 val)
 
 bool AssembleArgs::TryAppendCompactImm(Expr &&expr, u64 sizecode, bool strict)
 {
-	u64 res;
+	u64 val;
 	bool floating;
 	std::string err;
 
 	// if we can evaluate it immediately
-	if (expr.Evaluate(file.Symbols, res, floating, err))
+	if (expr.Evaluate(file.Symbols, val, floating, err))
 	{
 		// get the prefix byte - taking into account strict flag and potentially-default sizecode
-		u8 prefix = strict ? (u8)(sizecode) : GetCompactImmPrefix(res);
+		u8 prefix = strict ? (u8)(sizecode) : GetCompactImmPrefix(val);
 
 		// write the prefix byte and its appropriately-sized compact imm
-		return TryAppendByte(prefix) && TryAppendVal(Size(prefix & 3), res);
+		return TryAppendByte(prefix) && TryAppendVal(Size(prefix & 3), val);
 	}
 	// otherwise it'll need to be a dynamic hole
 	else
 	{
 		
 	}
+
+	throw std::runtime_error("append compact imm not currently implemented");
 }
 
 bool AssembleArgs::TryAppendExpr(u64 size, Expr &&expr, std::vector<HoleData> &holes, std::vector<u8> &segment)
@@ -380,9 +382,9 @@ bool AssembleArgs::TryPad(u64 size)
 	}
 }
 
-bool AssembleArgs::TryExtractExpr(const std::string &str, const int str_begin, const int str_end, std::unique_ptr<Expr> &expr, int &aft)
+bool AssembleArgs::TryExtractExpr(const std::string &str, const std::size_t str_begin, const std::size_t str_end, std::unique_ptr<Expr> &expr, std::size_t &aft)
 {
-	int pos, end; // position in str
+	std::size_t pos, end; // position in str
 
 	std::unique_ptr<Expr>  term_root; // holds the root of the current term tree
 	Expr                  *term_leaf; // holds the leaf of the current term tree (a valid Expr node to be filled out)
@@ -390,8 +392,8 @@ bool AssembleArgs::TryExtractExpr(const std::string &str, const int str_begin, c
 	std::vector<Expr*> stack; // the stack used to manage operator precedence rules
 	                          // top of stack shall be refered to as current
 
-	Expr::OPs op;    // extracted binary op (initialized so compiler doesn't complain)
-	int       oplen; // length of operator found (in characters)
+	Expr::OPs bin_op;     // extracted binary op (initialized so compiler doesn't complain)
+	int       bin_op_len; // length of operator found (in characters)
 
 	int unpaired_conditionals = 0; // number of unpaired conditional ops - i.e. number of ?: operators with the 3rd component
 
@@ -427,7 +429,7 @@ bool AssembleArgs::TryExtractExpr(const std::string &str, const int str_begin, c
 			case '!': term_leaf->OP = Expr::OPs::LogNot; term_leaf = (term_leaf->Left = std::make_unique<Expr>()).get(); break;
 
 			default:
-				if (std::isspace(str[pos])) break; // allow white space
+				if (std::isspace((unsigned char)str[pos])) break; // allow white space
 				goto unary_op_loop_aft; // unrecognized non-white is start of operand
 			}
 		}
@@ -438,8 +440,8 @@ bool AssembleArgs::TryExtractExpr(const std::string &str, const int str_begin, c
 		int depth = 0;  // parens depth - initially 0
 		int quote = -1; // index of current quote char - initially not in one
 
-		bool numeric = std::isdigit(str[pos]); // flag if this is a numeric literal
-
+		bool numeric = std::isdigit((unsigned char)str[pos]); // flag if this is a numeric literal
+		
 		// move end to next logical separator (white space or binary op)
 		for (end = pos; end < str_end; ++end)
 		{
@@ -451,7 +453,7 @@ bool AssembleArgs::TryExtractExpr(const std::string &str, const int str_begin, c
 				else if (str[end] == ')') --depth; // depth control
 				else if (numeric && (str[end] == 'e' || str[end] == 'E') && end + 1 < str_end && (str[end + 1] == '+' || str[end + 1] == '-')) ++end; // make sure an exponent sign won't be parsed as binary + or - by skipping it
 				else if (str[end] == '"' || str[end] == '\'' || str[end] == '`') quote = end; // quotes mark start of a string
-				else if (depth == 0 && (std::isspace(str[end]) || TryGetOp(str, end, op, oplen))) break; // break on white space or binary op
+				else if (depth == 0 && (std::isspace(str[end]) || TryGetOp(str, end, bin_op, bin_op_len))) break; // break on white space or binary op
 
 				// can't ever have negative depth
 				if (depth < 0) { res = {AssembleError::FormatError, "line " + tostr(line) + ": Mismatched parenthesis in expression"}; return false; }
@@ -476,7 +478,7 @@ bool AssembleArgs::TryExtractExpr(const std::string &str, const int str_begin, c
 		if (str[pos] == '(')
 		{
 			// parse the inside into the term leaf
-			int sub_aft;
+			std::size_t sub_aft;
 			std::unique_ptr<Expr> sub_expr;
 			if (!TryExtractExpr(str, pos + 1, end - 1, sub_expr, sub_aft)) return false;
 			*term_leaf = std::move(*sub_expr);
@@ -495,7 +497,7 @@ bool AssembleArgs::TryExtractExpr(const std::string &str, const int str_begin, c
 			std::string fn_name = ToUpper(str.substr(pos, first_paren - pos));
 
 			// the interior of the parenthesis (first_paren, end - 1) represents the function argument (expression) - extract it into temp's left branch
-			int fn_arg_aft;
+			std::size_t fn_arg_aft;
 			if (!TryExtractExpr(str, first_paren + 1, end - 1, term_leaf->Left, fn_arg_aft)) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Failed to parse function-like-operator argument: " + str.substr(first_paren+1, (end-1)-(first_paren+1)) + "\n-> " + res.ErrorMsg}; return false; }
 			// make sure we consumed the entire parenthesis interior
 			if (fn_arg_aft != end - 1) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Interior of function-like-operator was not an expression"}; return false; }
@@ -564,9 +566,9 @@ bool AssembleArgs::TryExtractExpr(const std::string &str, const int str_begin, c
 		// we may have stopped token parsing on white space, so wind up to find a binary op
 		for (; end < str_end; ++end)
 		{
-			if (TryGetOp(str, end, op, oplen)) break; // break when we find an op
+			if (TryGetOp(str, end, bin_op, bin_op_len)) break; // break when we find an op
 			// if we hit a non-white character, there are tokens with no binary ops between them - that's the end of the expression
-			else if (!std::isspace(str[end])) goto stop_parsing;
+			else if (!std::isspace((unsigned char)str[end])) goto stop_parsing;
 		}
 		// if we didn't find any binary ops, we're done
 		if (end >= str_end) goto stop_parsing;
@@ -574,7 +576,7 @@ bool AssembleArgs::TryExtractExpr(const std::string &str, const int str_begin, c
 		// -- process binary op -- //
 
 		// ternary conditional has special rules
-		if (op == Expr::OPs::Pair)
+		if (bin_op == Expr::OPs::Pair)
 		{
 			// seek out nearest conditional without a pair
 			for (; stack.back() && (stack.back()->OP != Expr::OPs::Condition || stack.back()->Right->OP == Expr::OPs::Pair); stack.pop_back());
@@ -582,16 +584,16 @@ bool AssembleArgs::TryExtractExpr(const std::string &str, const int str_begin, c
 			if (stack.back() == nullptr) { res = {AssembleError::FormatError, "line " + tostr(line) + ": Expression contained a ternary conditional pair without a corresponding condition"}; return false; }
 		}
 		// right-to-left operators
-		else if (op == Expr::OPs::Condition)
+		else if (bin_op == Expr::OPs::Condition)
 		{
 			// wind current up to correct precedence (right-to-left evaluation, so don't skip equal precedence)
-			for (; stack.back() && Precedence.at(stack.back()->OP) < Precedence.at(op); stack.pop_back());
+			for (; stack.back() && Precedence.at(stack.back()->OP) < Precedence.at(bin_op); stack.pop_back());
 		}
 		// left-to-right operators
 		else
 		{
 			// wind current up to correct precedence (left-to-right evaluation, so also skip equal precedence)
-			for (; stack.back() && Precedence.at(stack.back()->OP) <= Precedence.at(op); stack.pop_back());
+			for (; stack.back() && Precedence.at(stack.back()->OP) <= Precedence.at(bin_op); stack.pop_back());
 		}
 
 		// if we have a valid current
@@ -599,7 +601,7 @@ bool AssembleArgs::TryExtractExpr(const std::string &str, const int str_begin, c
 		{
 			// splice in the new operator, moving current's right sub-tree to left of new node
 			auto _temp = std::make_unique<Expr>();
-			_temp->OP = op;
+			_temp->OP = bin_op;
 			_temp->Left = std::move(stack.back()->Right);
 			stack.back()->Right = std::move(_temp);
 			stack.push_back(stack.back()->Right.get());
@@ -609,18 +611,18 @@ bool AssembleArgs::TryExtractExpr(const std::string &str, const int str_begin, c
 		{
 			// splice in the new operator, moving entire tree to left of new node
 			auto _temp = std::make_unique<Expr>();
-			_temp->OP = op;
+			_temp->OP = bin_op;
 			_temp->Left = std::move(expr);
 			expr = std::move(_temp);
 			stack.push_back(expr.get());
 		}
 
 		// update unpaired conditionals
-		if (op == Expr::OPs::Condition) ++unpaired_conditionals;
-		else if (op == Expr::OPs::Pair) --unpaired_conditionals;
+		if (bin_op == Expr::OPs::Condition) ++unpaired_conditionals;
+		else if (bin_op == Expr::OPs::Pair) --unpaired_conditionals;
 
-		// pass last delimiter and skip white space (end + oplen points just after the binary op)
-		for (pos = end + oplen; pos < str_end && std::isspace((unsigned char)str[pos]); ++pos);
+		// pass last delimiter and skip white space (end + bin_op_len points just after the binary op)
+		for (pos = end + bin_op_len; pos < str_end && std::isspace((unsigned char)str[pos]); ++pos);
 
 		// if pos is now out of bounds, there was a binary op with no second operand
 		if (pos >= str_end) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Binary op encountered without a second operand"}; return false; }
@@ -642,11 +644,11 @@ bool AssembleArgs::TryExtractExpr(const std::string &str, const int str_begin, c
 bool AssembleArgs::TryExtractExpr(const std::string &str, std::unique_ptr<Expr> &expr)
 {
 	// try to extract an expr from 0,len
-	int aft;
-	if (!TryExtractExpr(str, 0, (int)str.length(), expr, aft)) return false;
+	std::size_t aft;
+	if (!TryExtractExpr(str, 0, str.size(), expr, aft)) return false;
 
 	// ensure that the entire string was consumed
-	if (aft != (int)str.length()) { res = {AssembleError::FormatError, "line " + tostr(line) + ": Failed to parse \"" + str + "\" as an expression"}; return false; }
+	if (aft != str.length()) { res = {AssembleError::FormatError, "line " + tostr(line) + ": Failed to parse \"" + str + "\" as an expression"}; return false; }
 
 	return true;
 }
@@ -655,7 +657,7 @@ bool AssembleArgs::TryParseImm(const std::string &token, Expr &expr, u64 &sizeco
 {
 	// (STRICT) (BYTE/WORD/DWORD/QWORD) expr
 
-	int pos, end;
+	std::size_t pos, end;
 
 	// get the first white space delimited token
 	for (pos = 0; pos < token.size() && std::isspace((unsigned char)token[pos]); ++pos);
@@ -689,7 +691,7 @@ bool AssembleArgs::TryParseImm(const std::string &token, Expr &expr, u64 &sizeco
 
 	// parse the rest of the string as an expression - rest of string starts at index pos - place aft index into end
 	std::unique_ptr<Expr> ptr;
-	if (!TryExtractExpr(token, pos, (int)token.size(), ptr, end)) return false;
+	if (!TryExtractExpr(token, pos, token.size(), ptr, end)) return false;
 	// make sure the entire rest of the string was consumed
 	if (end != token.size()) { res = {AssembleError::FormatError, "line " + tostr(line) + ": Failed to parse as an expression: " + token.substr(pos)}; return false; }
 
@@ -803,18 +805,18 @@ std::unique_ptr<Expr> AssembleArgs::Ptrdiff(std::unique_ptr<Expr> expr)
 	if (sub.size() == 0) return std::make_unique<Expr>(Expr::ChainAddition(add));
 	else if (add.size() == 0)
 	{
-		std::unique_ptr<Expr> res = std::make_unique<Expr>();
-		res->OP = Expr::OPs::Neg;
-		res->Left = std::make_unique<Expr>(Expr::ChainAddition(sub));
-		return res;
+		std::unique_ptr<Expr> tree = std::make_unique<Expr>();
+		tree->OP = Expr::OPs::Neg;
+		tree->Left = std::make_unique<Expr>(Expr::ChainAddition(sub));
+		return tree;
 	}
 	else
 	{
-		std::unique_ptr<Expr> res = std::make_unique<Expr>();
-		res->OP = Expr::OPs::Sub;
-		res->Left = std::make_unique<Expr>(Expr::ChainAddition(add));
-		res->Right = std::make_unique<Expr>(Expr::ChainAddition(sub));
-		return res;
+		std::unique_ptr<Expr> tree = std::make_unique<Expr>();
+		tree->OP = Expr::OPs::Sub;
+		tree->Left = std::make_unique<Expr>(Expr::ChainAddition(add));
+		tree->Right = std::make_unique<Expr>(Expr::ChainAddition(sub));
+		return tree;
 	}
 }
 
@@ -1536,12 +1538,12 @@ bool AssembleArgs::TryProcessINCBIN()
 	return true;
 }
 
-bool AssembleArgs::TryProcessTernaryOp(OPCode op, bool has_ext_op, u8 ext_op, u64 sizemask)
+bool AssembleArgs::TryProcessTernaryOp(OPCode opcode, bool has_ext_op, u8 ext_op, u64 sizemask)
 {
 	if (args.size() != 3) { res = {AssembleError::ArgCount, "line " + tostr(line) + ": Expected 3 args"}; return false; }
 
 	// write op code
-	if (!TryAppendByte((u8)op)) return false;
+	if (!TryAppendByte((u8)opcode)) return false;
 	if (has_ext_op) { if (!TryAppendByte(ext_op)) return false; }
 
 	u64 dest, a_sizecode, imm_sz;
@@ -1583,12 +1585,12 @@ bool AssembleArgs::TryProcessTernaryOp(OPCode op, bool has_ext_op, u8 ext_op, u6
 
 	return true;
 }
-bool AssembleArgs::TryProcessBinaryOp(OPCode op, bool has_ext_op, u8 ext_op, u64 sizemask, int _force_b_imm_sizecode)
+bool AssembleArgs::TryProcessBinaryOp(OPCode opcode, bool has_ext_op, u8 ext_op, u64 sizemask, int _force_b_imm_sizecode)
 {
 	if (args.size() != 2) { res = {AssembleError::ArgCount, "line " + tostr(line) + ": Expected 2 operands"}; return false; }
 
 	// write op code
-	if (!TryAppendByte((u8)op)) return false;
+	if (!TryAppendByte((u8)opcode)) return false;
 	if (has_ext_op) { if (!TryAppendByte(ext_op)) return false; }
 
 	// reg, *
@@ -1695,12 +1697,12 @@ bool AssembleArgs::TryProcessBinaryOp(OPCode op, bool has_ext_op, u8 ext_op, u64
 
 	return true;
 }
-bool AssembleArgs::TryProcessUnaryOp(OPCode op, bool has_ext_op, u8 ext_op, u64 sizemask)
+bool AssembleArgs::TryProcessUnaryOp(OPCode opcode, bool has_ext_op, u8 ext_op, u64 sizemask)
 {
 	if (args.size() != 1) { res = {AssembleError::ArgCount, "line " + tostr(line) + ": Expected 1 operand"}; return false; }
 
 	// write op code
-	if (!TryAppendByte((u8)op)) return false;
+	if (!TryAppendByte((u8)opcode)) return false;
 	if (has_ext_op) { if (!TryAppendByte(ext_op)) return false; }
 
 	// reg
@@ -1732,12 +1734,12 @@ bool AssembleArgs::TryProcessUnaryOp(OPCode op, bool has_ext_op, u8 ext_op, u64 
 
 	return true;
 }
-bool AssembleArgs::TryProcessIMMRM(OPCode op, bool has_ext_op, u8 ext_op, u64 sizemask, int default_sizecode)
+bool AssembleArgs::TryProcessIMMRM(OPCode opcode, bool has_ext_op, u8 ext_op, u64 sizemask, int default_sizecode)
 {
 	if (args.size() != 1) { res = {AssembleError::ArgCount, "line " + tostr(line) + ": Expected 1 operand"}; return false; }
 
 	// write op code
-	if (!TryAppendByte((u8)op)) return false;
+	if (!TryAppendByte((u8)opcode)) return false;
 	if (has_ext_op) { if (!TryAppendByte(ext_op)) return false; }
 
 	// reg
@@ -1787,12 +1789,12 @@ bool AssembleArgs::TryProcessIMMRM(OPCode op, bool has_ext_op, u8 ext_op, u64 si
 
 	return true;
 }
-bool AssembleArgs::TryProcessRR_RM(OPCode op, bool has_ext_op, u8 ext_op, u64 sizemask)
+bool AssembleArgs::TryProcessRR_RM(OPCode opcode, bool has_ext_op, u8 ext_op, u64 sizemask)
 {
 	if (args.size() != 3) { res = {AssembleError::ArgCount, "line " + tostr(line) + ": Expected 3 operands"}; return false; }
 
 	// write op code
-	if (!TryAppendByte((u8)op)) return false;
+	if (!TryAppendByte((u8)opcode)) return false;
 	if (has_ext_op) { if (!TryAppendByte(ext_op)) return false; }
 
 	// reg, *, *
@@ -1842,15 +1844,15 @@ bool AssembleArgs::TryProcessRR_RM(OPCode op, bool has_ext_op, u8 ext_op, u64 si
 	return true;
 }
 
-bool AssembleArgs::TryProcessBinaryOp_NoBMem(OPCode op, bool has_ext_op, u8 ext_op, u64 sizemask, int _force_b_imm_sizecode)
+bool AssembleArgs::TryProcessBinaryOp_NoBMem(OPCode opcode, bool has_ext_op, u8 ext_op, u64 sizemask, int _force_b_imm_sizecode)
 {
 	// b can't be memory
 	if (args.size() > 1 && args[1][args[1].size() - 1] == ']') { res = {AssembleError::UsageError, "line " + tostr(line) + ": Second operand may not be a memory value"}; return false; }
 
 	// otherwise refer to binary formatter
-	return TryProcessBinaryOp(op, has_ext_op, ext_op, sizemask, _force_b_imm_sizecode);
+	return TryProcessBinaryOp(opcode, has_ext_op, ext_op, sizemask, _force_b_imm_sizecode);
 }
-bool AssembleArgs::TryProcessBinaryOp_R_RM(OPCode op, bool has_ext_op, u8 ext_op, u64 sizemask, int _force_b_imm_sizecode)
+bool AssembleArgs::TryProcessBinaryOp_R_RM(OPCode opcode, bool has_ext_op, u8 ext_op, u64 sizemask, int _force_b_imm_sizecode)
 {
 	// a must be register
 	u64 reg, sz;
@@ -1860,15 +1862,15 @@ bool AssembleArgs::TryProcessBinaryOp_R_RM(OPCode op, bool has_ext_op, u8 ext_op
 	if (args.size() > 1 && !TryParseCPURegister(args[1], reg, sz, high) && args[1][args[1].size() - 1] != ']') { res = {AssembleError::UsageError, "line " + tostr(line) + ": Second operand must be a cpu register or memory value"}; return false; }
 
 	// otherwise refer to binary formatter
-	return TryProcessBinaryOp(op, has_ext_op, ext_op, sizemask, _force_b_imm_sizecode);
+	return TryProcessBinaryOp(opcode, has_ext_op, ext_op, sizemask, _force_b_imm_sizecode);
 }
 
-bool AssembleArgs::TryProcessNoArgOp(OPCode op, bool has_ext_op, u8 ext_op)
+bool AssembleArgs::TryProcessNoArgOp(OPCode opcode, bool has_ext_op, u8 ext_op)
 {
 	if (args.size() != 0) { res = {AssembleError::ArgCount, "line " + tostr(line) + ": Expected no operands"}; return false; }
 
 	// write op code
-	if (!TryAppendByte((u8)op)) return false;
+	if (!TryAppendByte((u8)opcode)) return false;
 	if (has_ext_op) { if (!TryAppendByte(ext_op)) return false; }
 
 	return true;
@@ -1880,12 +1882,12 @@ bool AssembleArgs::TryProcessNoArgOp_no_write()
 	return true;
 }
 
-bool AssembleArgs::TryProcessXCHG(OPCode op)
+bool AssembleArgs::TryProcessXCHG(OPCode opcode)
 {
 	if (args.size() != 2) { res = {AssembleError::ArgCount, "line " + tostr(line) + ": Expected 2 operands"}; return false; }
 
 	// write op code
-	if (!TryAppendByte((u8)op)) return false;
+	if (!TryAppendByte((u8)opcode)) return false;
 
 	// reg, *
 	u64 reg, a_sizecode;
@@ -1945,7 +1947,7 @@ bool AssembleArgs::TryProcessXCHG(OPCode op)
 
 	return true;
 }
-bool AssembleArgs::TryProcessLEA(OPCode op)
+bool AssembleArgs::TryProcessLEA(OPCode opcode)
 {
 	if (args.size() != 2) { res = {AssembleError::ArgCount, "line " + tostr(line) + ": Expected 2 operands"}; return false; }
 
@@ -1959,18 +1961,18 @@ bool AssembleArgs::TryProcessLEA(OPCode op)
 	bool explicit_size;
 	if (!TryParseAddress(args[1], a, b, ptr_base, b_sizecode, explicit_size)) return false;
 
-	if (!TryAppendByte((u8)op)) return false;
+	if (!TryAppendByte((u8)opcode)) return false;
 	if (!TryAppendVal(1, (dest << 4) | (a_sizecode << 2))) return false;
 	if (!TryAppendAddress(a, b, std::move(ptr_base))) return false;
 
 	return true;
 }
-bool AssembleArgs::TryProcessPOP(OPCode op)
+bool AssembleArgs::TryProcessPOP(OPCode opcode)
 {
 	if (args.size() != 1) { res = {AssembleError::ArgCount, "line " + tostr(line) + ": Expected 1 operand"}; return false; }
 
 	// write op code
-	if (!TryAppendByte((u8)op)) return false;
+	if (!TryAppendByte((u8)opcode)) return false;
 
 	// reg
 	u64 reg, a_sizecode;
@@ -2034,12 +2036,12 @@ bool AssembleArgs::__TryProcessShift_mid()
 
 	return true;
 }
-bool AssembleArgs::TryProcessShift(OPCode op)
+bool AssembleArgs::TryProcessShift(OPCode opcode)
 {
 	if (args.size() != 2) { res = {AssembleError::ArgCount, "line " + tostr(line) + ": Expected 2 operands"}; return false; }
 
 	// write op code
-	if (!TryAppendByte((u8)op)) return false;
+	if (!TryAppendByte((u8)opcode)) return false;
 
 	// reg, *
 	u64 dest, a_sizecode;
@@ -2103,7 +2105,7 @@ bool AssembleArgs::__TryProcessMOVxX_settings_byte(bool sign, u64 dest, u64 dest
 
 	return true;
 }
-bool AssembleArgs::TryProcessMOVxX(OPCode op, bool sign)
+bool AssembleArgs::TryProcessMOVxX(OPCode opcode, bool sign)
 {
 	if (args.size() != 2) { res = {AssembleError::ArgCount, "line " + tostr(line) + ": Expected 2 operands"}; return false; }
 
@@ -2112,7 +2114,7 @@ bool AssembleArgs::TryProcessMOVxX(OPCode op, bool sign)
 	if (!TryParseCPURegister(args[0], dest, dest_sizecode, __dest_high)) { res = {AssembleError::UsageError, "line " + tostr(line) + ": First operand must be a cpu register"}; return false; }
 
 	// write op code
-	if (!TryAppendByte((u8)op)) return false;
+	if (!TryAppendByte((u8)opcode)) return false;
 
 	// reg, reg
 	u64 src, src_sizecode;
@@ -2170,27 +2172,27 @@ bool AssembleArgs::__TryGetBinaryStringOpSize(u64 &sizecode)
 	return true;
 }
 
-bool AssembleArgs::TryProcessMOVS_string(OPCode op, bool rep)
+bool AssembleArgs::TryProcessMOVS_string(OPCode opcode, bool rep)
 {
 	u64 sizecode;
 	if (!__TryGetBinaryStringOpSize(sizecode)) return false;
 	
-	if (!TryAppendByte((u8)op)) return false;
+	if (!TryAppendByte((u8)opcode)) return false;
 	if (!TryAppendByte((u8)(((rep ? 1 : 0) << 2) | sizecode))) return false;
 
 	return true;
 }
-bool AssembleArgs::TryProcessCMPS_string(OPCode op, bool repe, bool repne)
+bool AssembleArgs::TryProcessCMPS_string(OPCode opcode, bool repe, bool repne)
 {
 	u64 sizecode;
 	if (!__TryGetBinaryStringOpSize(sizecode)) return false;
 
-	if (!TryAppendByte((u8)op)) return false;
+	if (!TryAppendByte((u8)opcode)) return false;
 	if (!TryAppendByte((u8)(((repne ? 4 : repe ? 3 : 2) << 2) | sizecode))) return false;
 
 	return true;
 }
-bool AssembleArgs::TryProcessLODS_string(OPCode op, bool rep)
+bool AssembleArgs::TryProcessLODS_string(OPCode opcode, bool rep)
 {
 	if (args.size() != 1) { res = {AssembleError::ArgCount, "line " + tostr(line) + ": Expected 1 operand"}; return false; }
 
@@ -2201,12 +2203,12 @@ bool AssembleArgs::TryProcessLODS_string(OPCode op, bool rep)
 	if (reg != 0) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Operand must be a partition of RAX"}; return false; }
 	if (high) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Operand may not be AH"}; return false; }
 
-	if (!TryAppendByte((u8)op)) return false;
+	if (!TryAppendByte((u8)opcode)) return false;
 	if (!TryAppendByte((u8)(((rep ? 6 : 5) << 2) | sizecode))) return false;
 
 	return true;
 }
-bool AssembleArgs::TryProcessSTOS_string(OPCode op, bool rep)
+bool AssembleArgs::TryProcessSTOS_string(OPCode opcode, bool rep)
 {
 	if (args.size() != 1) { res = {AssembleError::ArgCount, "line " + tostr(line) + ": Expected 1 operand"}; return false; }
 
@@ -2218,12 +2220,12 @@ bool AssembleArgs::TryProcessSTOS_string(OPCode op, bool rep)
 	if (!explicit_size) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Could not deduce operand size"}; return false; }
 	if (sizecode > 3) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Specified operand size is not supported"}; return false; }
 
-	if (!TryAppendByte((u8)op)) return false;
+	if (!TryAppendByte((u8)opcode)) return false;
 	if (!TryAppendByte((u8)(((rep ? 8 : 7) << 2) | sizecode))) return false;
 
 	return true;
 }
-bool AssembleArgs::TryProcessSCAS_string(OPCode op, bool repe, bool repne)
+bool AssembleArgs::TryProcessSCAS_string(OPCode opcode, bool repe, bool repne)
 {
 	if (args.size() != 1) { res = {AssembleError::ArgCount, "line " + tostr(line) + ": Expected 1 operand"}; return false; }
 
@@ -2235,7 +2237,7 @@ bool AssembleArgs::TryProcessSCAS_string(OPCode op, bool repe, bool repne)
 	if (!explicit_size) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Could not deduce operand size"}; return false; }
 	if (sizecode > 3) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Specified operand size is not supported"}; return false; }
 
-	if (!TryAppendByte((u8)op)) return false;
+	if (!TryAppendByte((u8)opcode)) return false;
 	if (!TryAppendByte((u8)(((repne ? 11 : repe ? 10 : 9) << 2) | sizecode))) return false;
 
 	return true;
@@ -2356,12 +2358,12 @@ bool AssembleArgs::TryProcessLOCK()
 	return (*router)(*this);
 }
 
-bool AssembleArgs::TryProcessBSx(OPCode op, bool forward)
+bool AssembleArgs::TryProcessBSx(OPCode opcode, bool forward)
 {
 	if (args.size() != 2) { res = {AssembleError::ArgCount, "line " + tostr(line) + ": Expected 2 operands"}; return false; }
 
 	// write the op code
-	if (!TryAppendByte((u8)op)) return false;
+	if (!TryAppendByte((u8)opcode)) return false;
 
 	// first arg must be reg
 	u64 dest, dest_sz;
@@ -2399,10 +2401,10 @@ bool AssembleArgs::TryProcessBSx(OPCode op, bool forward)
 	return true;
 }
 
-bool AssembleArgs::TryProcessFPUBinaryOp(OPCode op, bool integral, bool pop)
+bool AssembleArgs::TryProcessFPUBinaryOp(OPCode opcode, bool integral, bool pop)
 {
 	// write op code
-	if (!TryAppendByte((u8)op)) return false;
+	if (!TryAppendByte((u8)opcode)) return false;
 
 	// make sure the programmer doesn't pull any funny business due to our arg-count-based approach
 	if (integral && args.size() != 1) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Integral {op} requires 1 arg"}; return false; }
@@ -2467,7 +2469,7 @@ bool AssembleArgs::TryProcessFPUBinaryOp(OPCode op, bool integral, bool pop)
 
 	return true;
 }
-bool AssembleArgs::TryProcessFPURegisterOp(OPCode op, bool has_ext_op, u8 ext_op)
+bool AssembleArgs::TryProcessFPURegisterOp(OPCode opcode, bool has_ext_op, u8 ext_op)
 {
 	if (args.size() != 1) { res = {AssembleError::ArgCount, "line " + tostr(line) + ": Expected 1 operand"}; return false; }
 
@@ -2475,7 +2477,7 @@ bool AssembleArgs::TryProcessFPURegisterOp(OPCode op, bool has_ext_op, u8 ext_op
 	if (!TryParseFPURegister(args[0], reg)) return false;
 
 	// write op code
-	if (!TryAppendByte((u8)op)) return false;
+	if (!TryAppendByte((u8)opcode)) return false;
 	if (has_ext_op) { if (!TryAppendByte(ext_op)) return false; }
 
 	// write the register
@@ -2484,7 +2486,7 @@ bool AssembleArgs::TryProcessFPURegisterOp(OPCode op, bool has_ext_op, u8 ext_op
 	return true;
 }
 
-bool AssembleArgs::TryProcessFSTLD_WORD(OPCode op, u8 mode, u64 _sizecode)
+bool AssembleArgs::TryProcessFSTLD_WORD(OPCode opcode, u8 mode, u64 _sizecode)
 {
 	if (args.size() != 1) { res = {AssembleError::ArgCount, "line " + tostr(line) + ": Expected 1 operand"}; return false; }
 
@@ -2498,19 +2500,19 @@ bool AssembleArgs::TryProcessFSTLD_WORD(OPCode op, u8 mode, u64 _sizecode)
 	if (explicit_size && sizecode != _sizecode) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Specified operand size is not supported"}; return false; }
 
 	// write data
-	if (!TryAppendByte((u8)op)) return false;
+	if (!TryAppendByte((u8)opcode)) return false;
 	if (!TryAppendByte(mode)) return false;
 	if (!TryAppendAddress(a, b, std::move(ptr_base))) return false;
 
 	return true;
 }
 
-bool AssembleArgs::TryProcessFLD(OPCode op, bool integral)
+bool AssembleArgs::TryProcessFLD(OPCode opcode, bool integral)
 {
 	if (args.size() != 1) { res = {AssembleError::ArgCount, "line " + tostr(line) + ": Expected 1 operand"}; return false; }
 
 	// write op code
-	if (!TryAppendByte((u8)op)) return false;
+	if (!TryAppendByte((u8)opcode)) return false;
 
 	// pushing st(i)
 	u64 reg;
@@ -2550,12 +2552,12 @@ bool AssembleArgs::TryProcessFLD(OPCode op, bool integral)
 
 	return true;
 }
-bool AssembleArgs::TryProcessFST(OPCode op, bool integral, bool pop, bool trunc)
+bool AssembleArgs::TryProcessFST(OPCode opcode, bool integral, bool pop, bool trunc)
 {
 	if (args.size() != 1) { res = {AssembleError::ArgCount, "line " + tostr(line) + ": Expected 1 operand"}; return false; }
 
 	// write the op code
-	if (!TryAppendByte((u8)op)) return false;
+	if (!TryAppendByte((u8)opcode)) return false;
 
 	// if it's an fpu register
 	u64 reg;
@@ -2605,10 +2607,10 @@ bool AssembleArgs::TryProcessFST(OPCode op, bool integral, bool pop, bool trunc)
 
 	return true;
 }
-bool AssembleArgs::TryProcessFCOM(OPCode op, bool integral, bool pop, bool pop2, bool eflags, bool unordered)
+bool AssembleArgs::TryProcessFCOM(OPCode opcode, bool integral, bool pop, bool pop2, bool eflags, bool unordered)
 {
 	// write the op code
-	if (!TryAppendByte((u8)op)) return false;
+	if (!TryAppendByte((u8)opcode)) return false;
 
 	// handle arg count cases
 	if (args.size() == 0)
@@ -2687,7 +2689,7 @@ bool AssembleArgs::TryProcessFCOM(OPCode op, bool integral, bool pop, bool pop2,
 
 	return true;
 }
-bool AssembleArgs::TryProcessFMOVcc(OPCode op, u64 condition)
+bool AssembleArgs::TryProcessFMOVcc(OPCode opcode, u64 condition)
 {
 	if (args.size() != 2) { res = {AssembleError::ArgCount, "line " + tostr(line) + ": Expected 2 operands"}; return false; }
 
@@ -2695,7 +2697,7 @@ bool AssembleArgs::TryProcessFMOVcc(OPCode op, u64 condition)
 	if (!TryParseFPURegister(args[0], reg) || reg != 0) { res = {AssembleError::UsageError, "line " + tostr(line) + ": First operand must be ST(0)"}; return false; }
 	if (!TryParseFPURegister(args[1], reg)) return false;
 
-	if (!TryAppendByte((u8)op)) return false;
+	if (!TryAppendByte((u8)opcode)) return false;
 	if (!TryAppendVal(1, (reg << 4) | condition)) return false;
 
 	return true;
@@ -2776,12 +2778,12 @@ bool AssembleArgs::VPUMaskPresent(Expr *mask, u64 elem_count)
 	}
 }
 
-bool AssembleArgs::TryProcessVPUMove(OPCode op, u64 elem_sizecode, bool maskable, bool aligned, bool scalar)
+bool AssembleArgs::TryProcessVPUMove(OPCode opcode, u64 elem_sizecode, bool maskable, bool aligned, bool scalar)
 {
 	if (args.size() != 2) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Expected 2 operands"}; return false; }
 
 	// write the op code
-	if (!TryAppendByte((u8)op)) return false;
+	if (!TryAppendByte((u8)opcode)) return false;
 
 	// extract the mask
 	std::unique_ptr<Expr> mask;
@@ -2861,12 +2863,12 @@ bool AssembleArgs::TryProcessVPUMove(OPCode op, u64 elem_sizecode, bool maskable
 
 	return true;
 }
-bool AssembleArgs::TryProcessVPUBinary(OPCode op, u64 elem_sizecode, bool maskable, bool aligned, bool scalar, bool has_ext_op, u8 ext_op)
+bool AssembleArgs::TryProcessVPUBinary(OPCode opcode, u64 elem_sizecode, bool maskable, bool aligned, bool scalar, bool has_ext_op, u8 ext_op)
 {
 	if (args.size() != 2 && args.size() != 3) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Expected 2 or 3 operands"}; return false; }
 
 	// write the op code
-	if (!TryAppendByte((u8)op)) return false;
+	if (!TryAppendByte((u8)opcode)) return false;
 	if (has_ext_op) { if (!TryAppendByte(ext_op)) return false; }
 
 	// extract the mask
@@ -2964,12 +2966,12 @@ bool AssembleArgs::TryProcessVPUBinary(OPCode op, u64 elem_sizecode, bool maskab
 
 	return true;
 }
-bool AssembleArgs::TryProcessVPUUnary(OPCode op, u64 elem_sizecode, bool maskable, bool aligned, bool scalar, bool has_ext_op, u8 ext_op)
+bool AssembleArgs::TryProcessVPUUnary(OPCode opcode, u64 elem_sizecode, bool maskable, bool aligned, bool scalar, bool has_ext_op, u8 ext_op)
 {
 	if (args.size() != 2) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Expected 2 operands"}; return false; }
 
 	// write the op code
-	if (!TryAppendByte((u8)op)) return false;
+	if (!TryAppendByte((u8)opcode)) return false;
 	if (has_ext_op) { if (!TryAppendByte(ext_op)) return false; }
 
 	// extract the mask
@@ -3021,15 +3023,15 @@ bool AssembleArgs::TryProcessVPUUnary(OPCode op, u64 elem_sizecode, bool maskabl
 	return true;
 }
 
-bool AssembleArgs::TryProcessVPUBinary_2arg(OPCode op, u64 elem_sizecode, bool maskable, bool aligned, bool scalar, bool has_ext_op, u8 ext_op)
+bool AssembleArgs::TryProcessVPUBinary_2arg(OPCode opcode, u64 elem_sizecode, bool maskable, bool aligned, bool scalar, bool has_ext_op, u8 ext_op)
 {
 	// ensure we select the 2 arg pathway
 	if (args.size() != 2) { res = {AssembleError::ArgCount, "line " + tostr(line) + ": Expected 2 operands"}; return false; }
 	// then refer to VPUBinary
-	return TryProcessVPUBinary(op, elem_sizecode, maskable, aligned, scalar, has_ext_op, ext_op);
+	return TryProcessVPUBinary(opcode, elem_sizecode, maskable, aligned, scalar, has_ext_op, ext_op);
 }
 
-bool AssembleArgs::TryProcessVPU_FCMP(OPCode op, u64 elem_sizecode, bool maskable, bool aligned, bool scalar)
+bool AssembleArgs::TryProcessVPU_FCMP(OPCode opcode, u64 elem_sizecode, bool maskable, bool aligned, bool scalar)
 {
 	// has the 2-3 args + 1 for the comparison predicate
 	if (args.size() != 3 && args.size() != 4) { res = { AssembleError::UsageError, "line " + tostr(line) + ": Expected 3 or 4 operands" }; return false; }
@@ -3051,15 +3053,15 @@ bool AssembleArgs::TryProcessVPU_FCMP(OPCode op, u64 elem_sizecode, bool maskabl
 	args.pop_back();
 
 	// now refer to binary vpu formatter
-	return TryProcessVPUBinary(op, elem_sizecode, maskable, aligned, scalar, true, (u8)pred);
+	return TryProcessVPUBinary(opcode, elem_sizecode, maskable, aligned, scalar, true, (u8)pred);
 }
 
-bool AssembleArgs::TryProcessVPUCVT_scalar_f2i(OPCode op, bool trunc, bool single)
+bool AssembleArgs::TryProcessVPUCVT_scalar_f2i(OPCode opcode, bool trunc, bool single)
 {
 	if (args.size() != 2) { res = {AssembleError::ArgCount, "line " + tostr(line) + ": Expected 2 operands"}; return false; }
 
 	// write the opcode
-	if (!TryAppendByte((u8)op)) return false;
+	if (!TryAppendByte((u8)opcode)) return false;
 
 	u8 mode = trunc ? 8 : 0; // decoded vpucvt mode
 	if (single) mode += 4;
@@ -3108,12 +3110,12 @@ bool AssembleArgs::TryProcessVPUCVT_scalar_f2i(OPCode op, bool trunc, bool singl
 
 	return true;
 }
-bool AssembleArgs::TryProcessVPUCVT_scalar_i2f(OPCode op, bool single)
+bool AssembleArgs::TryProcessVPUCVT_scalar_i2f(OPCode opcode, bool single)
 {
 	if (args.size() != 2) { res = {AssembleError::ArgCount, "line " + tostr(line) + ": Expected 2 operands"}; return false; }
 
 	// write the opcode
-	if (!TryAppendByte((u8)op)) return false;
+	if (!TryAppendByte((u8)opcode)) return false;
 
 	u8 mode = single ? 20 : 16; // decoded vpucvt mode
 
@@ -3165,12 +3167,12 @@ bool AssembleArgs::TryProcessVPUCVT_scalar_i2f(OPCode op, bool single)
 
 	return true;
 }
-bool AssembleArgs::TryProcessVPUCVT_scalar_f2f(OPCode op, bool extend)
+bool AssembleArgs::TryProcessVPUCVT_scalar_f2f(OPCode opcode, bool extend)
 {
 	if (args.size() != 2) { res = {AssembleError::ArgCount, "line " + tostr(line) + ": Expected 2 operands"}; return false; }
 
 	// write the opcode
-	if (!TryAppendByte((u8)op)) return false;
+	if (!TryAppendByte((u8)opcode)) return false;
 
 	u8 mode = extend ? 26 : 24; // decoded vpucvt mode
 
@@ -3219,11 +3221,11 @@ bool AssembleArgs::TryProcessVPUCVT_scalar_f2f(OPCode op, bool extend)
 	return true;
 }
 
-bool AssembleArgs::__TryProcessVPUCVT_packed_formatter_reg(OPCode op, u8 mode, u64 elem_count, u64 dest, Expr *mask, bool zmask, u64 src)
+bool AssembleArgs::__TryProcessVPUCVT_packed_formatter_reg(OPCode opcode, u8 mode, u64 elem_count, u64 dest, Expr *mask, bool zmask, u64 src)
 {
 	bool mask_present = VPUMaskPresent(mask, elem_count);
 
-	if (!TryAppendByte((u8)op)) return false;
+	if (!TryAppendByte((u8)opcode)) return false;
 	if (!TryAppendByte(mode)) return false;
 	if (!TryAppendByte((u8)(dest << 3) | (0) | (mask_present ? 2 : 0) | (zmask ? 1 : 0))) return false;
 	if (mask_present && !TryAppendExpr(BitsToBytes(elem_count), std::move(*mask))) return false;
@@ -3231,11 +3233,11 @@ bool AssembleArgs::__TryProcessVPUCVT_packed_formatter_reg(OPCode op, u8 mode, u
 
 	return true;
 }
-bool AssembleArgs::__TryProcessVPUCVT_packed_formatter_mem(OPCode op, u8 mode, u64 elem_count, u64 dest, Expr *mask, bool zmask, u64 a, u64 b, Expr &&ptr_base)
+bool AssembleArgs::__TryProcessVPUCVT_packed_formatter_mem(OPCode opcode, u8 mode, u64 elem_count, u64 dest, Expr *mask, bool zmask, u64 a, u64 b, Expr &&ptr_base)
 {
 	bool mask_present = VPUMaskPresent(mask, elem_count);
 
-	if (!TryAppendByte((u8)op)) return false;
+	if (!TryAppendByte((u8)opcode)) return false;
 	if (!TryAppendByte(mode)) return false;
 	if (!TryAppendByte((u8)(dest << 3) | (4) | (mask_present ? 2 : 0) | (zmask ? 1 : 0))) return false;
 	if (mask_present && !TryAppendExpr(BitsToBytes(elem_count), std::move(*mask))) return false;
@@ -3244,7 +3246,7 @@ bool AssembleArgs::__TryProcessVPUCVT_packed_formatter_mem(OPCode op, u8 mode, u
 	return true;
 }
 
-bool AssembleArgs::TryProcessVPUCVT_packed_f2i(OPCode op, bool trunc, bool single)
+bool AssembleArgs::TryProcessVPUCVT_packed_f2i(OPCode opcode, bool trunc, bool single)
 {
 	if (args.size() != 2) { res = {AssembleError::ArgCount, "line " + tostr(line) + ": Expected 2 operands"}; return false; }
 
@@ -3272,7 +3274,7 @@ bool AssembleArgs::TryProcessVPUCVT_packed_f2i(OPCode op, bool trunc, bool singl
 		u64 elem_count = (single ? 4 : 2) << (src_sizecode - 4);
 
 		// write the data
-		if (!__TryProcessVPUCVT_packed_formatter_reg(op, mode, elem_count, dest, mask.get(), zmask, src)) return false;
+		if (!__TryProcessVPUCVT_packed_formatter_reg(opcode, mode, elem_count, dest, mask.get(), zmask, src)) return false;
 	}
 	// if src is mem
 	else if (args[1].back() == ']')
@@ -3308,13 +3310,13 @@ bool AssembleArgs::TryProcessVPUCVT_packed_f2i(OPCode op, bool trunc, bool singl
 		else { res = {AssembleError::UsageError, "line " + tostr(line) + ": Could not deduce operand size"}; return false; }
 
 		// write the data
-		if (!__TryProcessVPUCVT_packed_formatter_mem(op, mode, elem_count, dest, mask.get(), zmask, a, b, std::move(ptr_base))) return false;
+		if (!__TryProcessVPUCVT_packed_formatter_mem(opcode, mode, elem_count, dest, mask.get(), zmask, a, b, std::move(ptr_base))) return false;
 	}
 	else { res = {AssembleError::UsageError, "line " + tostr(line) + ": Expected a VPU register or memory value as second operand"}; return false; }
 
 	return true;
 }
-bool AssembleArgs::TryProcessVPUCVT_packed_i2f(OPCode op, bool single)
+bool AssembleArgs::TryProcessVPUCVT_packed_i2f(OPCode opcode, bool single)
 {
 	if (args.size() != 2) { res = {AssembleError::ArgCount, "line " + tostr(line) + ": Expected 2 operands"}; return false; }
 
@@ -3341,7 +3343,7 @@ bool AssembleArgs::TryProcessVPUCVT_packed_i2f(OPCode op, bool single)
 		u64 elem_count = (single ? 4 : 2) << (dest_sizecode - 4);
 
 		// write the data
-		if (!__TryProcessVPUCVT_packed_formatter_reg(op, mode, elem_count, dest, mask.get(), zmask, src)) return false;
+		if (!__TryProcessVPUCVT_packed_formatter_reg(opcode, mode, elem_count, dest, mask.get(), zmask, src)) return false;
 	}
 	// if src is mem
 	else if (args[1].back() == ']')
@@ -3359,13 +3361,13 @@ bool AssembleArgs::TryProcessVPUCVT_packed_i2f(OPCode op, bool single)
 		u64 elem_count = (single ? 4 : 2) << (dest_sizecode - 4);
 
 		// write the data
-		if (!__TryProcessVPUCVT_packed_formatter_mem(op, mode, elem_count, dest, mask.get(), zmask, a, b, std::move(ptr_base))) return false;
+		if (!__TryProcessVPUCVT_packed_formatter_mem(opcode, mode, elem_count, dest, mask.get(), zmask, a, b, std::move(ptr_base))) return false;
 	}
 	else { res = {AssembleError::UsageError, "line " + tostr(line) + ": Expected a VPU register or memory value as second operand"}; return false; }
 
 	return true;
 }
-bool AssembleArgs::TryProcessVPUCVT_packed_f2f(OPCode op, bool extend)
+bool AssembleArgs::TryProcessVPUCVT_packed_f2f(OPCode opcode, bool extend)
 {
 	if (args.size() != 2) { res = { AssembleError::ArgCount, "line " + tostr(line) + ": Expected 2 operands" }; return false; }
 
@@ -3405,7 +3407,7 @@ bool AssembleArgs::TryProcessVPUCVT_packed_f2f(OPCode op, bool extend)
 		}
 
 		// write the data
-		if (!__TryProcessVPUCVT_packed_formatter_reg(op, mode, elem_count, dest, mask.get(), zmask, src)) return false;
+		if (!__TryProcessVPUCVT_packed_formatter_reg(opcode, mode, elem_count, dest, mask.get(), zmask, src)) return false;
 	}
 	// if src is mem
 	else if (args[1].back() == ']')
@@ -3446,7 +3448,7 @@ bool AssembleArgs::TryProcessVPUCVT_packed_f2f(OPCode op, bool extend)
 		}
 
 		// write the data
-		if (!__TryProcessVPUCVT_packed_formatter_mem(op, mode, elem_count, dest, mask.get(), zmask, a, b, std::move(ptr_base))) return false;
+		if (!__TryProcessVPUCVT_packed_formatter_mem(opcode, mode, elem_count, dest, mask.get(), zmask, a, b, std::move(ptr_base))) return false;
 	}
 	else { res = { AssembleError::UsageError, "line " + tostr(line) + ": Expected a VPU register or memory value as second operand" }; return false; }
 

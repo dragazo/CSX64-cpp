@@ -509,7 +509,7 @@ struct cmdln_pack
 	bool parse(int _argc, const char *const *_argv);
 };
 
-bool _help(cmdln_pack &p) { std::cout << HelpMessage; return false; }
+bool _help(cmdln_pack&) { std::cout << HelpMessage; return false; }
 
 bool _assemble(cmdln_pack &p)
 {
@@ -615,10 +615,10 @@ bool cmdln_pack::parse(int _argc, const char *const *_argv)
 	{
 		if (accepting_options)
 		{
-			auto it = long_names.find(argv[i]);
+			auto it_long_handler = long_names.find(argv[i]);
 
 			// if we found a handler, call it
-			if (it != long_names.end()) { if (!it->second(*this)) return false; }
+			if (it_long_handler != long_names.end()) { if (!it_long_handler->second(*this)) return false; }
 			// otherwise if it starts with a '-' it's a list of short options
 			else if (argv[i][0] == '-')
 			{
@@ -627,10 +627,10 @@ bool cmdln_pack::parse(int _argc, const char *const *_argv)
 				
 				for (const char *p = argv[i] + 1; *p; ++p)
 				{
-					auto it = short_names.find(*p);
+					auto it_short_handler = short_names.find(*p);
 
 					// if we found a handler, call it
-					if (it != short_names.end()) { if (!it->second(*this)) return false; }
+					if (it_short_handler != short_names.end()) { if (!it_short_handler->second(*this)) return false; }
 					// otherwise it's an unknown option
 					else { std::cerr << arg << ": Unknown option '" << *p << "'\n"; return false; }
 				}

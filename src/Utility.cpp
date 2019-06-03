@@ -1,77 +1,46 @@
-#include <utility>
-#include <cstddef>
-#include <cstdint>
-#include <cmath>
-#include <limits>
-#include <cstdlib>
-#include <string>
-#include <sstream>
-#include <iomanip>
-#include <vector>
-#include <exception>
-#include <stdexcept>
-#include <cctype>
-#include <iostream>
-#include <random>
-#include <unordered_map>
-#include <unordered_set>
-#include <memory>
-
-#include "../BiggerInts/BiggerInts.h"
-#include "../ios-frstor/iosfrstor.h"
-
 #include "../include/Utility.h"
+
+#include "../ios-frstor/iosfrstor.h"
 
 namespace CSX64
 {
+	// -- arch encoding helpers -- //
+
+	bool IsLittleEndian()
+	{
+		u64 val = 0x0102030405060708;
+		u8 arr[] = { 8, 7, 6, 5, 4, 3, 2, 1 };
+		return std::memcmp(&val, arr, 8) == 0;
+	}
+
 	// -- serialization -- //
 
-	std::ostream &BinWrite(std::ostream &ostr, const std::string &str)
+	std::ostream &BinWrite(std::ostream &ostr, const char *p, std::size_t count)
 	{
-		// write length prefix
-		u16 len = (u16)str.size();
-		BinWrite(ostr, len);
-		// write the string
-		ostr.write(str.data(), len);
-
+		ostr.write(p, count);
 		return ostr;
 	}
-	std::istream &BinRead(std::istream &istr, std::string &str)
+	std::istream &BinRead(std::istream &istr, char *p, std::size_t count)
 	{
-		// read length prefix
-		u16 len;
-		BinRead(istr, len);
-		// allocate space and read the string
-		str.resize(len);
-		istr.read(str.data(), len);
-		// make sure we got the whole thing
-		if (istr.gcount() != len) istr.setstate(std::ios::failbit);
-
+		istr.read(p, count);
+		if ((std::size_t)istr.gcount() != count) istr.setstate(std::ios::failbit);
 		return istr;
 	}
 
-	// -- misc utilities -- //
-
-	std::string remove_ch(const std::string &str, char ch)
+	std::ostream &BinWrite(std::ostream &ostr, const std::string &str)
 	{
-		std::string res;
+		u16 len = (u16)str.size();
+		if (len != str.size()) throw std::invalid_argument("BinWrite(std::string): string was too long");
 
-		for (std::size_t i = 0; i < str.size(); ++i)
-			if (str[i] != ch) res.push_back(str[i]);
-
-		return res;
+		BinWrite(ostr, len);
+		return BinWrite(ostr, str.data(), len);
 	}
-
-	std::string ToString(long double val)
+	std::istream &BinRead(std::istream &istr, std::string &str)
 	{
-		std::ostringstream str;
-		str << val;
-		return str.str();
-	}
-
-	u64 Rand64(std::default_random_engine &engine)
-	{
-		return ((u64)engine() << 32) | engine();
+		u16 len;
+		BinRead(istr, len);
+		str.resize(len);
+		return BinRead(istr, str.data(), len);
 	}
 
 	// -- memory utilities -- //
@@ -196,6 +165,14 @@ namespace CSX64
 		for (sz = str.size(); sz > 0 && std::isspace((unsigned char)str[sz - 1]); --sz);
 
 		std::string res = str.substr(i, sz - i);
+		return res;
+	}
+
+	std::string remove_ch(const std::string &str, char ch)
+	{
+		std::string res;
+		res.reserve(str.size());
+		for (char i : str) if (i != ch) res.push_back(i);
 		return res;
 	}
 
