@@ -414,14 +414,14 @@ namespace CSX64
 	}
 	
 	// helper for imm parser
-	bool TryGetOp(const std::string &token, int pos, Expr::OPs &op, int &oplen)
+	bool TryGetOp(const std::string &token, std::size_t pos, Expr::OPs &op, int &oplen)
 	{
 		// default to invalid op
 		op = Expr::OPs::None;
 		oplen = 0;
 
 		// try to take as many characters as possible (greedy)
-		if (pos + 2 <= (int)token.size())
+		if (pos + 2 <= token.size())
 		{
 			oplen = 2; // record oplen
 
@@ -451,7 +451,7 @@ namespace CSX64
 				}
 			}
 		}
-		if (pos + 1 <= (int)token.size())
+		if (pos + 1 <= token.size())
 		{
 			oplen = 1; // record oplen
 			switch (token[pos])

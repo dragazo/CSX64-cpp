@@ -452,7 +452,7 @@ bool AssembleArgs::TryExtractExpr(const std::string &str, const std::size_t str_
 				if (str[end] == '(') ++depth;
 				else if (str[end] == ')') --depth; // depth control
 				else if (numeric && (str[end] == 'e' || str[end] == 'E') && end + 1 < str_end && (str[end + 1] == '+' || str[end + 1] == '-')) ++end; // make sure an exponent sign won't be parsed as binary + or - by skipping it
-				else if (str[end] == '"' || str[end] == '\'' || str[end] == '`') quote = end; // quotes mark start of a string
+				else if (str[end] == '"' || str[end] == '\'' || str[end] == '`') quote = (int)end; // quotes mark start of a string
 				else if (depth == 0 && (std::isspace(str[end]) || TryGetOp(str, end, bin_op, bin_op_len))) break; // break on white space or binary op
 
 				// can't ever have negative depth
@@ -490,7 +490,7 @@ bool AssembleArgs::TryExtractExpr(const std::string &str, const std::size_t str_
 		else if (str[end - 1] == ')')
 		{
 			// get the index of the first paren (we're guaranteed one exists because there's one at the end and it already passed the paren mismatch test)
-			int first_paren;
+			std::size_t first_paren;
 			for (first_paren = pos; str[first_paren] != '('; ++first_paren);
 
 			// the string [pos, first_paren) represents the function name - extract it (uppercase since we're case invariant)

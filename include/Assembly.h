@@ -207,7 +207,7 @@ namespace CSX64
 	void RenameSymbol(ObjectFile &file, std::string from, std::string to);
 
 	// helper for imm parser
-	bool TryGetOp(const std::string &token, int pos, Expr::OPs &op, int &oplen);
+	bool TryGetOp(const std::string &token, std::size_t pos, Expr::OPs &op, int &oplen);
 
 	// defines a symbol for the assembler
 	void DefineSymbol(std::string key, std::string value);
