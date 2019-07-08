@@ -441,22 +441,23 @@ bool AssembleArgs::TryExtractExpr(const std::string &str, const std::size_t str_
 		int quote = -1; // index of current quote char - initially not in one
 
 		bool numeric = std::isdigit((unsigned char)str[pos]); // flag if this is a numeric literal
-		
-		// move end to next logical separator (white space or binary op)
+
+		// move end to next logical separator (white space, open paren, or binary op - only at depth 0)
 		for (end = pos; end < str_end; ++end)
 		{
 			// if we're not in a quote
 			if (quote < 0)
 			{
 				// account for important characters
-				if (str[end] == '(') ++depth;
-				else if (str[end] == ')') --depth; // depth control
+				if (str[end] == '(' && (depth != 0 || end == pos)) ++depth;
+				else if (str[end] == ')')
+				{
+					if (depth > 0) --depth; // if depth > 0 drop down a level
+					else break; // otherwise this marks the end of the expression
+				}
 				else if (numeric && (str[end] == 'e' || str[end] == 'E') && end + 1 < str_end && (str[end + 1] == '+' || str[end + 1] == '-')) ++end; // make sure an exponent sign won't be parsed as binary + or - by skipping it
 				else if (str[end] == '"' || str[end] == '\'' || str[end] == '`') quote = (int)end; // quotes mark start of a string
-				else if (depth == 0 && (std::isspace(str[end]) || TryGetOp(str, end, bin_op, bin_op_len))) break; // break on white space or binary op
-
-				// can't ever have negative depth
-				if (depth < 0) { res = {AssembleError::FormatError, "line " + tostr(line) + ": Mismatched parenthesis in expression"}; return false; }
+				else if (depth == 0 && (std::isspace((unsigned char)str[end]) || str[end] == '(' || TryGetOp(str, end, bin_op, bin_op_len))) break; // break on white space, open paren, or binary op - only at depth 0
 			}
 			// otherwise we're in a quote
 			else
@@ -486,26 +487,50 @@ bool AssembleArgs::TryExtractExpr(const std::string &str, const std::size_t str_
 			// if the sub expression didn't capture the entire parenthetical region then the interior was not a (single) expression
 			if (sub_aft != end - 1) { res = {AssembleError::FormatError, "line " + tostr(line) + ": Interior of parenthesis is not an expression"}; return false; }
 		}
-		// if it's a function call (uses the fact that the above case failed)
-		else if (str[end - 1] == ')')
+		// if it's a user-level assembler token
+		else if (str[pos] == '$')
 		{
-			// get the index of the first paren (we're guaranteed one exists because there's one at the end and it already passed the paren mismatch test)
-			std::size_t first_paren;
-			for (first_paren = pos; str[first_paren] != '('; ++first_paren);
+			// get the value to insert (uppercase because user-level assembler tokens are case insensitive)
+			std::string val = ToUpper(str.substr(pos, end - pos));
 
-			// the string [pos, first_paren) represents the function name - extract it (uppercase since we're case invariant)
-			std::string fn_name = ToUpper(str.substr(pos, first_paren - pos));
+			// if it's the current line macro
+			if (val == CurrentLineMacro)
+			{
+				// must be in a segment
+				if (current_seg == AsmSegment::INVALID) { res = { AssembleError::FormatError, "line " + tostr(line) + ": Attempt to take an address outside of a segment" }; return false; }
 
-			// the interior of the parenthesis (first_paren, end - 1) represents the function argument (expression) - extract it into temp's left branch
-			std::size_t fn_arg_aft;
-			if (!TryExtractExpr(str, first_paren + 1, end - 1, term_leaf->Left, fn_arg_aft)) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Failed to parse function-like-operator argument: " + str.substr(first_paren+1, (end-1)-(first_paren+1)) + "\n-> " + res.ErrorMsg}; return false; }
-			// make sure we consumed the entire parenthesis interior
-			if (fn_arg_aft != end - 1) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Interior of function-like-operator was not an expression"}; return false; }
+				term_leaf->OP = Expr::OPs::Add;
+				term_leaf->Left = Expr::NewToken(SegOffsets.at(current_seg));
+				term_leaf->Right = Expr::NewInt(line_pos_in_seg);
+			}
+			// if it's the start of segment macro
+			else if (val == StartOfSegMacro)
+			{
+				// must be in a segment
+				if (current_seg == AsmSegment::INVALID) { res = { AssembleError::FormatError, "line " + tostr(line) + ": Attempt to take an address outside of a segment" }; return false; }
 
-			// get the op to apply to said argument
-			const Expr::OPs *it;
-			if (!TryGetValue(FunctionOperator_to_OP, fn_name, it)) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Unknown function-like-operator: " + fn_name}; return false; }
-			term_leaf->OP = *it; // all we need to do is set it - everything else is already done
+				term_leaf->Token(SegOrigins.at(current_seg));
+			}
+			// if it's the TIMES iter id macro
+			else if (val == TimesIterIdMacro)
+			{
+				term_leaf->IntResult(times_i);
+			}
+			// if it's a function-like operator
+			else if (TryGetValue(FunctionOperator_to_OP, val, term_leaf->OP))
+			{
+				// get the index of the first paren
+				for (; end < str_end && str[end] != '('; ++end);
+				if (end >= str_end) { res = { AssembleError::UsageError, "line " + tostr(line) + ": Expected a call expression after function-like operator" }; return false; }
+
+				// extract the call expression (starting just past first paren (end)) - store it into leaf's left
+				if (!TryExtractExpr(str, end + 1, str_end, term_leaf->Left, end)) { res = { AssembleError::UsageError, "line " + tostr(line) + ": Failed to parse call expression\n-> " + res.ErrorMsg }; return false; }
+				// make sure it ended in a closing paren - also increment end by 1 to pass it for the rest of the parsing logic
+				if (end >= str_end || str[end] != ')') { res = {AssembleError::UsageError, "line " + tostr(line) + ": Unterminated call expression"}; return false; }
+				++end;
+			}
+			// otherwise unrecognized
+			else { res = {AssembleError::UnknownOp, "line " + tostr(line) + ": Unrecognized special token: " + val}; return false; }
 		}
 		// otherwise it's a value
 		else
@@ -516,38 +541,11 @@ bool AssembleArgs::TryExtractExpr(const std::string &str, const std::size_t str_
 			// mutate it
 			if (!MutateName(val)) { res = {AssembleError::FormatError, "line " + tostr(line) + ": Failed to parse expression\n-> " + res.ErrorMsg}; return false; }
 
-			// if it's the current line macro
-			if (val == CurrentLineMacro)
-			{
-				// must be in a segment
-				if (current_seg == AsmSegment::INVALID) { res = {AssembleError::FormatError, "line " + tostr(line) + ": Attempt to take an address outside of a segment"}; return false; }
+			// create the hole for it
+			term_leaf->Token(val);
 
-				term_leaf->OP = Expr::OPs::Add;
-				term_leaf->Left = Expr::NewToken(SegOffsets.at(current_seg));
-				term_leaf->Right = Expr::NewInt(line_pos_in_seg);
-			}
-			// if it's the start of segment macro
-			else if (val == StartOfSegMacro)
-			{
-				// must be in a segment
-				if (current_seg == AsmSegment::INVALID) { res = {AssembleError::FormatError, "line " + tostr(line) + ": Attempt to take an address outside of a segment"}; return false; }
-
-				term_leaf->Token(SegOrigins.at(current_seg));
-			}
-			// if it's the TIMES iter id macro
-			else if (val == TimesIterIdMacro)
-			{
-				term_leaf->IntResult(times_i);
-			}
-			// otherwise it's a normal value/symbol
-			else
-			{
-				// create the hole for it
-				term_leaf->Token(val);
-
-				// it either needs to be evaluatable or a valid label name
-				if (!term_leaf->Evaluatable(file.Symbols) && !IsValidName(val, err)) { res = {AssembleError::FormatError, "line " + tostr(line) + ": Failed to resolve token as a valid imm or symbol name: " + val + "\n-> " + err}; return false; }
-			}
+			// it either needs to be evaluatable or a valid label name
+			if (!term_leaf->Evaluatable(file.Symbols) && !IsValidName(val, err)) { res = {AssembleError::FormatError, "line " + tostr(line) + ": Failed to resolve token as a valid imm or symbol name: " + val + "\n-> " + err}; return false; }
 		}
 
 		// -- append subtree to main tree --

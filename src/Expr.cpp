@@ -38,22 +38,22 @@ namespace CSX64
 		{Expr::OPs::BitNot, "~"},
 		{Expr::OPs::LogNot, "!"},
 
-		{Expr::OPs::Int, "int"},
-		{Expr::OPs::Float, "float"},
+		{Expr::OPs::Int, "$int"},
+		{Expr::OPs::Float, "$float"},
 
-		{Expr::OPs::Floor, "floor"},
-		{Expr::OPs::Ceil, "ceil"},
-		{Expr::OPs::Round, "round"},
-		{Expr::OPs::Trunc, "trunc"},
+		{Expr::OPs::Floor, "$floor"},
+		{Expr::OPs::Ceil, "$ceil"},
+		{Expr::OPs::Round, "$round"},
+		{Expr::OPs::Trunc, "$trunc"},
 
-		{Expr::OPs::Repr64, "repr64"},
-		{Expr::OPs::Repr32, "repr32"},
+		{Expr::OPs::Repr64, "$repr64"},
+		{Expr::OPs::Repr32, "$repr32"},
 
-		{Expr::OPs::Float64, "float64"},
-		{Expr::OPs::Float32, "float32"},
+		{Expr::OPs::Float64, "$float64"},
+		{Expr::OPs::Float32, "$float32"},
 
-		{Expr::OPs::Prec64, "prec64"},
-		{Expr::OPs::Prec32, "prec32"},
+		{Expr::OPs::Prec64, "$prec64"},
+		{Expr::OPs::Prec32, "$prec32"},
 
 		{Expr::OPs::Condition, "?"},
 		{Expr::OPs::Pair, ":"},

@@ -14,7 +14,7 @@ namespace CSX64
 
 	const std::string CurrentLineMacro = "$";
 	const std::string StartOfSegMacro = "$$";
-	const std::string TimesIterIdMacro = "$i";
+	const std::string TimesIterIdMacro = "$I";
 
 	const std::unordered_map<Expr::OPs, int> Precedence
 	{
@@ -53,22 +53,22 @@ namespace CSX64
 
 	const std::unordered_map<std::string, Expr::OPs> FunctionOperator_to_OP
 	{
-		{ "INT", Expr::OPs::Int },
-	{ "FLOAT", Expr::OPs::Float },
+		{ "$INT", Expr::OPs::Int },
+	{ "$FLOAT", Expr::OPs::Float },
 
-	{ "FLOOR", Expr::OPs::Floor },
-	{ "CEIL", Expr::OPs::Ceil },
-	{ "ROUND", Expr::OPs::Round },
-	{ "TRUNC", Expr::OPs::Trunc },
+	{ "$FLOOR", Expr::OPs::Floor },
+	{ "$CEIL", Expr::OPs::Ceil },
+	{ "$ROUND", Expr::OPs::Round },
+	{ "$TRUNC", Expr::OPs::Trunc },
 
-	{ "REPR64", Expr::OPs::Repr64 },
-	{ "REPR32", Expr::OPs::Repr32 },
+	{ "$REPR64", Expr::OPs::Repr64 },
+	{ "$REPR32", Expr::OPs::Repr32 },
 
-	{ "FLOAT64", Expr::OPs::Float64 },
-	{ "FLOAT32", Expr::OPs::Float32 },
+	{ "$FLOAT64", Expr::OPs::Float64 },
+	{ "$FLOAT32", Expr::OPs::Float32 },
 
-	{ "PREC64", Expr::OPs::Prec64 },
-	{ "PREC32", Expr::OPs::Prec32 },
+	{ "$PREC64", Expr::OPs::Prec64 },
+	{ "$PREC32", Expr::OPs::Prec32 },
 	};
 
 	const std::unordered_map<AsmSegment, std::string> SegOffsets

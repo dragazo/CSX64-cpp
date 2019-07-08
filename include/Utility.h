@@ -101,6 +101,15 @@ namespace CSX64
 		return ptr;
 	}
 
+	// returns true if the map contains the key - if so, stores the associated value in dest (by copy)
+	template<typename T, typename U, typename K>
+	bool TryGetValue(const std::unordered_map<T, U> &map, const K &key, U &dest)
+	{
+		auto iter = map.find(key);
+		if (iter != map.end()) { dest = iter->second; return true; }
+		else return false;
+	}
+
 	// -- memory utilities -- //
 
 	// allocates space and returns a pointer to at least <size> bytes which is aligned to <align>.
