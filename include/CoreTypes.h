@@ -3,6 +3,7 @@
 
 #include <cstdint>
 #include <climits>
+#include <type_traits>
 
 namespace CSX64
 {
@@ -20,6 +21,38 @@ namespace CSX64
 
 	typedef double f64;
 	typedef float f32;
+	struct f80
+	{
+	private: // -- data -- //
+
+		unsigned char data[10];
+
+	public: // -- ctor / dtor / asgn -- //
+
+		f80() noexcept = default;
+		f80(const f80&) noexcept = default;
+		f80 &operator=(const f80&) noexcept = default;
+
+		// extends a double value
+		f80(f64 val) noexcept;
+
+	public: // -- interface -- //
+
+		operator f64() const noexcept;
+		operator f32() const noexcept { return (float)*this; }
+
+		f80 &operator+=(const f80 &other) noexcept;
+		f80 &operator-=(const f80 &other) noexcept;
+
+		f80 &operator*=(const f80 &other) noexcept;
+		f80 &operator/=(const f80 &other) noexcept;
+
+		friend f80 operator+(const f80 &a, const f80 &b) noexcept { f80 cpy = a; cpy += b; return cpy; }
+		friend f80 operator-(const f80 &a, const f80 &b) noexcept { f80 cpy = a; cpy -= b; return cpy; }
+
+		friend f80 operator*(const f80 &a, const f80 &b) noexcept { f80 cpy = a; cpy *= b; return cpy; }
+		friend f80 operator/(const f80 &a, const f80 &b) noexcept { f80 cpy = a; cpy /= b; return cpy; }
+	};
 
 	// the standard dictates fixed-size ints operate as if they were that size, but doesn't guarantee they actually /are/ that size
 	// we do some stuff that only works if they really /are/ the proper size
@@ -36,6 +69,7 @@ namespace CSX64
 
 	// additionally, we do a lot of things involving reading floating values as integers, and we need to make sure they're the assumed size
 
+	static_assert(sizeof(f80) * CHAR_BIT == 80, "Uhoh!! This compiler didn't make f80 80-bit!");
 	static_assert(sizeof(f64) * CHAR_BIT == 64, "Uhoh!! This compiler's double isn't 64-bit!");
 	static_assert(sizeof(f32) * CHAR_BIT == 32, "Uhoh!! This compiler's float isn't 32-bit!");
 
@@ -43,6 +77,9 @@ namespace CSX64
 
 	// true if long double has greater precision than double
 	constexpr bool ld_is_extended_fp = sizeof(long double) * CHAR_BIT > 64;
+
+	// assert that f80 is trivial so we can memcpy it all over the place without a care in the world
+	static_assert(std::is_trivial_v<f80>, "f80 is non-trivial");
 
 	// ---------------------------------------
 

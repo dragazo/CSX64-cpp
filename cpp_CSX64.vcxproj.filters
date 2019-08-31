@@ -92,5 +92,8 @@
     <ClCompile Include="localization.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="src\extended_float.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
 </Project>
