@@ -151,7 +151,7 @@ bool AssembleArgs::TryFindMatchingParen(const std::string &str, const std::size_
 	// wind through all the characters in the string
 	for (; pos < str_end; ++pos)
 	{
-		if (quote == -1)
+		if (quote == (std::size_t)-1)
 		{
 			if (str[pos] == '(') ++depth;
 			else if (str[pos] == ')')
@@ -186,13 +186,13 @@ bool AssembleArgs::TrySplitOnCommas(std::vector<std::string> &vec, const std::st
 		// find the next terminator (comma-separated)
 		for (end = pos, quote = -1; end < str_end; ++end)
 		{
-			if (quote == -1)
+			if (quote == (std::size_t)-1)
 			{
 				if (str[end] == '(') ++depth;
 				else if (str[end] == ')')
 				{
 					// hitting negative depth is totally not allowed ever
-					if (--depth == -1) { res = {AssembleError::FormatError, "Unmatched parens in argument"}; return false; }
+					if (depth-- == 0) { res = {AssembleError::FormatError, "Unmatched parens in argument"}; return false; }
 				}
 				else if (str[end] == '"' || str[end] == '\'' || str[end] == '`') quote = end;
 				else if (depth == 0 && str[end] == ',') break; // comma at depth 0 marks end of token
@@ -200,7 +200,7 @@ bool AssembleArgs::TrySplitOnCommas(std::vector<std::string> &vec, const std::st
 			else if (str[end] == str[quote]) quote = -1;
 		}
 		// make sure we closed any quotations
-		if (quote != -1) { res = { AssembleError::FormatError, std::string() + "Unmatched quotation encountered in argument list" }; return false; }
+		if (quote != (std::size_t)-1) { res = { AssembleError::FormatError, std::string() + "Unmatched quotation encountered in argument list" }; return false; }
 		// make sure we closed any parens
 		if (depth != 0) { res = { AssembleError::FormatError, "Unmatched parens in argument" }; return false; }
 

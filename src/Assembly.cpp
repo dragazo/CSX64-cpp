@@ -889,7 +889,7 @@ namespace CSX64
 				for (auto &lit : obj->Literals.literals)
 					if (lit.top_level_index == i)
 					{
-						lit.top_level_index = literal_pos;
+						lit.top_level_index = referenced_top_level_index;
 						lit.start += start;
 					}
 			}
