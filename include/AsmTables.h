@@ -16,6 +16,8 @@ namespace CSX64
 
 	extern const std::string CurrentLineMacro;
 	extern const std::string StartOfSegMacro;
+	extern const std::string StringLiteralMacro;
+	extern const std::string BinaryLiteralMacro;
 	extern const std::string TimesIterIdMacro;
 
 	extern const std::unordered_map<Expr::OPs, int> Precedence;
@@ -24,6 +26,7 @@ namespace CSX64
 
 	extern const std::unordered_map<AsmSegment, std::string> SegOffsets;
 	extern const std::unordered_map<AsmSegment, std::string> SegOrigins;
+	extern const std::string BinaryLiteralSymbolPrefix;
 
 	// a set of all the ids to use for ptrdiff logic
 	extern const std::unordered_set<std::string> PtrdiffIDs;

@@ -144,6 +144,10 @@ namespace CSX64
 		
 		BinWrite<u64>(file, BssLen);
 
+		// -- write binary literals -- //
+
+		Literals.write_to(file);
+
 		// -- validation -- //
 
 		// make sure the writes succeeded
@@ -267,6 +271,10 @@ namespace CSX64
 		if (!BinRead(file, reinterpret_cast<char*>(Data.data()), val)) goto err;
 
 		if (!BinRead(file, BssLen)) goto err;
+
+		// -- read binary literals -- //
+
+		if (!Literals.read_from(file)) goto err;
 
 		// -- done -- //
 
@@ -769,6 +777,12 @@ namespace CSX64
 		// a table for relating included object files to their beginning positions in the resulting binary (text, rodata, data, bss) tuples
 		std::unordered_map<ObjectFile*, std::tuple<u64, u64, u64, u64>> included;
 
+		BinaryLiteralCollection total_literals; // destination to merge all binary literals throughout all included object files
+		std::unordered_map<ObjectFile*, std::vector<std::size_t>> obj_to_total_literals_locations; // maps from an included object file to its literal index map in total_literals
+
+		std::size_t literals_size; // the total size of all (top level) literals merged together
+		std::vector<std::size_t> rodata_top_level_literal_offsets; // offsets of each top level literal in the rodata segment
+
 		// -- populate things -- //
 
 		// populate global_to_obj with ALL global symbols
@@ -860,6 +874,76 @@ namespace CSX64
 				}
 				// otherwise it wasn't defined
 				else return LinkResult{LinkError::MissingSymbol, "No global symbol found to match external symbol \"" + external + "\""};
+			}
+
+			// merge top level binary literals for this include file and fix their aliasing literal ranges
+			for (std::size_t i = 0; i < obj->Literals.top_level_literals.size(); ++i)
+			{
+				// add the top level literal and get its literal index
+				std::size_t literal_pos = total_literals.add(std::move(obj->Literals.top_level_literals[i]));
+				// extract all the info we need to adjust and merge the literal ranges for this object file
+				std::size_t referenced_top_level_index = total_literals.literals[literal_pos].top_level_index;
+				std::size_t start = total_literals.literals[literal_pos].start;
+
+				// update all the literals for this top level literal (source index)
+				for (auto &lit : obj->Literals.literals)
+					if (lit.top_level_index == i)
+					{
+						lit.top_level_index = literal_pos;
+						lit.start += start;
+					}
+			}
+
+			// insert a new literal locations map (pre-sized) and alias it
+			std::vector<std::size_t> &literal_locations = obj_to_total_literals_locations.emplace(obj, obj->Literals.literals.size()).first->second;
+
+			// merge the (fixed) aliasing literal ranges
+			for (std::size_t i = 0; i < obj->Literals.literals.size(); ++i)
+			{
+				// insert the aliasing literal range (aliased top level already added and range info fixed)
+				// store the insertion index in the literal locations map for this object file
+				literal_locations[i] = total_literals._insert(obj->Literals.literals[i]);
+			}
+
+			// this object file's literals collection is now invalid - just clear it all out
+			obj->Literals.literals.clear();
+			obj->Literals.top_level_literals.clear();
+		}
+
+		// after merging, but before alignment, we need to handle all the provisioned binary literals.
+		// we'll just dump them all in the rodata segment (they're required to be read-only from a user perspective esp since they can alias)
+		literals_size = 0;
+		rodata_top_level_literal_offsets.resize(total_literals.top_level_literals.size());
+		for (std::size_t i = 0; i < total_literals.top_level_literals.size(); ++i)
+		{
+			// for each top level literal, compute its (future) offset in the rodata segment and while we're at it calculate the total size of all top level literals
+			rodata_top_level_literal_offsets[i] = rodata.size() + literals_size;
+			literals_size += total_literals.top_level_literals[i].size();
+		}
+
+		// now that we know where all the literals should go, resize the rodata segment and copy them to their appropriate places
+		rodata.resize(rodata.size() + literals_size);
+		for (std::size_t i = 0; i < total_literals.top_level_literals.size(); ++i)
+		{
+			std::memcpy(&rodata[0] + rodata_top_level_literal_offsets[i], total_literals.top_level_literals[i].data(), total_literals.top_level_literals[i].size());
+		}
+
+		// and now go ahead and resolve all the missing binary literal symbols with relative address from the rodata origin
+		for (const auto &entry : obj_to_total_literals_locations)
+		{
+			for (std::size_t i = 0; i < entry.second.size(); ++i)
+			{
+				// alias the literal range in total_literals
+				const BinaryLiteralCollection::BinaryLiteral &lit = total_literals.literals[entry.second[i]];
+
+				// construct the expr to alias the correct location in the rodata segment
+				Expr expr;
+				expr.OP = Expr::OPs::Add;
+				expr.Left = Expr::NewToken(SegOrigins.at(AsmSegment::RODATA));
+				expr.Right = Expr::NewInt(rodata_top_level_literal_offsets[lit.top_level_index] + lit.start);
+
+				// inject the symbol definition into the object file's symbol table
+				entry.first->Symbols.emplace(BinaryLiteralSymbolPrefix + tohex(i), std::move(expr));
 			}
 		}
 

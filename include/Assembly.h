@@ -77,6 +77,64 @@ namespace CSX64
 	};
 
 	// -----------------------------
+	
+	class ObjectFile;
+
+	// represents a collection of (shared) binary literals.
+	// they are stored in the most compact way possible with maximum sharing.
+	class BinaryLiteralCollection
+	{
+	private: // -- private types -- //
+
+		struct BinaryLiteral
+		{
+			std::size_t top_level_index; // index in top_level_literals
+			std::size_t start;  // starting index of the binary value in the top level literal
+			std::size_t length; // length of the binary value (in bytes)
+
+			friend bool operator==(const BinaryLiteral &a, const BinaryLiteral &b) noexcept { return a.top_level_index == b.top_level_index && a.start == b.start && a.length == b.length; }
+			friend bool operator!=(const BinaryLiteral &a, const BinaryLiteral &b) noexcept { return !(a == b); }
+		};
+
+	private: // -- private data -- //
+
+		std::vector<BinaryLiteral> literals;
+		std::vector<std::vector<u8>> top_level_literals;
+
+		friend LinkResult Link(Executable &exe, std::vector<ObjectFile> &objs, const std::string &entry_point);
+
+	private: // -- utility -- //
+
+		// inserts info into literals (if it doesn't already exist) and returns its index in the literals array
+		std::size_t _insert(const BinaryLiteral &info);
+
+	public: // -- ctor / dtor / asgn -- //
+
+		BinaryLiteralCollection() = default;
+
+		BinaryLiteralCollection(const BinaryLiteralCollection&) = default;
+		BinaryLiteralCollection(BinaryLiteralCollection &&other) noexcept = default;
+
+		BinaryLiteralCollection &operator=(const BinaryLiteralCollection&) = default;
+		BinaryLiteralCollection &operator=(BinaryLiteralCollection&&) = default;
+
+	public: // -- interface -- //
+
+		// adds a new binary literal to the collection - returns the index of the literal added
+		std::size_t add(std::vector<u8> &&value);
+
+	public: // -- IO -- //
+
+		// writes the contents of this binary literal collection to the stream.
+		// success can be checked by testing the steram after writing.
+		std::ostream &write_to(std::ostream &writer) const;
+		// discards the current contents of this collection and reads the contents in from the stream.
+		// the contents must have been written via write_to().
+		// success can be checked by testing the stream after reading.
+		std::istream &read_from(std::istream &reader);
+	};
+	
+	// -----------------------------
 
 	// represents a flag used to denote a clean state in e.g. an object file
 	class clean_flag_t
@@ -133,6 +191,8 @@ namespace CSX64
 		std::vector<u8> Rodata;
 		std::vector<u8> Data;
 		u64 BssLen = 0;
+
+		BinaryLiteralCollection Literals;
 
 	public: // -- ctor / dtor / asgn -- //
 

@@ -14,6 +14,8 @@ namespace CSX64
 
 	const std::string CurrentLineMacro = "$";
 	const std::string StartOfSegMacro = "$$";
+	const std::string StringLiteralMacro = "$STR";
+	const std::string BinaryLiteralMacro = "$BIN";
 	const std::string TimesIterIdMacro = "$I";
 
 	const std::unordered_map<Expr::OPs, int> Precedence
@@ -85,6 +87,7 @@ namespace CSX64
 	{AsmSegment::DATA, "#D"},
 	{AsmSegment::BSS, "#B"}
 	};
+	const std::string BinaryLiteralSymbolPrefix = "#L";
 
 	const std::unordered_set<std::string> PtrdiffIDs
 	{

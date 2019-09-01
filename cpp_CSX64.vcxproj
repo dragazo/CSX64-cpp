@@ -41,6 +41,7 @@
     <ClCompile Include="src\AsmArgs.cpp" />
     <ClCompile Include="src\AsmTables.cpp" />
     <ClCompile Include="src\Assembly.cpp" />
+    <ClCompile Include="src\BinaryLiteral.cpp" />
     <ClCompile Include="src\Computer.cpp" />
     <ClCompile Include="src\Executable.cpp" />
     <ClCompile Include="src\ExeTables.cpp" />

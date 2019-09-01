@@ -138,54 +138,108 @@ bool AssembleArgs::TryExtractLineHeader(std::string &rawline)
 	return true;
 }
 
+bool AssembleArgs::TryFindMatchingParen(const std::string &str, const std::size_t str_begin, const std::size_t str_end, std::size_t &match)
+{
+	// assert usage conditions
+	if (str_begin >= str_end) throw std::invalid_argument("TryFindMatchingParen(): string region cannot be empty");
+	if (str[str_begin] != '(') throw std::invalid_argument("TryFindMatchingParen(): str_begin does not point to an open paren");
+
+	std::size_t pos = str_begin + 1; // skip the open paren since we already know about it
+	std::size_t quote = -1; // initially not in a quote
+	std::size_t depth = 1; // initially 1 because we're skipping the open paren
+
+	// wind through all the characters in the string
+	for (; pos < str_end; ++pos)
+	{
+		if (quote == -1)
+		{
+			if (str[pos] == '(') ++depth;
+			else if (str[pos] == ')')
+			{
+				// if we hit depth zero, this is the matching paren we were looking for
+				if (--depth == 0) { match = pos; return true; }
+			}
+			else if (str[pos] == '"' || str[pos] == '\'' || str[pos] == '`') quote = pos;
+		}
+		else if (str[pos] == str[quote]) quote = -1;
+	}
+
+	// if we get here we failed to find a matching closing paren
+	res = { AssembleError::FormatError, "Failed to find a matching closing paren" };
+	return false;
+}
+
+bool AssembleArgs::TrySplitOnCommas(std::vector<std::string> &vec, const std::string &str, const std::size_t str_begin, const std::size_t str_end)
+{
+	std::size_t pos, end = str_begin - 1; // -1 cancels out inital +1 inside loop for comma skip
+	std::size_t depth = 0; // parenthetical depth
+	std::size_t quote;
+
+	// parse the rest of the line as comma-separated tokens
+	while (true)
+	{
+		// skip leading white space (+1 skips the preceding comma)
+		for (pos = end + 1; pos < str_end && std::isspace((unsigned char)str[pos]); ++pos);
+		// when pos reaches end of token, we're done parsing
+		if (pos >= str_end) break;
+
+		// find the next terminator (comma-separated)
+		for (end = pos, quote = -1; end < str_end; ++end)
+		{
+			if (quote == -1)
+			{
+				if (str[end] == '(') ++depth;
+				else if (str[end] == ')')
+				{
+					// hitting negative depth is totally not allowed ever
+					if (--depth == -1) { res = {AssembleError::FormatError, "Unmatched parens in argument"}; return false; }
+				}
+				else if (str[end] == '"' || str[end] == '\'' || str[end] == '`') quote = end;
+				else if (depth == 0 && str[end] == ',') break; // comma at depth 0 marks end of token
+			}
+			else if (str[end] == str[quote]) quote = -1;
+		}
+		// make sure we closed any quotations
+		if (quote != -1) { res = { AssembleError::FormatError, std::string() + "Unmatched quotation encountered in argument list" }; return false; }
+		// make sure we closed any parens
+		if (depth != 0) { res = { AssembleError::FormatError, "Unmatched parens in argument" }; return false; }
+
+		// get the arg (remove leading/trailing white space - some logic requires them not be there e.g. address parser)
+		std::string arg = Trim(str.substr(pos, end - pos));
+		// make sure arg isn't empty
+		if (arg.empty()) { res = { AssembleError::FormatError, "Empty argument encountered" }; return false; }
+		// add this token
+		vec.emplace_back(std::move(arg));
+	}
+
+	// successfully parsed line
+	return true;
+}
+
 bool AssembleArgs::SplitLine(const std::string &rawline)
 {
 	// (op (arg, arg, ...))
 
-	int pos = 0, end; // position in line parsing
-	int quote;        // index of openning quote in args
-
+	std::size_t pos = 0, end; // position in line parsing
+	
 	// discard args from last line
 	args.clear();
 
 	// -- parse op -- //
 
 	// get the first white space delimited token
-	for (; pos < (int)rawline.size() && std::isspace(rawline[pos]); ++pos);
-	for (end = pos; end < (int)rawline.size() && !std::isspace(rawline[end]); ++end);
+	for (; pos < rawline.size() && std::isspace((unsigned char)rawline[pos]); ++pos);
+	for (end = pos; end < rawline.size() && !std::isspace((unsigned char)rawline[end]); ++end);
 
 	// if we got something, record as op, otherwise is empty string
-	if (pos < (int)rawline.size()) op = rawline.substr(pos, end - pos);
+	if (pos < rawline.size()) op = rawline.substr(pos, end - pos);
 	else op.clear();
 
 	// -- parse args -- //
 
-	// parse the rest of the line as comma-separated tokens
-	while (true)
-	{
-		// skip leading white space
-		for (pos = end + 1; pos < (int)rawline.size() && std::isspace(rawline[pos]); ++pos);
-		// when pos reaches end of token, we're done parsing
-		if (pos >= (int)rawline.size()) break;
+	// split the rest of the line as comma separated values and store in args
+	if (!TrySplitOnCommas(args, rawline, end, rawline.size())) { res = {AssembleError::FormatError, "line " + tostr(line) + ": " + res.ErrorMsg}; return false; }
 
-		// find the next terminator (comma-separated)
-		for (end = pos, quote = -1; end < (int)rawline.size(); ++end)
-		{
-			if (rawline[end] == '"' || rawline[end] == '\'' || rawline[end] == '`') quote = quote < 0 ? end : rawline[end] == rawline[quote] ? -1 : quote;
-			else if (quote < 0 && rawline[end] == ',') break; // comma marks end of token
-		}
-		// make sure we closed any quotations
-		if (quote >= 0) { res = { AssembleError::FormatError, std::string() + "line " + tostr(line) + ": Unmatched quotation encountered in argument list" }; return false; }
-
-		// get the arg (remove leading/trailing white space - some logic requires them not be there e.g. address parser)
-		std::string arg = Trim(rawline.substr(pos, end - pos));
-		// make sure arg isn't empty
-		if (arg.empty()) { res = { AssembleError::FormatError, "line " + tostr(line) + ": Empty operation argument encountered" }; return false; }
-		// add this token
-		args.emplace_back(std::move(arg));
-	}
-
-	// successfully parsed line
 	return true;
 }
 
@@ -515,6 +569,70 @@ bool AssembleArgs::TryExtractExpr(const std::string &str, const std::size_t str_
 			else if (val == TimesIterIdMacro)
 			{
 				term_leaf->IntResult(times_i);
+			}
+			// if it's the string/binary literal macro
+			else if (val == StringLiteralMacro || val == BinaryLiteralMacro)
+			{
+				// get the index of the first paren
+				for (; end < str_end && str[end] != '('; ++end);
+				if (end >= str_end) { res = { AssembleError::UsageError, "line " + tostr(line) + ": Expected a call expression after function-like operator" }; return false; }
+
+				// find the matching (closing) paren and store to end
+				std::size_t _start = end;
+				if (!TryFindMatchingParen(str, end, str_end, end)) { res = { AssembleError::FormatError, "line " + tostr(line) + ": Failed to parse binary literal expression\n-> " + res.ErrorMsg }; return false; }
+				++end; // bump up end to be 1 past the closing paren (for logic outside of the loop)
+
+				// parse the parenthesis interior into an array of comma-separated arguments
+				std::vector<std::string> bin_args;
+				if (!TrySplitOnCommas(bin_args, str, _start + 1, end - 1)) { res = { AssembleError::FormatError, "line " + tostr(line) + ": Failed to parse binary literal expression\n-> " + res.ErrorMsg }; return false; }
+
+				// construct the binary literal
+				std::vector<u8> literal_value;
+				for (const std::string &arg : bin_args)
+				{
+					Expr _expr;
+					u64 _sizecode;
+					bool _explicit_size, _strict;
+
+					// if it's a string
+					if (std::string _str; TryExtractStringChars(arg, _str, err))
+					{
+						// dump into the literal (one byte each)
+						literal_value.reserve(literal_value.size() + _str.size());
+						for (char _ch : _str) literal_value.push_back((u8)_ch);
+					}
+					// if it's a value (imm)
+					else if (TryParseImm(arg, _expr, _sizecode, _explicit_size, _strict))
+					{
+						// we only allow bytes here, so disallow any kind of explicit size control flags
+						if (_explicit_size) { res = {AssembleError::UsageError, "line " + tostr(line) + ": A size directive in this context is not allowed"}; return false; }
+						if (_strict) { res = {AssembleError::UsageError, "line " + tostr(line) + ": A STRICT specifier in this context is not allowed"}; return false; }
+
+						// additionally, expressions used in binary/string literals are critical expressions
+						u64 _val;
+						bool _floating;
+						if (!_expr.Evaluate(file.Symbols, _val, _floating, err)) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Expressions to binary literals are critical expressions\n-> " + err}; return false; }
+
+						// bounds check it since it's a compile time constant
+						if (_val > 0xff) { res = {AssembleError::UsageError, "line " + tostr(line) + ": (byte) expression to binary literal exceeded 255"}; return false; }
+
+						literal_value.push_back((u8)_val);
+					}
+					// otherwise we failed to parse it
+					else { res = {AssembleError::FormatError, "line " + tostr(line) + ": Failed to parse operand as a string or imm: " + arg + "\n-> " + res.ErrorMsg}; return false; }
+				}
+
+				// we handled both string/binary cases here - if it was actually a string literal, append a terminator
+				if (val == StringLiteralMacro) literal_value.push_back(0);
+
+				// binary literal is not allowed to be empty
+				if (literal_value.empty()) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Attempt to provision empty binary literal"}; return false; }
+
+				// add resulting (non-empty) binary literal to the binary literals collection
+				std::size_t literal_index = file.Literals.add(std::move(literal_value));
+
+				// bind a reference to the binary literal in the expression node
+				term_leaf->Token(BinaryLiteralSymbolPrefix + tohex(literal_index));
 			}
 			// if it's a function-like operator
 			else if (TryGetValue(FunctionOperator_to_OP, val, term_leaf->OP))
@@ -1190,7 +1308,8 @@ bool AssembleArgs::VerifyLegalExpression(Expr &expr)
 		const std::string &tok = *expr.Token();
 		if (ContainsKey(file.Symbols, tok) || Contains(file.ExternalSymbols, tok)
 			|| ContainsValue(SegOffsets, tok) || ContainsValue(SegOrigins, tok)
-			|| Contains(VerifyLegalExpressionIgnores, tok))
+			|| Contains(VerifyLegalExpressionIgnores, tok)
+			|| StartsWith(tok, BinaryLiteralSymbolPrefix))
 			return true;
 		// otherwise we don't know what it is
 		else { res = {AssembleError::UnknownSymbol, "Unknown symbol: " + tok}; return false; }
@@ -1319,7 +1438,7 @@ bool AssembleArgs::TryProcessDeclare(u64 size)
 		if (TryExtractStringChars(args[i], chars, err))
 		{
 			// dump into memory (one byte each)
-			for (int j = 0; j < (int)chars.size(); ++j) if (!TryAppendByte((u8)chars[j])) return false;
+			for (std::size_t j = 0; j < chars.size(); ++j) if (!TryAppendByte((u8)chars[j])) return false;
 			// make sure we write a multiple of size
 			if (!TryPad(AlignOffset((u64)chars.size(), size))) return false;
 		}

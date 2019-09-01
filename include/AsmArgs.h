@@ -57,6 +57,18 @@ namespace CSX64
 		/// <param name="rawline">the raw line to extract header information from</param>
 		bool TryExtractLineHeader(std::string &rawline);
 
+		// given a string region defined by str[str_begin..str_end) attempts to find the matching close paren for a given open paren located at str_begin.
+		// if such a closing paren is found, it is stored to match.
+		bool TryFindMatchingParen(const std::string &str, std::size_t str_begin, std::size_t str_end, std::size_t &match);
+
+		// splits the string into an array of (non-empty) comma-separated values which are also trimmed of whitespace.
+		// if no values are present (i.e. string region is empty or white space), no args are added to the array (no args present).
+		// vec       - the location to store the indivual values (added to the end of the array in order)
+		// str       - the string to inspect
+		// str_begin - the starting index of the region to inspect (inclusive)
+		// str_end   - the ending index of the region to inspect (exclusive)
+		bool TrySplitOnCommas(std::vector<std::string> &vec, const std::string &str, std::size_t str_begin, std::size_t str_end);
+
 		/// <summary>
 		/// Splits the raw line into its separate components. The raw line should not have a comment section.
 		/// </summary>
