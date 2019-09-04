@@ -2,6 +2,30 @@
 
 namespace CSX64
 {
+	const std::unordered_map<ErrorCode, std::string> ErrorCodeToString
+	{
+		{ErrorCode::None, ""},
+		{ErrorCode::OutOfBounds, "Out of Bounds"},
+		{ErrorCode::UnhandledSyscall, "Unhandled Syscall"},
+		{ErrorCode::UndefinedBehavior, "Undefined Behavior"},
+		{ErrorCode::ArithmeticError, "Arithmetic Error"},
+		{ErrorCode::Abort, "Abort"},
+		{ErrorCode::IOFailure, "IO Failure"},
+		{ErrorCode::FSDisabled, "FS Disabled"},
+		{ErrorCode::AccessViolation, "Access Violation"},
+		{ErrorCode::InsufficientFDs, "Insufficient FDs"},
+		{ErrorCode::FDNotInUse, "FD not in use"},
+		{ErrorCode::NotImplemented, "Not Implemented"},
+		{ErrorCode::StackOverflow, "Stack Overflow"},
+		{ErrorCode::FPUStackOverflow, "FPU Stack Overflow"},
+		{ErrorCode::FPUStackUnderflow, "FPU Stack Underflow"},
+		{ErrorCode::FPUError, "FPU Error"},
+		{ErrorCode::FPUAccessViolation, "FPU Access Violation"},
+		{ErrorCode::AlignmentViolation, "Alignment Violation"},
+		{ErrorCode::UnknownOp, "Unknown Operation"},
+		{ErrorCode::FilePermissions, "File Permissions Error"},
+	};
+
 	#define p2(b) b, !b, !b, b
 	#define p4(b) p2(b), p2(!b), p2(!b), p2(b)
 	#define p6(b) p4(b), p4(!b), p4(!b), p4(b)

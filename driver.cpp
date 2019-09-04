@@ -145,6 +145,7 @@ void AddPredefines()
 	DefineSymbol("err_fpuaccessviolation", (u64)ErrorCode::FPUAccessViolation);
 	DefineSymbol("err_alignmentviolation", (u64)ErrorCode::AlignmentViolation);
 	DefineSymbol("err_unknownop", (u64)ErrorCode::UnknownOp);
+	DefineSymbol("err_filepermissions", (u64)ErrorCode::FilePermissions);
 
 	// -- file open modes -- //
 
@@ -470,7 +471,7 @@ int RunConsole(const Executable &exe, const std::vector<std::string> &args, bool
 	// if there was an error
 	if (computer.Error() != ErrorCode::None)
 	{
-		std::cerr << "\n\nError Encountered: " << (int)computer.Error() << '\n';
+		std::cerr << "\n\nError Encountered: (" << (int)computer.Error() << ") " << ErrorCodeToString.at(computer.Error()) << '\n';
 		return ExecErrorReturnCode;
 	}
 	// otherwise no error

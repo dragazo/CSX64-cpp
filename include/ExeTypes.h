@@ -11,6 +11,7 @@
 #include <cstring>
 #include <string>
 #include <vector>
+#include <unordered_map>
 
 #include "CoreTypes.h"
 #include "punning.h"
@@ -26,6 +27,8 @@ namespace CSX64
 		FPUStackOverflow, FPUStackUnderflow, FPUError, FPUAccessViolation,
 		AlignmentViolation, UnknownOp, FilePermissions,
 	};
+	extern const std::unordered_map<ErrorCode, std::string> ErrorCodeToString;
+
 	enum class SyscallCode
 	{
 		sys_exit,

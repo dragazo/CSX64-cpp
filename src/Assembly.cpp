@@ -892,10 +892,13 @@ namespace CSX64
 				literal_fix_map[i] = {referenced_top_level_index, start};
 			}
 			// update all the literals for this file
-			for (std::size_t i = 0; i < obj->Literals.literals.size(); ++i)
+			for (auto &lit : obj->Literals.literals)
 			{
-				obj->Literals.literals[i].top_level_index = literal_fix_map[i].first;
-				obj->Literals.literals[i].start += literal_fix_map[i].second;
+				// get the fix info for this literal's old top level index
+				const std::pair<std::size_t, std::size_t> &fix_info = literal_fix_map[lit.top_level_index];
+
+				lit.top_level_index = fix_info.first;
+				lit.start += fix_info.second;
 			}
 
 			// insert a new literal locations map (pre-sized) and alias it
