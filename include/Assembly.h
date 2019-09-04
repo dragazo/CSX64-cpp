@@ -123,6 +123,9 @@ namespace CSX64
 		// adds a new binary literal to the collection - returns the index of the literal added
 		std::size_t add(std::vector<u8> &&value);
 
+		// erases the contents of the collection
+		void clear() noexcept;
+
 	public: // -- IO -- //
 
 		// writes the contents of this binary literal collection to the stream.

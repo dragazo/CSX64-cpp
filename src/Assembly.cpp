@@ -75,6 +75,8 @@ namespace CSX64
 		Rodata.clear();
 		Data.clear();
 		BssLen = 0;
+
+		Literals.clear();
 	}
 
 	static const u8 obj_header[] = { 'C', 'S', 'X', '6', '4', 'o', 'b', 'j' };
@@ -877,6 +879,7 @@ namespace CSX64
 			}
 
 			// merge top level binary literals for this include file and fix their aliasing literal ranges
+			std::vector<std::pair<std::size_t, std::size_t>> literal_fix_map(obj->Literals.top_level_literals.size());
 			for (std::size_t i = 0; i < obj->Literals.top_level_literals.size(); ++i)
 			{
 				// add the top level literal and get its literal index
@@ -885,13 +888,14 @@ namespace CSX64
 				std::size_t referenced_top_level_index = total_literals.literals[literal_pos].top_level_index;
 				std::size_t start = total_literals.literals[literal_pos].start;
 
-				// update all the literals for this top level literal (source index)
-				for (auto &lit : obj->Literals.literals)
-					if (lit.top_level_index == i)
-					{
-						lit.top_level_index = referenced_top_level_index;
-						lit.start += start;
-					}
+				// add a fix entry for this top level literal
+				literal_fix_map[i] = {referenced_top_level_index, start};
+			}
+			// update all the literals for this file
+			for (std::size_t i = 0; i < obj->Literals.literals.size(); ++i)
+			{
+				obj->Literals.literals[i].top_level_index = literal_fix_map[i].first;
+				obj->Literals.literals[i].start += literal_fix_map[i].second;
 			}
 
 			// insert a new literal locations map (pre-sized) and alias it

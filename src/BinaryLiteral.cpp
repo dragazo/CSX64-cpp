@@ -103,6 +103,12 @@ namespace CSX64
 		return _insert({ top_level_literals.size() - 1, 0, top_level_literals.back().size() });
 	}
 
+	void BinaryLiteralCollection::clear() noexcept
+	{
+		literals.clear();
+		top_level_literals.clear();
+	}
+
 	// -----------------------------------------------------------------------------------
 
 	std::ostream &BinaryLiteralCollection::write_to(std::ostream &writer) const
@@ -131,24 +137,23 @@ namespace CSX64
 	std::istream &BinaryLiteralCollection::read_from(std::istream &reader)
 	{
 		// discard current contents
-		literals.clear();
-		top_level_literals.clear();
+		clear();
 
 		u64 temp, temp2;
 
 		// read top level literals
-		if (!BinRead(reader, temp)) return reader;
+		if (!BinRead<u64>(reader, temp)) return reader;
 		top_level_literals.reserve(temp);
 		for (u64 i = 0; i < temp; ++i)
 		{
-			if (!BinRead(reader, temp2)) return reader;
+			if (!BinRead<u64>(reader, temp2)) return reader;
 			std::vector<u8> v(temp2);
 			if (!BinRead(reader, (char*)&v[0], temp2)) return reader;
 			top_level_literals.emplace_back(std::move(v));
 		}
 
 		// read literals
-		if (!BinRead(reader, temp)) return reader;
+		if (!BinRead<u64>(reader, temp)) return reader;
 		literals.resize(temp);
 		for (auto &i : literals)
 		{
