@@ -2193,34 +2193,26 @@ bool AssembleArgs::TryProcessShift(OPCode opcode)
 // helper for MOVxX formatter - additionally, ensures the sizes for dest/src are valid
 bool AssembleArgs::__TryProcessMOVxX_settings_byte(bool sign, u64 dest, u64 dest_sizecode, u64 src_sizecode)
 {
-	// 16, *
-	if (dest_sizecode == 1)
+	// switch through mode (using 4 bits for sizecodes in case either is a nonstandard size e.g. xmmword memory)
+	u64 mode;
+	switch ((sign ? 0x100 : 0ul) | (dest_sizecode << 4) | src_sizecode)
 	{
-		// 16, 8
-		if (src_sizecode == 0)
-		{
-			if (!TryAppendVal(1, (dest << 4) | (sign ? 1 : 0ul))) return false;
-		}
-		else { res = {AssembleError::UsageError, "line " + tostr(line) + ": Specified size combination is not supported"}; return false; }
-	}
-	// 32/64, *
-	else if (dest_sizecode == 2 || dest_sizecode == 3)
-	{
-		// 32/64, 8
-		if (src_sizecode == 0)
-		{
-			if (!TryAppendVal(1, (dest << 4) | (dest_sizecode == 2 ? sign ? 4 : 2ul : sign ? 8 : 6ul))) return false;
-		}
-		// 32/64, 16
-		else if (src_sizecode == 1)
-		{
-			if (!TryAppendVal(1, (dest << 4) | (dest_sizecode == 2 ? sign ? 5 : 3ul : sign ? 9 : 7ul))) return false;
-		}
-		else { res = {AssembleError::UsageError, "line " + tostr(line) + ": Specified size combination is not supported"}; return false; }
-	}
-	else { res = {AssembleError::UsageError, "line " + tostr(line) + ": Specified size combination is not supported"}; return false; }
+	case 0x010: mode = 0; break;
+	case 0x110: mode = 1; break;
+	case 0x020: mode = 2; break;
+	case 0x021: mode = 3; break;
+	case 0x120: mode = 4; break;
+	case 0x121: mode = 5; break;
+	case 0x030: mode = 6; break;
+	case 0x031: mode = 7; break;
+	case 0x130: mode = 8; break;
+	case 0x131: mode = 9; break;
+	case 0x132: mode = 10; break;
 
-	return true;
+	default: res = {AssembleError::UsageError, "line " + tostr(line) + ": Specified size combination is not supported"}; return false;
+	}
+
+	return TryAppendByte((dest << 4) | mode);
 }
 bool AssembleArgs::TryProcessMOVxX(OPCode opcode, bool sign)
 {
