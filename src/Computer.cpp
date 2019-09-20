@@ -228,9 +228,11 @@ namespace CSX64
 
 	std::ostream &Computer::WriteCPUDebugString(std::ostream &ostr)
 	{
+		// clear the width field and set up a format restore point
+		ostr.width(0);
 		iosfrstor _frstor(ostr);
 
-		ostr << std::hex << std::setfill('0') << std::setw(0) << std::noboolalpha;
+		ostr << std::hex << std::setfill('0') << std::noboolalpha;
 
 		ostr << '\n';
 		ostr << "RAX: " << std::setw(16) << RAX() << "     CF: " << CF() << "     RFLAGS: " << std::setw(16) << RFLAGS() << '\n';
@@ -254,9 +256,11 @@ namespace CSX64
 	}
 	std::ostream &Computer::WriteVPUDebugString(std::ostream &ostr)
 	{
+		// clear the width field and set up a format restore point
+		ostr.width(0);
 		iosfrstor _frstor(ostr);
 
-		ostr << std::setfill('0') << std::setw(0);
+		ostr << std::setfill('0');
 
 		ostr << '\n';
 		for (int i = 0; i < 32; ++i)

@@ -2212,7 +2212,7 @@ bool AssembleArgs::__TryProcessMOVxX_settings_byte(bool sign, u64 dest, u64 dest
 	default: res = {AssembleError::UsageError, "line " + tostr(line) + ": Specified size combination is not supported"}; return false;
 	}
 
-	return TryAppendByte((dest << 4) | mode);
+	return TryAppendByte((u8)((dest << 4) | mode));
 }
 bool AssembleArgs::TryProcessMOVxX(OPCode opcode, bool sign)
 {
