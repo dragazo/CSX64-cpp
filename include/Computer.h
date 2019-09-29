@@ -84,12 +84,13 @@ namespace CSX64
 
 			friend std::ostream &operator<<(std::ostream &ostr, const ST_Wrapper_common &wrapper)
 			{
+				// set up a format restore point and clear the restore width (we'll use the provided width)
+				iosfrstor _frstor(ostr);
+				_frstor.fmt().width(0);
+
 				if (wrapper.Empty()) ostr << "Empty";
-				else
-				{
-					iosfrstor _frstor(ostr);
-					ostr << std::defaultfloat << std::setprecision(17) << (long double)wrapper;
-				}
+				else ostr << std::defaultfloat << std::setprecision(17) << (long double)wrapper;
+
 				return ostr;
 			}
 		};

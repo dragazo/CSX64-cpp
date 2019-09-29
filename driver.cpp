@@ -98,6 +98,8 @@ Assemble, link, or execute CSX64 files.
       --rootdir <dir>       specify an explicit rootdir (contains _start.o and stdlib/*.o)
 
       --fs                  sets the file system flag during execution
+  -u, --unsafe              sets all unsafe flags during execution (those in this section)
+
   -t, --time                after execution display elapsed time
       --end                 remaining args are not options (added to arg list)
 
@@ -569,6 +571,7 @@ bool _rootdir(cmdln_pack &p)
 bool _fs(cmdln_pack &p) { p.fsf = true; return true; }
 bool _time(cmdln_pack &p) { p.time = true; return true; }
 bool _end(cmdln_pack &p) { p.accepting_options = false; return true; }
+bool _unsafe(cmdln_pack &p) { p.fsf = true; return true; }
 
 // maps (long) options to their parsing handlers
 const std::unordered_map<std::string, bool(*)(cmdln_pack&)> long_names
@@ -585,6 +588,8 @@ const std::unordered_map<std::string, bool(*)(cmdln_pack&)> long_names
 { "--rootdir", _rootdir },
 
 { "--fs", _fs },
+{ "--unsafe", _unsafe },
+
 { "--time", _time },
 { "--end", _end },
 };
@@ -601,6 +606,8 @@ const std::unordered_map<char, bool(*)(cmdln_pack&)> short_names
 { 'S', _multiscript },
 
 { 'o', _out },
+
+{ 'u', _unsafe },
 
 { 't', _time },
 };
