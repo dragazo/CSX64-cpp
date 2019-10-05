@@ -522,7 +522,7 @@ namespace CSX64
     {
         u64 ext, s, m, _dest;
         if (!GetMemAdv<u8>(ext)) return false;
-        if (!FetchUnaryOpFormat(s, m, _dest, false, 0)) return false;
+        if (!FetchUnaryOpFormat(s, m, _dest, false)) return false;
 
         // get the flag
         bool flag;
