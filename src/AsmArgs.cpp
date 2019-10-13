@@ -1539,6 +1539,9 @@ bool AssembleArgs::TryProcessSegment()
 {
 	if (args.size() != 1) { res = {AssembleError::ArgCount, "line " + tostr(line) + ": Expected 1 operand"}; return false; }
 
+	// if a label is on the same line as a segment directive, it's ambiguous what segment it should belong to - just disallow this altogether
+	if (!label_def.empty()) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Label has ambiguous segment ownership"}; return false; }
+
 	// get the segment we're going to
 	std::string useg = ToUpper(args[0]);
 	if (useg == ".TEXT") current_seg = AsmSegment::TEXT;

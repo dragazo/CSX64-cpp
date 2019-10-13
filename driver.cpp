@@ -101,7 +101,7 @@ Assemble, link, or execute CSX64 files.
   -u, --unsafe              sets all unsafe flags during execution (those in this section)
 
   -t, --time                after execution display elapsed time
-      --end                 remaining args are not options (added to arg list)
+      --                    remaining args are not csx64 options (added to arg list)
 
 Report bugs to: https://github.com/dragazo/CSX64-cpp/issues
 )";
@@ -591,13 +591,11 @@ const std::unordered_map<std::string, bool(*)(cmdln_pack&)> long_names
 { "--unsafe", _unsafe },
 
 { "--time", _time },
-{ "--end", _end },
+{ "--", _end },
 };
 // maps (short) options to their parsing handlers
 const std::unordered_map<char, bool(*)(cmdln_pack&)> short_names
 {
-	{ '-', [](cmdln_pack&) { return true; } }, // no-op separator
-
 { 'h', _help },
 
 { 'a', _assemble },
