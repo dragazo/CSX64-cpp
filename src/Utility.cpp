@@ -300,29 +300,42 @@ namespace CSX64
 		dump.width(0);
 		iosfrstor _rstor(dump);
 
-		dump << std::hex << std::setfill('0'); // switch to hex mode and zero fill
+		char str[18];   // create a 16-character dump string
+		str[16] = '\n'; // each string dump is at the end of a line
+		str[17] = 0;    // null terminate it
 
-		// make a header
-		dump << "            0  1  2  3  4  5  6  7  8  9  a  b  c  d  e  f";
-		
-		// if it's not starting on a new row
-		if (start % 16 != 0)
+		u64 len = 0; // current length of str
+
+		dump << std::hex << std::setfill('0');                                // switch to hex mode and zero fill
+		dump << "          0  1  2  3  4  5  6  7  8  9  a  b  c  d  e  f\n"; // write the top header
+		dump << std::setw(8) << (start & ~(u64)15) << ' ';                    // write the first hex dump address
+
+		// tack on white space to skip any characters we're missing in the first row
+		for (u64 i = start & 15; i > 0; --i)
 		{
-			// we need to write a line header
-			dump << '\n' << std::setw(8) << (start & ~(u64)15) << " - ";
-
-			// and tack on some white space
-			for (u64 i = start % 16; i > 0; --i) dump << "   ";
+			dump << "   ";
+			str[len++] = ' '; // for any skipped byte, set its string char to space
 		}
 
 		// write the data
 		for (u64 i = 0; i < count; ++i)
 		{
-			// start of new row gets a line header
-			if ((start + i) % 16 == 0) dump << '\n' << std::setw(8) << (start + i) << " - ";
-			
-			dump << std::setw(2) << (int)reinterpret_cast<const unsigned char*>(data)[start + i] << ' '; // aliasing is safe because u8 is unsigned char type
+			// if we just finished a row, write the string dump and the next hex dump address
+			if (len == 16)
+			{
+				dump << str << std::setw(8) << (start + i) << ' ';
+				len = 0;
+			}
+
+			unsigned char ch = reinterpret_cast<const unsigned char*>(data)[start + i]; // get the character to print
+			dump << std::setw(2) << (int)ch << ' ';   // print it to the hex dump
+			str[len++] = std::isprint(ch) ? ch : '.'; // if the character is printable, use it for the string dump, otherwise use '.'
 		}
+
+		// finish off the last row
+		for (u64 i = 16 - len; i > 0; --i) dump << "   ";
+		str[len] = 0;
+		dump << str;
 
 		// end with a new line
 		return dump << '\n';
