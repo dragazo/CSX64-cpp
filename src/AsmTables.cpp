@@ -1096,6 +1096,7 @@ namespace CSX64
 	{"DEBUG_CPU", [](AssembleArgs &args) { return args.TryProcessNoArgOp(OPCode::DEBUG, true, 0); }},
 	{"DEBUG_VPU", [](AssembleArgs &args) { return args.TryProcessNoArgOp(OPCode::DEBUG, true, 1); }},
 	{"DEBUG_FULL", [](AssembleArgs &args) { return args.TryProcessNoArgOp(OPCode::DEBUG, true, 2); }},
+	{"DEBUG_MEM", [](AssembleArgs &args) { return args.TryProcessDEBUG_mem(); }},
 
 	// -------------------- //
 

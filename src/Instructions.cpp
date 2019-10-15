@@ -4275,7 +4275,7 @@ namespace CSX64
 
     bool Computer::ProcessDEBUG()
     {
-        u64 op;
+        u64 op, temp;
         if (!GetMemAdv<u8>(op)) return false;
 
         switch (op)
@@ -4283,6 +4283,17 @@ namespace CSX64
         case 0: WriteCPUDebugString(std::cout); break;
         case 1: WriteVPUDebugString(std::cout); break;
         case 2: WriteFullDebugString(std::cout); break;
+		case 3:
+			if (!GetAddressAdv(op) || !GetMemAdv<u64>(temp)) { Terminate(ErrorCode::UndefinedBehavior); return false; }
+
+			// if starting position is out of bounds, print 0 characters (don't no-op cause then user might think it's not working)
+			if (op >= mem_size) temp = 0;
+			// otherwise if printing more than exists, print as many as possible instead
+			else if (temp > mem_size || op + temp > mem_size) temp = mem_size - op;
+
+			std::cout << '\n';
+			Dump(std::cout, mem, op, temp);
+			break;
 
         default: Terminate(ErrorCode::UndefinedBehavior); return false;
         }

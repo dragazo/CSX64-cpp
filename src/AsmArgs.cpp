@@ -1658,6 +1658,29 @@ bool AssembleArgs::TryProcessINCBIN()
 	return true;
 }
 
+bool AssembleArgs::TryProcessDEBUG_mem()
+{
+	if (args.size() != 2) { res = { AssembleError::ArgCount, "line " + tostr(line) + ": Expected 2 args" }; return false; }
+
+	// write op code
+	if (!TryAppendByte((u8)OPCode::DEBUG) || !TryAppendByte(3)) return false;
+
+	u64 a, b, sizecode;
+	Expr ptr_base, count;
+	bool explicit_size, strict;
+
+	if (!TryParseAddress(args[0], a, b, ptr_base, sizecode, explicit_size)) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Expected memory operand as first arg\n-> " + res.ErrorMsg}; return false; }
+
+	if (!TryParseImm(args[1], count, sizecode, explicit_size, strict)) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Expected imm as second arg\n-> " + res.ErrorMsg}; return false; }
+	if (explicit_size) { res = {AssembleError::UsageError, "line " + tostr(line) + ": A size directive in this context is not allowed"}; return false; }
+	if (strict) { res = {AssembleError::UsageError, "line " + tostr(line) + ": A STRICT specifier in this context is not allowed"}; return false; }
+
+	if (!TryAppendAddress(a, b, std::move(ptr_base))) return false;
+	if (!TryAppendExpr(8, std::move(count))) return false;
+
+	return true;
+}
+
 bool AssembleArgs::TryProcessTernaryOp(OPCode opcode, bool has_ext_op, u8 ext_op, u64 sizemask)
 {
 	if (args.size() != 3) { res = {AssembleError::ArgCount, "line " + tostr(line) + ": Expected 3 args"}; return false; }

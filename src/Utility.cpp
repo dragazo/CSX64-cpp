@@ -300,27 +300,28 @@ namespace CSX64
 		dump.width(0);
 		iosfrstor _rstor(dump);
 
-		// make a header
-		dump << "           ";
-		for (int i = 0; i < 16; ++i) dump << ' ' << std::hex << i << ' ';
+		dump << std::hex << std::setfill('0'); // switch to hex mode and zero fill
 
+		// make a header
+		dump << "            0  1  2  3  4  5  6  7  8  9  a  b  c  d  e  f";
+		
 		// if it's not starting on a new row
 		if (start % 16 != 0)
 		{
 			// we need to write a line header
-			dump << ' ' << std::hex << (start - start % 16) << " - ";
+			dump << '\n' << std::setw(8) << (start & ~(u64)15) << " - ";
 
 			// and tack on some white space
-			for (int i = 0; i < (int)start % 16; ++i) dump << "   ";
+			for (u64 i = start % 16; i > 0; --i) dump << "   ";
 		}
 
 		// write the data
-		for (int i = 0; i < (int)count; ++i)
+		for (u64 i = 0; i < count; ++i)
 		{
 			// start of new row gets a line header
-			if ((start + i) % 16 == 0) dump << '\n' << std::hex << std::setw(8) << (start + i) << " - ";
+			if ((start + i) % 16 == 0) dump << '\n' << std::setw(8) << (start + i) << " - ";
 			
-			dump << std::hex << std::setw(2) << (int)reinterpret_cast<const unsigned char*>(data)[start + i] << ' '; // aliasing is safe because u8 is unsigned char type
+			dump << std::setw(2) << (int)reinterpret_cast<const unsigned char*>(data)[start + i] << ' '; // aliasing is safe because u8 is unsigned char type
 		}
 
 		// end with a new line
