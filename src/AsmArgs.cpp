@@ -1819,6 +1819,7 @@ bool AssembleArgs::TryProcessBinaryOp(OPCode opcode, bool has_ext_op, u8 ext_op,
 				if (explicit_size) { if (a_sizecode != b_sizecode) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Operand size missmatch"}; return false; } }
 				else b_sizecode = a_sizecode;
 			}
+			else if (_force_b_imm_sizecode == -666) { res = {AssembleError::UsageError, "line " + tostr(line) + ": An imm in this context is not allowed"}; return false; }
 			else b_sizecode = (u64)_force_b_imm_sizecode;
 
 			if (!TryAppendVal(1, (dest << 4) | (a_sizecode << 2) | (dest_high ? 2 : 0ul))) return false;
@@ -1864,6 +1865,7 @@ bool AssembleArgs::TryProcessBinaryOp(OPCode opcode, bool has_ext_op, u8 ext_op,
 				else if (a_explicit) b_sizecode = a_sizecode;
 				else { res = {AssembleError::UsageError, "line " + tostr(line) + ": Could not deduce operand size"}; return false; }
 			}
+			else if (_force_b_imm_sizecode == -666) { res = { AssembleError::UsageError, "line " + tostr(line) + ": An imm in this context is not allowed" }; return false; }
 			else b_sizecode = (u64)_force_b_imm_sizecode;
 
 			if ((Size(a_sizecode) & sizemask) == 0) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Specified size not supported"}; return false; }
@@ -2026,6 +2028,11 @@ bool AssembleArgs::TryProcessRR_RM(OPCode opcode, bool has_ext_op, u8 ext_op, u6
 	return true;
 }
 
+bool AssembleArgs::TryProcessBinaryOp_NoBIMM(OPCode opcode, bool has_ext_op, u8 ext_op, u64 sizemask)
+{
+	// set special no imm sizecode value
+	return TryProcessBinaryOp(opcode, has_ext_op, ext_op, sizemask, -666);
+}
 bool AssembleArgs::TryProcessBinaryOp_NoBMem(OPCode opcode, bool has_ext_op, u8 ext_op, u64 sizemask, int _force_b_imm_sizecode)
 {
 	// b can't be memory

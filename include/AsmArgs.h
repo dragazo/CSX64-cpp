@@ -180,6 +180,7 @@ namespace CSX64
 		bool TryProcessIMMRM(OPCode op, bool has_ext_op = false, u8 ext_op = 0, u64 sizemask = 15, int default_sizecode = -1);
 		bool TryProcessRR_RM(OPCode op, bool has_ext_op = false, u8 ext_op = 0, u64 sizemask = 15);
 
+		bool TryProcessBinaryOp_NoBIMM(OPCode op, bool has_ext_op = false, u8 ext_op = 0, u64 sizemask = 15);
 		bool TryProcessBinaryOp_NoBMem(OPCode op, bool has_ext_op = false, u8 ext_op = 0, u64 sizemask = 15, int _force_b_imm_sizecode = -1);
 		bool TryProcessBinaryOp_R_RM(OPCode op, bool has_ext_op = false, u8 ext_op = 0, u64 sizemask = 15, int _force_b_imm_sizecode = -1);
 

@@ -419,6 +419,27 @@ namespace CSX64
 	void ExtractDouble(double val, double &exp, double &sig);
 	double AssembleDouble(double exp, double sig);
 
+	// returns the result of swaping the byte positions of the specified value
+	inline constexpr u64 ByteSwap(u64 val, u64 sizecode)
+	{
+		u64 res = 0;
+		switch (sizecode)
+		{
+		case 3:
+			res = (val << 32) | (val >> 32);
+			res = ((val & 0x0000ffff0000ffff) << 16) | ((val & 0xffff0000ffff0000) >> 16);
+			res = ((val & 0x00ff00ff00ff00ff) << 8) | ((val & 0xff00ff00ff00ff00) >> 8);
+			break;
+		case 2:
+			res = (val << 16) | (val >> 16);
+			res = ((val & 0x00ff00ff) << 8) | ((val & 0xff00ff00) >> 8);
+			break;
+		case 1: res = (val << 8) | (val >> 8); break;
+		case 0: res = val; break;
+		}
+		return res;
+	}
+
 	/// <summary>
 	/// Returns true if the floating-point value is denormalized (including +-0)
 	/// </summary>

@@ -624,6 +624,8 @@ namespace CSX64
 
 	{"TZCNT", [](AssembleArgs &args) { return args.TryProcessBSx(OPCode::TZCNT, true); }},
 
+	{"MOVBS", [](AssembleArgs &args) { return args.TryProcessBinaryOp_NoBIMM(OPCode::TRANS, true, 4, 14); } },
+
 	{"UD", [](AssembleArgs &args) { return args.TryProcessNoArgOp(OPCode::UD); }},
 
 	// --------- //

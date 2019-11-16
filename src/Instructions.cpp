@@ -409,8 +409,8 @@ namespace CSX64
     {
         if constexpr (FlagAccessMasking)
         {
-            EFLAGS() &= ~MASK_UNION_3(ZF, SF, PF);
-            EFLAGS() |= (value == 0 ? MASK_UNION_1(ZF) : 0) | (Negative(value, sizecode) ? MASK_UNION_1(SF) : 0) | (parity_table[value & 0xff] ? MASK_UNION_1(PF) : 0);
+            RFLAGS() &= ~MASK_UNION_3(ZF, SF, PF);
+			RFLAGS() |= (value == 0 ? MASK_UNION_1(ZF) : 0) | (Negative(value, sizecode) ? MASK_UNION_1(SF) : 0) | (parity_table[value & 0xff] ? MASK_UNION_1(PF) : 0);
         }
         else
         {
@@ -927,8 +927,8 @@ namespace CSX64
 
         if constexpr (FlagAccessMasking)
         {
-            EFLAGS() &= ~MASK_UNION_6(ZF, SF, PF, CF, AF, OF);
-            EFLAGS() |= (res == 0 ? MASK_UNION_1(ZF) : 0) | (Negative(res, sizecode) ? MASK_UNION_1(SF) : 0) | (parity_table[res & 0xff] ? MASK_UNION_1(PF) : 0)
+			RFLAGS() &= ~MASK_UNION_6(ZF, SF, PF, CF, AF, OF);
+			RFLAGS() |= (res == 0 ? MASK_UNION_1(ZF) : 0) | (Negative(res, sizecode) ? MASK_UNION_1(SF) : 0) | (parity_table[res & 0xff] ? MASK_UNION_1(PF) : 0)
                 | (a < b ? MASK_UNION_1(CF) : 0) | ((a & 0xf) < (b & 0xf) ? MASK_UNION_1(AF) : 0) | (Negative((a ^ b) & (a ^ res), sizecode) ? MASK_UNION_1(OF) : 0);
         }
         else
@@ -987,7 +987,7 @@ namespace CSX64
         }
         } // end switch
         
-        EFLAGS() ^= Rand() & MASK_UNION_4(SF, ZF, AF, PF);
+		RFLAGS() ^= Rand() & MASK_UNION_4(SF, ZF, AF, PF);
 
         return true;
     }
@@ -1066,7 +1066,7 @@ namespace CSX64
         }
         } // end switch
 
-        EFLAGS() ^= Rand() & MASK_UNION_4(SF, ZF, AF, PF);
+		RFLAGS() ^= Rand() & MASK_UNION_4(SF, ZF, AF, PF);
 
         return true;
     }
@@ -1106,7 +1106,7 @@ namespace CSX64
         }
         } // end switch
 
-        EFLAGS() ^= Rand() & MASK_UNION_4(SF, ZF, AF, PF);
+		RFLAGS() ^= Rand() & MASK_UNION_4(SF, ZF, AF, PF);
 
         return StoreBinaryOpFormat(s1, s2, m, (u64)res);
     }
@@ -1146,7 +1146,7 @@ namespace CSX64
         }
         } // end switch
 
-        EFLAGS() ^= Rand() & MASK_UNION_4(SF, ZF, AF, PF);
+		RFLAGS() ^= Rand() & MASK_UNION_4(SF, ZF, AF, PF);
 
         return StoreTernaryOPFormat(s, (u64)res);
     }
@@ -1191,7 +1191,7 @@ namespace CSX64
         }
         } // end switch
 
-        EFLAGS() ^= Rand() & MASK_UNION_6(CF, OF, SF, ZF, AF, PF);
+		RFLAGS() ^= Rand() & MASK_UNION_6(CF, OF, SF, ZF, AF, PF);
 
         return true;
     }
@@ -1239,7 +1239,7 @@ namespace CSX64
         }
         } // end switch
 
-        EFLAGS() ^= Rand() & MASK_UNION_6(CF, OF, SF, ZF, AF, PF);
+		RFLAGS() ^= Rand() & MASK_UNION_6(CF, OF, SF, ZF, AF, PF);
 
         return true;
     }
@@ -1483,8 +1483,8 @@ namespace CSX64
 
         if constexpr (FlagAccessMasking)
         {
-            EFLAGS() &= ~MASK_UNION_5(ZF, SF, PF, AF, OF);
-            EFLAGS() |= (res == 0 ? MASK_UNION_1(ZF) : 0) | (Negative(res, sizecode) ? MASK_UNION_1(SF) : 0) | (parity_table[res & 0xff] ? MASK_UNION_1(PF) : 0)
+			RFLAGS() &= ~MASK_UNION_5(ZF, SF, PF, AF, OF);
+			RFLAGS() |= (res == 0 ? MASK_UNION_1(ZF) : 0) | (Negative(res, sizecode) ? MASK_UNION_1(SF) : 0) | (parity_table[res & 0xff] ? MASK_UNION_1(PF) : 0)
                 | ((res & 0xf) == 0 ? MASK_UNION_1(AF) : 0) | (Positive(a, sizecode) && Negative(res, sizecode) ? MASK_UNION_1(OF) : 0);
         }
         else
@@ -1506,8 +1506,8 @@ namespace CSX64
 
         if constexpr (FlagAccessMasking)
         {
-            EFLAGS() &= ~MASK_UNION_5(ZF, SF, PF, AF, OF);
-            EFLAGS() |= (res == 0 ? MASK_UNION_1(ZF) : 0) | (Negative(res, sizecode) ? MASK_UNION_1(SF) : 0) | (parity_table[res & 0xff] ? MASK_UNION_1(PF) : 0)
+			RFLAGS() &= ~MASK_UNION_5(ZF, SF, PF, AF, OF);
+			RFLAGS() |= (res == 0 ? MASK_UNION_1(ZF) : 0) | (Negative(res, sizecode) ? MASK_UNION_1(SF) : 0) | (parity_table[res & 0xff] ? MASK_UNION_1(PF) : 0)
                 | ((a & 0xf) == 0 ? MASK_UNION_1(AF) : 0) | (Negative(a, sizecode) && Positive(res, sizecode) ? MASK_UNION_1(OF) : 0);
         }
         else
@@ -1562,9 +1562,7 @@ namespace CSX64
         u64 sizecode = (s >> 2) & 3;
 
         UpdateFlagsZSP(a, sizecode);
-        CF() = false;
-        OF() = false;
-        AF() = false;
+		RFLAGS() &= ~MASK_UNION_3(CF, OF, AF);
 
         return true;
     }
@@ -1575,23 +1573,7 @@ namespace CSX64
         if (!FetchUnaryOpFormat(s, m, a)) return false;
         u64 sizecode = (s >> 2) & 3;
 
-        u64 res = 0;
-        switch (sizecode)
-        {
-        case 3:
-            res = (a << 32) | (a >> 32);
-            res = ((a & 0x0000ffff0000ffff) << 16) | ((a & 0xffff0000ffff0000) >> 16);
-            res = ((a & 0x00ff00ff00ff00ff) << 8) | ((a & 0xff00ff00ff00ff00) >> 8);
-            break;
-        case 2:
-            res = (a << 16) | (a >> 16);
-            res = ((a & 0x00ff00ff) << 8) | ((a & 0xff00ff00) >> 8);
-            break;
-        case 1: res = (a << 8) | (a >> 8); break;
-        case 0: res = a; break;
-        }
-
-        return StoreUnaryOpFormat(s, m, res);
+        return StoreUnaryOpFormat(s, m, ByteSwap(a, sizecode));
     }
     bool Computer::ProcessBEXTR()
     {
@@ -1606,7 +1588,7 @@ namespace CSX64
 
         EFLAGS() = 2; // clear all the (public) flags (flag 1 must always be set)
         ZF() = res == 0; // ZF is set on zero
-        EFLAGS() ^= Rand() & MASK_UNION_3(AF, SF, PF); // AF, SF, PF undefined
+		RFLAGS() ^= Rand() & MASK_UNION_3(AF, SF, PF); // AF, SF, PF undefined
 
         return StoreBinaryOpFormat(s1, s2, m, res);
     }
@@ -1623,7 +1605,7 @@ namespace CSX64
         SF() = Negative(res, sizecode);
         CF() = a != 0;
         OF() = false;
-        EFLAGS() ^= Rand() & MASK_UNION_2(AF, PF);
+		RFLAGS() ^= Rand() & MASK_UNION_2(AF, PF);
 
         return StoreUnaryOpFormat(s, m, res);
     }
@@ -1638,7 +1620,7 @@ namespace CSX64
         SF() = Negative(res, sizecode);
         CF() = a == 0;
         ZF() = OF() = false;
-        EFLAGS() ^= Rand() & MASK_UNION_2(AF, PF);
+		RFLAGS() ^= Rand() & MASK_UNION_2(AF, PF);
 
         return StoreUnaryOpFormat(s, m, res);
     }
@@ -1654,7 +1636,7 @@ namespace CSX64
         SF() = Negative(res, sizecode);
         CF() = a == 0;
         OF() = false;
-        EFLAGS() ^= Rand() & MASK_UNION_2(AF, PF);
+		RFLAGS() ^= Rand() & MASK_UNION_2(AF, PF);
 
         return StoreUnaryOpFormat(s, m, res);
     }
@@ -1676,7 +1658,7 @@ namespace CSX64
         SF() = Negative(res, sizecode);
         OF() = false;
         CF() = false;
-        EFLAGS() ^= Rand() & MASK_UNION_2(AF, PF);
+		RFLAGS() ^= Rand() & MASK_UNION_2(AF, PF);
 
         return StoreRR_RMFormat(s1, res);
     }
@@ -1700,7 +1682,7 @@ namespace CSX64
         u64 mask = (u64)1 << (b % SizeBits(sizecode)); // performed modulo-n
 
         CF() = (a & mask) != 0;
-        EFLAGS() ^= Rand() & MASK_UNION_4(OF, SF, AF, PF);
+		RFLAGS() ^= Rand() & MASK_UNION_4(OF, SF, AF, PF);
 
         switch (ext)
         {
@@ -1902,7 +1884,7 @@ namespace CSX64
             }
             AL() &= 0x0f;
 
-            EFLAGS() ^= Rand() & MASK_UNION_4(OF, SF, ZF, PF);
+			RFLAGS() ^= Rand() & MASK_UNION_4(OF, SF, ZF, PF);
 
             return true;
 
@@ -1921,7 +1903,7 @@ namespace CSX64
             }
             AL() &= 0x0f;
 
-            EFLAGS() ^= Rand() & MASK_UNION_4(OF, SF, ZF, PF);
+			RFLAGS() ^= Rand() & MASK_UNION_4(OF, SF, ZF, PF);
 
             return true;
 
@@ -1950,7 +1932,7 @@ namespace CSX64
 
             // update flags
             UpdateFlagsZSP(AL(), 0);
-            EFLAGS() ^= Rand() & MASK_UNION_1(OF);
+			RFLAGS() ^= Rand() & MASK_UNION_1(OF);
 
             return true;
 
@@ -1976,7 +1958,7 @@ namespace CSX64
 
             // update flags
             UpdateFlagsZSP(AL(), 0);
-            EFLAGS() ^= Rand() & MASK_UNION_1(OF);
+			RFLAGS() ^= Rand() & MASK_UNION_1(OF);
 
             return true;
 
@@ -2302,7 +2284,7 @@ namespace CSX64
 
         // update dest and flags
         CPURegisters[s & 15][sizecode] = res;
-        EFLAGS() ^= Rand() & MASK_UNION_5(CF, OF, SF, AF, PF);
+		RFLAGS() ^= Rand() & MASK_UNION_5(CF, OF, SF, AF, PF);
 
         return true;
     }
@@ -2328,7 +2310,7 @@ namespace CSX64
         // update dest and flags
         CPURegisters[s & 15][sizecode] = res;
         ZF() = res == 0;
-        EFLAGS() ^= Rand() & MASK_UNION_4(OF, SF, AF, PF);
+		RFLAGS() ^= Rand() & MASK_UNION_4(OF, SF, AF, PF);
 
         return true;
     }
@@ -3988,7 +3970,7 @@ namespace CSX64
         CF() = z;
         
         // clear OF, AF, and SF
-        EFLAGS() &= ~MASK_UNION_3(OF, AF, SF);
+		RFLAGS() &= ~MASK_UNION_3(OF, AF, SF);
 
         // result is src1 (see explanation above)
         res = _a;
@@ -4270,7 +4252,7 @@ namespace CSX64
         default: Terminate(ErrorCode::UndefinedBehavior); return false;
         }
     }
-
+	
     // -------------------------------------------------------------------------------------
 
 	/*
@@ -4281,33 +4263,46 @@ namespace CSX64
 
 	mode = 2: [4: dest][4: src]    dest (r64) <- src (xmm)
 	mode = 3: [4: dest][4: src]    dest (xmm) <- src (r64)
+
+	mode = 4: [binary op]          dest <- bswap(src)
 	*/
 	bool Computer::TryProcessTRANS()
 	{
-		u64 temp1;
-		if (!GetMemAdv<u8>(temp1)) return false;
+		u64 temp;
+		if (!GetMemAdv<u8>(temp)) return false;
 
-		switch (temp1)
+		switch (temp)
 		{
 		case 0:
-			if (!GetMemAdv<u8>(temp1)) return false;
-			CPURegisters[temp1 >> 4].x32() = ZMMRegisters[temp1 & 15].get<u32>(0);
+			if (!GetMemAdv<u8>(temp)) return false;
+			CPURegisters[temp >> 4].x32() = ZMMRegisters[temp & 15].get<u32>(0);
 			return true;
 		case 1:
-			if (!GetMemAdv<u8>(temp1)) return false;
-			ZMMRegisters[temp1 >> 4].get<u32>(0) = CPURegisters[temp1 & 15].x32();
+			if (!GetMemAdv<u8>(temp)) return false;
+			ZMMRegisters[temp >> 4].get<u32>(0) = CPURegisters[temp & 15].x32();
 			return true;
 
 		// -----------------------------------
 
 		case 2:
-			if (!GetMemAdv<u8>(temp1)) return false;
-			CPURegisters[temp1 >> 4].x64() = ZMMRegisters[temp1 & 15].get<u64>(0);
+			if (!GetMemAdv<u8>(temp)) return false;
+			CPURegisters[temp >> 4].x64() = ZMMRegisters[temp & 15].get<u64>(0);
 			return true;
 		case 3:
-			if (!GetMemAdv<u8>(temp1)) return false;
-			ZMMRegisters[temp1 >> 4].get<u64>(0) = CPURegisters[temp1 & 15].x64();
+			if (!GetMemAdv<u8>(temp)) return false;
+			ZMMRegisters[temp >> 4].get<u64>(0) = CPURegisters[temp & 15].x64();
 			return true;
+
+		// -----------------------------------
+
+		case 4:
+		{
+			u64 s1, s2, m, a, b;
+			if (!FetchBinaryOpFormat(s1, s2, m, a, b, false)) return false;
+			u64 sizecode = (s1 >> 2) & 3;
+
+			return StoreBinaryOpFormat(s1, s2, m, ByteSwap(b, sizecode));
+		}
 
 		// -----------------------------------
 
