@@ -1127,6 +1127,8 @@ namespace CSX64
 
 		// -- misc instructions -- //
 
+		bool TryProcessTRANS();
+
 		bool ProcessDEBUG();
 		bool ProcessUNKNOWN();
 	};

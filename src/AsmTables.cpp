@@ -773,8 +773,20 @@ namespace CSX64
 
 	// ------------- //
 
-	{"MOVQ", [](AssembleArgs &args) { return args.TryProcessVPUMove(OPCode::VPU_MOV, 3, false, false, true); }},
-	{"MOVD", [](AssembleArgs &args) { return args.TryProcessVPUMove(OPCode::VPU_MOV, 2, false, false, true); }},
+	{"MOVQ", [](AssembleArgs &args)
+		{
+			u64 _1, _2;
+			bool _3;
+			return args.args.size() >= 1 && (args.TryParseCPURegister(args.args[0], _1, _2, _3) || args.TryParseCPURegister(args.args[1], _1, _2, _3))
+				? args.TryProcessMOVx_trans(3) : args.TryProcessVPUMove(OPCode::VPU_MOV, 3, false, false, true);
+		} },
+	{"MOVD", [](AssembleArgs &args)
+		{
+			u64 _1, _2;
+			bool _3;
+			return args.args.size() >= 1 && (args.TryParseCPURegister(args.args[0], _1, _2, _3) || args.TryParseCPURegister(args.args[1], _1, _2, _3))
+				? args.TryProcessMOVx_trans(2) : args.TryProcessVPUMove(OPCode::VPU_MOV, 2, false, false, true);
+		} },
 
 	// MOVSD (vec) requires disambiguation
 	{"MOVSS", [](AssembleArgs &args) { return args.TryProcessVPUMove(OPCode::VPU_MOV, 2, false, false, true); }},

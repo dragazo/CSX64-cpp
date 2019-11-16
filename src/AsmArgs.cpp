@@ -1658,6 +1658,45 @@ bool AssembleArgs::TryProcessINCBIN()
 	return true;
 }
 
+bool AssembleArgs::TryProcessMOVx_trans(u64 sizecode)
+{
+	if (args.size() != 2) { res = { AssembleError::ArgCount, "line " + tostr(line) + ": Expected 2 args" }; return false; }
+
+	// write op code
+	if (!TryAppendByte((u8)OPCode::TRANS)) return false;
+
+	u64 dest, src, szc;
+	bool high;
+
+	// r, *
+	if (TryParseCPURegister(args[0], dest, szc, high))
+	{
+		if (szc != sizecode) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Unsupported destination size"}; return false; }
+
+		// r, xmm
+		if (TryParseVPURegister(args[1], src, szc) && szc == 4)
+		{
+			if (!TryAppendByte(sizecode == 3 ? 2 : 0) || !TryAppendByte((u8)((dest << 4) | src))) return false;
+		}
+		else { res = {AssembleError::UsageError, "line " + tostr(line) + ": Unsupported arg combination"}; return false; }
+	}
+	// xmm, *
+	else if (TryParseVPURegister(args[0], dest, szc) && szc == 4)
+	{
+		// xmm, r
+		if (TryParseCPURegister(args[1], src, szc, high))
+		{
+			if (szc != sizecode) { res = { AssembleError::UsageError, "line " + tostr(line) + ": Unsupported destination size" }; return false; }
+
+			if (!TryAppendByte(sizecode == 3 ? 3 : 1) || !TryAppendByte((u8)((dest << 4) | src))) return false;
+		}
+		else { res = { AssembleError::UsageError, "line " + tostr(line) + ": Unsupported destination size" }; return false; }
+	}
+	else { res = {AssembleError::UsageError, "line " + tostr(line) + ": Expected dest to be cpu or vpu register"}; return false; }
+
+	return true;
+}
+
 bool AssembleArgs::TryProcessDEBUG_mem()
 {
 	if (args.size() != 2) { res = { AssembleError::ArgCount, "line " + tostr(line) + ": Expected 2 args" }; return false; }

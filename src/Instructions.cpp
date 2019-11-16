@@ -4273,6 +4273,50 @@ namespace CSX64
 
     // -------------------------------------------------------------------------------------
 
+	/*
+	[8: mode]
+
+	mode = 0: [4: dest][4: src]    dest (r32) <- src (xmm)
+	mode = 1: [4: dest][4: src]    dest (xmm) <- src (r32)
+
+	mode = 2: [4: dest][4: src]    dest (r64) <- src (xmm)
+	mode = 3: [4: dest][4: src]    dest (xmm) <- src (r64)
+	*/
+	bool Computer::TryProcessTRANS()
+	{
+		u64 temp1;
+		if (!GetMemAdv<u8>(temp1)) return false;
+
+		switch (temp1)
+		{
+		case 0:
+			if (!GetMemAdv<u8>(temp1)) return false;
+			CPURegisters[temp1 >> 4].x32() = ZMMRegisters[temp1 & 15].get<u32>(0);
+			return true;
+		case 1:
+			if (!GetMemAdv<u8>(temp1)) return false;
+			ZMMRegisters[temp1 >> 4].get<u32>(0) = CPURegisters[temp1 & 15].x32();
+			return true;
+
+		// -----------------------------------
+
+		case 2:
+			if (!GetMemAdv<u8>(temp1)) return false;
+			CPURegisters[temp1 >> 4].x64() = ZMMRegisters[temp1 & 15].get<u64>(0);
+			return true;
+		case 3:
+			if (!GetMemAdv<u8>(temp1)) return false;
+			ZMMRegisters[temp1 >> 4].get<u64>(0) = CPURegisters[temp1 & 15].x64();
+			return true;
+
+		// -----------------------------------
+
+		default:
+			Terminate(ErrorCode::UndefinedBehavior);
+			return false;
+		}
+	}
+
     bool Computer::ProcessDEBUG()
     {
         u64 op, temp;

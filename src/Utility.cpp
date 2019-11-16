@@ -306,9 +306,9 @@ namespace CSX64
 
 		u64 len = 0; // current length of str
 
-		dump << std::hex << std::setfill('0');                                // switch to hex mode and zero fill
-		dump << "          0  1  2  3  4  5  6  7  8  9  a  b  c  d  e  f\n"; // write the top header
-		dump << std::setw(8) << (start & ~(u64)15) << ' ';                    // write the first hex dump address
+		dump << std::hex << std::setfill('0');                                        // switch to hex mode and zero fill
+		dump << "                  0  1  2  3  4  5  6  7  8  9  a  b  c  d  e  f\n"; // write the top header
+		dump << std::setw(16) << (start & ~(u64)15) << ' ';                           // write the first hex dump address
 
 		// tack on white space to skip any characters we're missing in the first row
 		for (u64 i = start & 15; i > 0; --i)
@@ -323,7 +323,7 @@ namespace CSX64
 			// if we just finished a row, write the string dump and the next hex dump address
 			if (len == 16)
 			{
-				dump << str << std::setw(8) << (start + i) << ' ';
+				dump << str << std::setw(16) << (start + i) << ' ';
 				len = 0;
 			}
 

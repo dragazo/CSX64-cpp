@@ -118,6 +118,8 @@ namespace CSX64
 
 		// misc instructions
 
+		TRANS,
+
 		DEBUG = 255
 	};
 }

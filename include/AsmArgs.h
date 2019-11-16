@@ -168,6 +168,8 @@ namespace CSX64
 
 		bool TryProcessINCBIN();
 
+		bool TryProcessMOVx_trans(u64 sizecode);
+
 		bool TryProcessDEBUG_mem();
 
 		// -- x86 op formats -- //
