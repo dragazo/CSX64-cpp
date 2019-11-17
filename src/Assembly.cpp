@@ -729,7 +729,7 @@ namespace CSX64
 		// return no error
 		return {AssembleError::None, ""};
 	}
-	LinkResult Link(Executable &exe, std::vector<ObjectFile> &objs, const std::string &entry_point)
+	LinkResult Link(Executable &exe, std::list<std::pair<std::string, ObjectFile>> &objs, const std::string &entry_point)
 	{
 		// parsing locations for evaluation
 		u64 _res;
@@ -746,15 +746,15 @@ namespace CSX64
 		if (objs.empty()) return {LinkError::EmptyResult, "Got no object files"};
 
 		// make sure all object files are starting out clean
-		for (const ObjectFile &obj : objs) if (!obj.is_clean()) throw DirtyError("Attempt to use dirty object file");
+		for (const auto &obj : objs) if (!obj.second.is_clean()) throw DirtyError("Attempt to use dirty object file");
 
 		// -- validate _start file -- //
 
 		// _start file must declare an external named "_start"
-		if (!Contains(objs[0].ExternalSymbols, "_start")) return LinkResult{LinkError::FormatError, "_start file must declare an external named \"_start\""};
+		if (!Contains(objs.front().second.ExternalSymbols, "_start")) return LinkResult{LinkError::FormatError, "_start file must declare an external named \"_start\""};
 
 		// rename "_start" symbol in _start file to whatever the entry point is (makes _start dirty)
-		try { objs[0].make_dirty(); RenameSymbol(objs[0], "_start", entry_point); }
+		try { objs.front().second.make_dirty(); RenameSymbol(objs.front().second, "_start", entry_point); }
 		catch (...) { return {LinkError::FormatError, "an error occured while renaming \"_start\" in the _start file"}; }
 
 		// -- define things -- //
@@ -772,15 +772,15 @@ namespace CSX64
 		u64 bssalign = 1;
 
 		// a table for relating global symbols to their object file
-		std::unordered_map<std::string, ObjectFile*> global_to_obj;
+		std::unordered_map<std::string, std::pair<std::string, ObjectFile>*> global_to_obj;
 
 		// the queue of object files that need to be added to the executable
-		std::deque<ObjectFile*> include_queue;
+		std::deque<std::pair<std::string, ObjectFile>*> include_queue;
 		// a table for relating included object files to their beginning positions in the resulting binary (text, rodata, data, bss) tuples
-		std::unordered_map<ObjectFile*, std::tuple<u64, u64, u64, u64>> included;
+		std::unordered_map<std::pair<std::string, ObjectFile>*, std::tuple<u64, u64, u64, u64>> included;
 
 		BinaryLiteralCollection total_literals; // destination to merge all binary literals throughout all included object files
-		std::unordered_map<ObjectFile*, std::vector<std::size_t>> obj_to_total_literals_locations; // maps from an included object file to its literal index map in total_literals
+		std::unordered_map<std::pair<std::string, ObjectFile>*, std::vector<std::size_t>> obj_to_total_literals_locations; // maps from an included object file to its literal index map in total_literals
 
 		std::size_t literals_size; // the total size of all (top level) literals merged together
 		std::vector<std::size_t> rodata_top_level_literal_offsets; // offsets of each top level literal in the rodata segment
@@ -788,16 +788,16 @@ namespace CSX64
 		// -- populate things -- //
 
 		// populate global_to_obj with ALL global symbols
-		for (ObjectFile &obj : objs)
+		for (auto &obj : objs)
 		{
 			const Expr *value;
 
-			for (const std::string &global : obj.GlobalSymbols)
+			for (const auto &global : obj.second.GlobalSymbols)
 			{
 				// make sure source actually defined this symbol (just in case of corrupted object file)
-				if (!TryGetValue(obj.Symbols, global, value)) return LinkResult{LinkError::MissingSymbol, "Global symbol \"" + global + "\" was not defined"};
+				if (!TryGetValue(obj.second.Symbols, global, value)) return LinkResult{LinkError::MissingSymbol, obj.first + ": Global symbol \"" + global + "\" was not defined"};
 				// make sure it wasn't already defined
-				if (ContainsKey(global_to_obj, global)) return LinkResult{LinkError::SymbolRedefinition, "Global symbol \"" + global + "\" was defined by multiple sources"};
+				if (ContainsKey(global_to_obj, global)) return LinkResult{LinkError::SymbolRedefinition, obj.first + ": Global symbol \"" + global + "\" was defined by " + global_to_obj[global]->first};
 
 				// add to the table
 				global_to_obj.emplace(global, &obj);
@@ -807,15 +807,15 @@ namespace CSX64
 		// -- verify things -- //
 
 		// make sure no one defined over reserved symbol names
-		for (ObjectFile &obj : objs)
+		for (auto &obj : objs)
 		{
 			// only the verify ignores are a problem (because we'll be defining those)
 			for (const std::string &reserved : VerifyLegalExpressionIgnores)
-				if (ContainsKey(obj.Symbols, reserved)) return LinkResult{LinkError::SymbolRedefinition, "Object file defined symbol with name \"" + reserved + "\" (reserved)"};
+				if (ContainsKey(obj.second.Symbols, reserved)) return LinkResult{LinkError::SymbolRedefinition, obj.first + ": defined symbol with name \"" + reserved + "\" (reserved)"};
 		}
 
 		// start the merge process with the _start file
-		include_queue.push_back(&objs[0]); // (by this point [0] is guaranteed to exist)
+		include_queue.push_back(&objs.front()); // (by this point [0] is guaranteed to exist)
 
 		// -- merge things -- //
 
@@ -823,46 +823,48 @@ namespace CSX64
 		while (include_queue.size() > 0)
 		{
 			// get the object file we need to incorporate
-			ObjectFile *obj = include_queue.front();
+			std::pair<std::string, ObjectFile> *item = include_queue.front();
 			include_queue.pop_front();
+			ObjectFile &obj = item->second;
+
 			// all included files are dirty
-			obj->make_dirty();
+			obj.make_dirty();
 
 			// account for alignment requirements
-			Align(text, obj->TextAlign);
-			Align(rodata, obj->RodataAlign);
-			Align(data, obj->DataAlign);
-			bsslen = Align(bsslen, obj->BSSAlign);
+			Align(text, obj.TextAlign);
+			Align(rodata, obj.RodataAlign);
+			Align(data, obj.DataAlign);
+			bsslen = Align(bsslen, obj.BSSAlign);
 
 			// update segment alignments
-			textalign = std::max<u64>(textalign, obj->TextAlign);
-			rodataalign = std::max<u64>(rodataalign, obj->RodataAlign);
-			dataalign = std::max<u64>(dataalign, obj->DataAlign);
-			bssalign = std::max<u64>(bssalign, obj->BSSAlign);
+			textalign = std::max<u64>(textalign, obj.TextAlign);
+			rodataalign = std::max<u64>(rodataalign, obj.RodataAlign);
+			dataalign = std::max<u64>(dataalign, obj.DataAlign);
+			bssalign = std::max<u64>(bssalign, obj.BSSAlign);
 
 			// add it to the set of included files
-			included.emplace(obj, std::tuple<u64, u64, u64, u64>(text.size(), rodata.size(), data.size(), bsslen));
+			included.emplace(item, std::tuple<u64, u64, u64, u64>(text.size(), rodata.size(), data.size(), bsslen));
 
 			// offset holes to be relative to the start of their total segment (not relative to resulting file)
-			for (HoleData &hole : obj->TextHoles) hole.Address += text.size();
-			for (HoleData &hole : obj->RodataHoles) hole.Address += rodata.size();
-			for (HoleData &hole : obj->DataHoles) hole.Address += data.size();
+			for (HoleData &hole : obj.TextHoles) hole.Address += text.size();
+			for (HoleData &hole : obj.RodataHoles) hole.Address += rodata.size();
+			for (HoleData &hole : obj.DataHoles) hole.Address += data.size();
 
 			// reserve space for segments
-			text.resize(text.size() + obj->Text.size());
-			rodata.resize(rodata.size() + obj->Rodata.size());
-			data.resize(data.size() + obj->Data.size());
+			text.resize(text.size() + obj.Text.size());
+			rodata.resize(rodata.size() + obj.Rodata.size());
+			data.resize(data.size() + obj.Data.size());
 
 			// append segments
-			if (obj->Text.size() > 0) std::memcpy(text.data() + (text.size() - obj->Text.size()), obj->Text.data(), obj->Text.size());
-			if (obj->Rodata.size() > 0) std::memcpy(rodata.data() + (rodata.size() - obj->Rodata.size()), obj->Rodata.data(), obj->Rodata.size());
-			if (obj->Data.size() > 0) std::memcpy(data.data() + (data.size() - obj->Data.size()), obj->Data.data(), obj->Data.size());
-			bsslen += obj->BssLen;
+			if (obj.Text.size() > 0) std::memcpy(text.data() + (text.size() - obj.Text.size()), obj.Text.data(), obj.Text.size());
+			if (obj.Rodata.size() > 0) std::memcpy(rodata.data() + (rodata.size() - obj.Rodata.size()), obj.Rodata.data(), obj.Rodata.size());
+			if (obj.Data.size() > 0) std::memcpy(data.data() + (data.size() - obj.Data.size()), obj.Data.data(), obj.Data.size());
+			bsslen += obj.BssLen;
 
 			// for each external symbol
-			for (const std::string &external : obj->ExternalSymbols)
+			for (const std::string &external : obj.ExternalSymbols)
 			{
-				ObjectFile **global_source;
+				std::pair<std::string, ObjectFile> **global_source;
 
 				// if this is a global symbol somewhere
 				if (TryGetValue(global_to_obj, external, global_source))
@@ -875,15 +877,15 @@ namespace CSX64
 					}
 				}
 				// otherwise it wasn't defined
-				else return LinkResult{LinkError::MissingSymbol, "No global symbol found to match external symbol \"" + external + "\""};
+				else return LinkResult{LinkError::MissingSymbol, item->first + ": No global symbol found to match external symbol \"" + external + "\""};
 			}
 
 			// merge top level binary literals for this include file and fix their aliasing literal ranges
-			std::vector<std::pair<std::size_t, std::size_t>> literal_fix_map(obj->Literals.top_level_literals.size());
-			for (std::size_t i = 0; i < obj->Literals.top_level_literals.size(); ++i)
+			std::vector<std::pair<std::size_t, std::size_t>> literal_fix_map(obj.Literals.top_level_literals.size());
+			for (std::size_t i = 0; i < obj.Literals.top_level_literals.size(); ++i)
 			{
 				// add the top level literal and get its literal index
-				std::size_t literal_pos = total_literals.add(std::move(obj->Literals.top_level_literals[i]));
+				std::size_t literal_pos = total_literals.add(std::move(obj.Literals.top_level_literals[i]));
 				// extract all the info we need to adjust and merge the literal ranges for this object file
 				std::size_t referenced_top_level_index = total_literals.literals[literal_pos].top_level_index;
 				std::size_t start = total_literals.literals[literal_pos].start;
@@ -892,7 +894,7 @@ namespace CSX64
 				literal_fix_map[i] = {referenced_top_level_index, start};
 			}
 			// update all the literals for this file
-			for (auto &lit : obj->Literals.literals)
+			for (auto &lit : obj.Literals.literals)
 			{
 				// get the fix info for this literal's old top level index
 				const std::pair<std::size_t, std::size_t> &fix_info = literal_fix_map[lit.top_level_index];
@@ -902,19 +904,19 @@ namespace CSX64
 			}
 
 			// insert a new literal locations map (pre-sized) and alias it
-			std::vector<std::size_t> &literal_locations = obj_to_total_literals_locations.emplace(obj, obj->Literals.literals.size()).first->second;
+			std::vector<std::size_t> &literal_locations = obj_to_total_literals_locations.emplace(item, obj.Literals.literals.size()).first->second;
 
 			// merge the (fixed) aliasing literal ranges
-			for (std::size_t i = 0; i < obj->Literals.literals.size(); ++i)
+			for (std::size_t i = 0; i < obj.Literals.literals.size(); ++i)
 			{
 				// insert the aliasing literal range (aliased top level already added and range info fixed)
 				// store the insertion index in the literal locations map for this object file
-				literal_locations[i] = total_literals._insert(obj->Literals.literals[i]);
+				literal_locations[i] = total_literals._insert(obj.Literals.literals[i]);
 			}
 
 			// this object file's literals collection is now invalid - just clear it all out
-			obj->Literals.literals.clear();
-			obj->Literals.top_level_literals.clear();
+			obj.Literals.literals.clear();
+			obj.Literals.top_level_literals.clear();
 		}
 
 		// after merging, but before alignment, we need to handle all the provisioned binary literals.
@@ -950,7 +952,7 @@ namespace CSX64
 				expr.Right = Expr::NewInt(rodata_top_level_literal_offsets[lit.top_level_index] + lit.start);
 
 				// inject the symbol definition into the object file's symbol table
-				entry.first->Symbols.emplace(BinaryLiteralSymbolPrefix + tohex(i), std::move(expr));
+				entry.first->second.Symbols.emplace(BinaryLiteralSymbolPrefix + tohex(i), std::move(expr));
 			}
 		}
 
@@ -964,7 +966,7 @@ namespace CSX64
 		for (auto &entry : included)
 		{
 			// alias the object file
-			ObjectFile &obj = *entry.first;
+			ObjectFile &obj = entry.first->second;
 
 			// define the segment origins
 			obj.Symbols.emplace(SegOrigins.at(AsmSegment::TEXT), Expr::CreateInt(0));
@@ -986,7 +988,7 @@ namespace CSX64
 			{
 				// if it can't be evaluated internally, it's an error (i.e. cannot define a global in terms of another file's globals)
 				if (!obj.Symbols.at(global).Evaluate(obj.Symbols, _res, _floating, _err))
-					return LinkResult{LinkError::MissingSymbol, "Global symbol \"" + global + "\" could not be evaluated internally"};
+					return LinkResult{LinkError::MissingSymbol, entry.first->first + ": Global symbol \"" + global + "\" could not be evaluated internally"};
 			}
 		}
 
@@ -994,7 +996,7 @@ namespace CSX64
 		for (auto &entry : included)
 		{
 			// alias the object file
-			ObjectFile &obj = *entry.first;
+			ObjectFile &obj = entry.first->second;
 
 			// for each external symbol
 			for (const std::string &external : obj.ExternalSymbols)
@@ -1002,24 +1004,24 @@ namespace CSX64
 				// add externals to local scope //
 
 				// if obj already has a symbol of the same name
-				if (ContainsKey(obj.Symbols, external)) return {LinkError::SymbolRedefinition, "Object file defined external symbol \"" + external + "\""};
+				if (ContainsKey(obj.Symbols, external)) return {LinkError::SymbolRedefinition, entry.first->first + ": defined external symbol \"" + external + "\""};
 				// otherwise define it as a local in obj
-				else obj.Symbols.emplace(external, global_to_obj.at(external)->Symbols.at(external));
+				else obj.Symbols.emplace(external, global_to_obj.at(external)->second.Symbols.at(external));
 			}
 		}
-
+		
 		// -- patch things -- //
 
 		// for each object file
 		for (auto &entry : included)
 		{
 			// alias object file
-			ObjectFile &obj = *entry.first;
+			ObjectFile &obj = entry.first->second;
 
 			// patch all the holes
-			if (!_FixAllHoles(obj.Symbols, obj.TextHoles, text, res)) return res;
-			if (!_FixAllHoles(obj.Symbols, obj.RodataHoles, rodata, res)) return res;
-			if (!_FixAllHoles(obj.Symbols, obj.DataHoles, data, res)) return res;
+			if (!_FixAllHoles(obj.Symbols, obj.TextHoles, text, res)) return {res.Error, entry.first->first + ":\n" + res.ErrorMsg};
+			if (!_FixAllHoles(obj.Symbols, obj.RodataHoles, rodata, res)) return { res.Error, entry.first->first + ":\n" + res.ErrorMsg };
+			if (!_FixAllHoles(obj.Symbols, obj.DataHoles, data, res)) return { res.Error, entry.first->first + ":\n" + res.ErrorMsg };
 		}
 
 		// -- finalize things -- //

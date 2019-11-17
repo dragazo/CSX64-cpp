@@ -3,6 +3,8 @@
 
 #include <string>
 #include <vector>
+#include <list>
+#include <utility>
 #include <unordered_map>
 #include <unordered_set>
 
@@ -101,7 +103,7 @@ namespace CSX64
 		std::vector<BinaryLiteral> literals;
 		std::vector<std::vector<u8>> top_level_literals;
 
-		friend LinkResult Link(Executable &exe, std::vector<ObjectFile> &objs, const std::string &entry_point);
+		friend LinkResult Link(Executable &exe, std::list<std::pair<std::string, ObjectFile>> &objs, const std::string &entry_point);
 
 	private: // -- utility -- //
 
@@ -295,7 +297,7 @@ namespace CSX64
 	/// <param name="objs">the object files to link. should all be clean. the first item in this array is the _start file</param>
 	/// <param name="entry_point">the raw starting file</param>
 	/// <exception cref="ArgumentException"></exception>
-	LinkResult Link(Executable &exe, std::vector<ObjectFile> &objs, const std::string &entry_point = "main");
+	LinkResult Link(Executable &exe, std::list<std::pair<std::string, ObjectFile>> &objs, const std::string &entry_point = "main");
 }
 
 #endif

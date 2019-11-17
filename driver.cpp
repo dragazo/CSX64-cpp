@@ -2,6 +2,7 @@
 #include <fstream>
 #include <utility>
 #include <vector>
+#include <list>
 #include <string>
 #include <cstdlib>
 #include <chrono>
@@ -299,7 +300,7 @@ int LoadObjectFile(const std::string &path, ObjectFile &obj)
 // Loads the .o (obj) files from a directory and adds them to the list.
 // objs - the resulting list of object files (new entries appended to the end).
 // path - the directory to load.
-int LoadObjectFileDir(std::vector<ObjectFile> &objs, const std::string &path)
+int LoadObjectFileDir(std::list<std::pair<std::string, ObjectFile>> &objs, const std::string &path)
 {
 	std::error_code err;
 	fs::file_status stat = fs::status(path, err);
@@ -314,7 +315,9 @@ int LoadObjectFileDir(std::vector<ObjectFile> &objs, const std::string &path)
 		std::string f_path = entry.path().string();
 		if (EndsWith(f_path, ".o"))
 		{
-			int ret = LoadObjectFile(f_path, objs.emplace_back());
+			auto &obj = objs.emplace_back();
+			obj.first = f_path;
+			int ret = LoadObjectFile(f_path, obj.second);
 			if (ret != 0) return ret;
 		}
 	}
@@ -359,7 +362,7 @@ int Assemble(const std::string &file, ObjectFile &dest)
 // Loads the stdlib object files and appends them to the end of the list.
 // objs    - the destination for storing loaded stdlib object files (appended to end).
 // rootdir - the root directory to use for core file lookup - null for default.
-int LoadStdlibObjs(std::vector<ObjectFile> &objs, const char *rootdir)
+int LoadStdlibObjs(std::list<std::pair<std::string, ObjectFile>> &objs, const char *rootdir)
 {
 	// get exe directory - default to provided root dir if present
 	const char *dir = rootdir ? rootdir : exe_dir();
@@ -378,7 +381,9 @@ int LoadStdlibObjs(std::vector<ObjectFile> &objs, const char *rootdir)
 	}
 
 	// load the _start file
-	int ret = LoadObjectFile(dir + (std::string)"/_start.o", objs.emplace_back());
+	auto &obj = objs.emplace_back();
+	obj.first = dir + (std::string)"/_start.o";
+	int ret = LoadObjectFile(obj.first, obj.second);
 	if (ret != 0) return ret;
 
 	// then load the stdlib files
@@ -392,7 +397,7 @@ int LoadStdlibObjs(std::vector<ObjectFile> &objs, const char *rootdir)
 // rootdir     - the root directory to use for core file lookup - null for default.
 int Link(Executable &dest, const std::vector<std::string> &files, const std::string &entry_point, const char *rootdir)
 {
-	std::vector<ObjectFile> objs;
+	std::list<std::pair<std::string, ObjectFile>> objs;
 
 	// load the stdlib files
 	int ret = LoadStdlibObjs(objs, rootdir);
@@ -402,7 +407,9 @@ int Link(Executable &dest, const std::vector<std::string> &files, const std::str
 	for (const std::string &file : files)
 	{
 		// treat ".o" as object file, otherwise as assembly source
-		ret = EndsWith(file, ".o") ? LoadObjectFile(file, objs.emplace_back()) : Assemble(file, objs.emplace_back());
+		auto &obj = objs.emplace_back();
+		obj.first = file;
+		ret = EndsWith(file, ".o") ? LoadObjectFile(file, obj.second) : Assemble(file, obj.second);
 		if (ret != 0) return ret;
 	}
 
