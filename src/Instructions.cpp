@@ -3293,7 +3293,7 @@ namespace CSX64
             {
                 if ((mask & 1) != 0)
                 {
-                    if (!SetMemRaw(m, Size(elem_sizecode), ZMMRegisters[reg].uint((int)elem_sizecode, i))) return false;
+                    if (!SetMemRaw(m, Size(elem_sizecode), ZMMRegisters[reg].uint(elem_sizecode, i))) return false;
                 }
                 else if (zmask && !SetMemRaw(m, Size(elem_sizecode), 0)) return false;
             }

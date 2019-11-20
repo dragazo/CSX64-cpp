@@ -205,9 +205,12 @@ namespace CSX64
 
 		&Computer::TryProcessVEC_CVT,
 
+		// -- misc -- //
+
+		&Computer::TryProcessTRANS,
+
 		// -- unused opcodes -- //
 
-		&Computer::ProcessUNKNOWN,
 		&Computer::ProcessUNKNOWN,
 		&Computer::ProcessUNKNOWN,
 		&Computer::ProcessUNKNOWN,
