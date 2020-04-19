@@ -42,7 +42,7 @@ namespace CSX64
 	// -- extra type info -- //
 
 	// true if long double has greater precision than double
-	constexpr bool ld_is_extended_fp = sizeof(long double) * CHAR_BIT > 64;
+	inline constexpr bool ld_is_extended_fp = sizeof(long double) * CHAR_BIT > 64;
 
 	// ---------------------------------------
 
@@ -78,6 +78,8 @@ namespace CSX64
 		BSx, TZCNT,
 
 		UD,
+
+		IO,
 
 		// x87 instructions
 

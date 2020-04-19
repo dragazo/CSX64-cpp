@@ -2582,6 +2582,69 @@ bool AssembleArgs::TryProcessBSx(OPCode opcode, bool forward)
 	return true;
 }
 
+bool AssembleArgs::TryProcessIN(OPCode op)
+{
+	if (args.size() != 2) { res = {AssembleError::ArgCount, "line " + tostr(line) + ": Expected 2 operands"}; return false; }
+
+	if (!TryAppendByte((u8)op)) return false;
+
+	u64 reg, sizecode, t_sizecode;
+	bool high, explicit_size, strict;
+	Expr expr;
+
+	if (!TryParseCPURegister(args[0], reg, sizecode, high) || reg != 0) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Expected RAX partition as first arg"}; return false; }
+	if (high) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Use of AH not supported"}; return false; }
+
+	if (TryParseCPURegister(args[1], reg, t_sizecode, high))
+	{
+		if (reg != 3 || t_sizecode != 1) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Only DX register is supported as second arg"}; return false; }
+
+		if (!TryAppendByte((u8)((sizecode << 6) | 0 | 1))) return false;
+	}
+	else if (TryParseImm(args[1], expr, t_sizecode, explicit_size, strict))
+	{
+		if (explicit_size) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Explicit size specifier in this context is not allowed"}; return false; }
+		if (strict) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Strict specifier in this context is not allowed"}; return false; }
+
+		if (!TryAppendByte((u8)((sizecode << 6) | 0 | 0))) return false;
+		if (!TryAppendExpr(1, std::move(expr))) return false;
+	}
+	else { res = {AssembleError::UsageError, "line " + tostr(line) + ": Failed to parse second arg as CPU register or IMM"}; return false; }
+
+	return true;
+}
+bool AssembleArgs::TryProcessOUT(OPCode op)
+{
+	if (args.size() != 2) { res = { AssembleError::ArgCount, "line " + tostr(line) + ": Expected 2 operands" }; return false; }
+
+	if (!TryAppendByte((u8)op)) return false;
+
+	u64 reg, sizecode, t_sizecode;
+	bool high, explicit_size, strict;
+	Expr expr;
+
+	if (!TryParseCPURegister(args[1], reg, sizecode, high) || reg != 0) { res = { AssembleError::UsageError, "line " + tostr(line) + ": Expected RAX partition as second arg" }; return false; }
+	if (high) { res = { AssembleError::UsageError, "line " + tostr(line) + ": Use of AH not supported" }; return false; }
+
+	if (TryParseCPURegister(args[0], reg, t_sizecode, high))
+	{
+		if (reg != 3 || t_sizecode != 1) { res = { AssembleError::UsageError, "line " + tostr(line) + ": Only DX register is supported as first arg" }; return false; }
+
+		if (!TryAppendByte((u8)((sizecode << 6) | 2 | 1))) return false;
+	}
+	else if (TryParseImm(args[0], expr, t_sizecode, explicit_size, strict))
+	{
+		if (explicit_size) { res = { AssembleError::UsageError, "line " + tostr(line) + ": Explicit size specifier in this context is not allowed" }; return false; }
+		if (strict) { res = { AssembleError::UsageError, "line " + tostr(line) + ": Strict specifier in this context is not allowed" }; return false; }
+
+		if (!TryAppendByte((u8)((sizecode << 6) | 2 | 0))) return false;
+		if (!TryAppendExpr(1, std::move(expr))) return false;
+	}
+	else { res = { AssembleError::UsageError, "line " + tostr(line) + ": Failed to parse first arg as CPU register or IMM" }; return false; }
+
+	return true;
+}
+
 bool AssembleArgs::TryProcessFPUBinaryOp(OPCode opcode, bool integral, bool pop)
 {
 	// write op code

@@ -1,12 +1,11 @@
-#include <experimental/filesystem>
+#include <filesystem>
 #include <memory>
 #include <cstdio>
 #include <sstream>
 
 #include "../include/Computer.h"
 
-// !! CHANGE THIS ONCE VISUAL STUDIO IS UPDATED !! //
-namespace fs = std::experimental::filesystem;
+namespace fs = std::filesystem;
 
 // -- Syscall -- //
 

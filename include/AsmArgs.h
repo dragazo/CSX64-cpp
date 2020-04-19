@@ -27,7 +27,7 @@ namespace CSX64
 		std::string last_nonlocal_label;
 
 		std::string label_def;
-		i64 times, times_i; // the TIMES upper bound and current loop index (i)
+		i64 times = 0, times_i = 0; // the TIMES upper bound and current loop index (i)
 		std::string op;
 		std::vector<std::string> args; // must be array for ref params
 
@@ -216,6 +216,9 @@ namespace CSX64
 		bool TryProcessLOCK();
 
 		bool TryProcessBSx(OPCode op, bool forward);
+
+		bool TryProcessIN(OPCode op);
+		bool TryProcessOUT(OPCode op);
 
 		// -- x87 op formats -- //
 

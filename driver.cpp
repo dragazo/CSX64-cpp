@@ -7,7 +7,7 @@
 #include <cstdlib>
 #include <chrono>
 #include <unordered_map>
-#include <experimental/filesystem>
+#include <filesystem>
 
 #include "include/CoreTypes.h"
 #include "include/Computer.h"
@@ -16,7 +16,7 @@
 
 using namespace CSX64;
 
-namespace fs = std::experimental::filesystem;
+namespace fs = std::filesystem;
 
 // Represents a desired action
 enum class ProgramAction

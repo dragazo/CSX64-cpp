@@ -628,6 +628,9 @@ namespace CSX64
 
 	{"UD", [](AssembleArgs &args) { return args.TryProcessNoArgOp(OPCode::UD); }},
 
+	{ "IN", [](AssembleArgs &args) { return args.TryProcessIN(OPCode::IO); } },
+	{ "OUT", [](AssembleArgs &args) { return args.TryProcessOUT(OPCode::IO); } },
+
 	// --------- //
 
 	// -- x87 -- //

@@ -114,6 +114,8 @@ namespace CSX64
 
 		&Computer::ProcessUD,
 
+		&Computer::ProcessIO,
+
 		// -- x87 instructions -- //
 
 		&Computer::ProcessNOP,
@@ -211,7 +213,6 @@ namespace CSX64
 
 		// -- unused opcodes -- //
 
-		&Computer::ProcessUNKNOWN,
 		&Computer::ProcessUNKNOWN,
 		&Computer::ProcessUNKNOWN,
 		&Computer::ProcessUNKNOWN,

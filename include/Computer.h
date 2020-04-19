@@ -273,7 +273,16 @@ namespace CSX64
 
 	protected: // -- virtual functions -- //
 
+		// this is what handles syscalls from client code.
+		// you can overload this to add your own, but for the sake of users should preserve pre-existing syscall behavior.
 		virtual bool ProcessSYSCALL();
+
+		// these handle raw IO port data transfers
+		// port is the IO port to use
+		// dest/value hold the values to read/write from/to.
+		// sizecode specifies transaction size (0=8 bit, 1=16 bit, 2=32 bit, 3=64 bit).
+		virtual bool Input(u64 port, u64 &dest, u64 sizecode) { dest = 0; return true; }
+		virtual bool Output(u64 port, u64 value, u64 sizecode) { return true; }
 
 	private: // -- syscall functions -- //
 
@@ -813,7 +822,7 @@ namespace CSX64
 		bool ProcessNOP() { return true; }
 		bool ProcessHLT() { Terminate(ErrorCode::Abort); return true; }
 
-		static constexpr u64 ModifiableFlags = 0x003f0fd5ul;
+		static inline constexpr u64 ModifiableFlags = 0x003f0fd5ul;
 
 		bool ProcessSTLDF();
 
@@ -913,6 +922,8 @@ namespace CSX64
 		bool ProcessTZCNT();
 
 		bool ProcessUD();
+
+		bool ProcessIO();
 
 		// -- floating point stuff -- //
 

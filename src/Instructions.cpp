@@ -981,7 +981,7 @@ namespace CSX64
         case 3:
         {
             auto _res = (BiggerInts::uint_t<128>)RAX() * (BiggerInts::uint_t<128>)a;
-            RDX() = _res.high; RAX() = _res.low;
+            RDX() = _res.blocks[1]; RAX() = _res.blocks[0];
             CF() = OF() = RDX() != 0;
             break;
         }
@@ -1006,7 +1006,7 @@ namespace CSX64
         case 3:
         {
             auto _res = (BiggerInts::uint_t<128>)a * (BiggerInts::uint_t<128>)b;
-            CPURegisters[s1 >> 4].x64() = _res.high; CPURegisters[s2 & 15].x64() = _res.low;
+            CPURegisters[s1 >> 4].x64() = _res.blocks[1]; CPURegisters[s2 & 15].x64() = _res.blocks[0];
             break;
         }
 
@@ -1060,7 +1060,7 @@ namespace CSX64
         case 3:
         {
             auto _res = (BiggerInts::int_t<128>)(i64)RAX() * (BiggerInts::int_t<128>)a;
-            RDX() = _res.high; RAX() = _res.low;
+            RDX() = _res.blocks[1]; RAX() = _res.blocks[0];
             CF() = OF() = _res != (i64)_res;
             break;
         }
@@ -1183,7 +1183,7 @@ namespace CSX64
             break;
         case 3:
         {
-            BiggerInts::uint_t<128> Full; Full.high = RDX(); Full.low = RAX();
+            BiggerInts::uint_t<128> Full; Full.blocks[1] = RDX(); Full.blocks[0] = RAX();
             auto divmod = BiggerInts::divmod(Full, (BiggerInts::uint_t<128>)a);
             if (divmod.first != (u64)divmod.first) { Terminate(ErrorCode::ArithmeticError); return false; }
             RAX() = (u64)divmod.first; RDX() = (u64)divmod.second;
@@ -1231,7 +1231,7 @@ namespace CSX64
             break;
         case 3:
         {
-            BiggerInts::int_t<128> Full; Full.high = RDX(); Full.low = RAX();
+            BiggerInts::int_t<128> Full; Full.blocks[1] = RDX(); Full.blocks[0] = RAX();
             auto divmod = BiggerInts::divmod(Full, (BiggerInts::int_t<128>)a);
             if (divmod.first != (i64)divmod.first) { Terminate(ErrorCode::ArithmeticError); return false; }
             RAX() = (u64)divmod.first; RDX() = (u64)divmod.second;
@@ -2323,6 +2323,31 @@ namespace CSX64
         return false;
     }
 
+    /*
+    [2: sizecode][2:][2:][1: in 0 / out 1][1: dx]
+        dx = 0:
+        dx = 1: [8: port]
+    */
+    bool Computer::ProcessIO()
+    {
+        u64 s, port;
+        if (!GetMemAdv<u8>(s)) return false;
+
+        if (s & 1) port = DX();
+        else if (!GetMemAdv<u8>(port)) return false;
+
+        if (s & 2)
+        {
+            if (!Input(port, port, s >> 6)) return false;
+            CPURegisters[0][s >> 6] = port;
+            return true;
+        }
+        else
+        {
+            return Output(port, CPURegisters[0][s >> 6], s >> 6);
+        }
+    }
+
     // -----------------------------------------------------------
 
     bool Computer::FINIT()
@@ -2844,8 +2869,8 @@ namespace CSX64
         long double a = ST(0);
         long double b = ST(1);
 
-        // compute remainder with truncated quotient
-        long double res = a - (i64)(a / b) * b;
+        // compute remainder with truncation
+		long double res = std::fmod(a, b);
 
         // store value
         ST(0) = res;
@@ -2867,10 +2892,8 @@ namespace CSX64
         long double a = ST(0);
         long double b = ST(1);
 
-        // compute remainder with rounded quotient (IEEE)
-        long double q = a / b;
-        std::fesetround(FE_TONEAREST);
-        long double res = a - std::nearbyintl(q) * b;
+        // compute remainder with rounding
+		long double res = std::remainder(a, b);
 
         // store value
         ST(0) = res;
@@ -3078,9 +3101,9 @@ namespace CSX64
             if ((s & 128) == 0) { Terminate(ErrorCode::ArithmeticError); return false; }
             x = y = z = true;
         }
-
+		
         // eflags
-        if (s == 11 || s == 12)
+        if ((s & 15) == 11 || (s & 15) == 12)
         {
             ZF() = x;
             PF() = y;
