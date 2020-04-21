@@ -1,28 +1,27 @@
-#include "../include/Utility.h"
+#include <climits>
+#include <iomanip>
 
+#include "../include/Utility.h"
 #include "../ios-frstor/iosfrstor.h"
 
 namespace CSX64
 {
-	// -- arch encoding helpers -- //
+	// -- assertions -- //
 
-	bool IsLittleEndian()
-	{
-		u64 val = 0x0102030405060708;
-		u8 arr[] = { 8, 7, 6, 5, 4, 3, 2, 1 };
-		return std::memcmp(&val, arr, 8) == 0;
-	}
+	static_assert(std::endian::native == std::endian::little || std::endian::native == std::endian::big, "mixed endian systems are not currently supported");
+	static_assert(CHAR_BIT == 8, "only 8-bit byte systems are currently supported");
+	static_assert(sizeof(u8) == 1, "u8 is not size 1");
 
 	// -- serialization -- //
 
-	std::ostream &BinWrite(std::ostream &ostr, const char *p, std::size_t count)
+	std::ostream &BinWrite(std::ostream &ostr, const void *p, std::size_t count)
 	{
-		ostr.write(p, count);
+		ostr.write(reinterpret_cast<const char*>(p), count);
 		return ostr;
 	}
-	std::istream &BinRead(std::istream &istr, char *p, std::size_t count)
+	std::istream &BinRead(std::istream &istr, void *p, std::size_t count)
 	{
-		istr.read(p, count);
+		istr.read(reinterpret_cast<char*>(p), count);
 		if ((std::size_t)istr.gcount() != count) istr.setstate(std::ios::failbit);
 		return istr;
 	}
@@ -32,48 +31,18 @@ namespace CSX64
 		u16 len = (u16)str.size();
 		if (len != str.size()) throw std::invalid_argument("BinWrite(std::string): string was too long");
 
-		BinWrite(ostr, len);
+		write<u16>(ostr, len);
 		return BinWrite(ostr, str.data(), len);
 	}
 	std::istream &BinRead(std::istream &istr, std::string &str)
 	{
 		u16 len;
-		BinRead(istr, len);
+		read<u16>(istr, len);
 		str.resize(len);
 		return BinRead(istr, str.data(), len);
 	}
 
 	// -- memory utilities -- //
-
-	void *aligned_malloc(std::size_t size, std::size_t align)
-	{
-		// calling with 0 yields nullptr
-		if (size == 0) return nullptr;
-
-		// allocate enough space for a void*, padding, and the array
-		size += sizeof(void*) + align - 1;
-
-		// grab that much space - if that fails, return null
-		void *raw = std::malloc(size);
-		if (!raw) return nullptr;
-
-		// get the pointer to return (before alignment)
-		void *ret = reinterpret_cast<char*>(raw) + sizeof(void*);
-
-		// align the return pointer
-		ret = reinterpret_cast<char*>(ret) + (-(std::intptr_t)ret & (align - 1));
-
-		// store the raw pointer before start of ret array
-		reinterpret_cast<void**>(ret)[-1] = raw; // aliasing is safe because only we (should) ever modify it
-
-		// return ret pointer
-		return ret;
-	}
-	void aligned_free(void *ptr)
-	{
-		// free the raw pointer (freeing nullptr does nothing)
-		if (ptr) std::free(reinterpret_cast<void**>(ptr)[-1]); // aliasing is safe because only we (should) ever modify it
-	}
 
 	bool Write(std::vector<u8> &arr, u64 pos, u64 size, u64 val)
 	{
@@ -81,9 +50,9 @@ namespace CSX64
 		if (pos >= arr.size() || pos + size > arr.size()) return false;
 
 		// write the value (little-endian)
-		for (int i = 0; i < (int)size; ++i)
+		for (std::size_t i = 0; i < size; ++i)
 		{
-			arr[pos + i] = (u8)val;
+			arr[(std::size_t)pos + i] = (u8)val;
 			val >>= 8;
 		}
 
@@ -96,8 +65,8 @@ namespace CSX64
 
 		// read the value (little-endian)
 		res = 0;
-		for (int i = (int)size - 1; i >= 0; --i)
-			res = (res << 8) | arr[pos + i];
+		for (std::size_t i = (std::size_t)size; i-- > 0; )
+			res = (res << 8) | arr[(std::size_t)pos + i];
 
 		return true;
 	}

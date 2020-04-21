@@ -68,7 +68,7 @@ namespace CSX64
 		void CacheResult(u64 result, bool floating);
 
 		// helper function for Evaluate()
-		bool __Evaluate__(std::unordered_map<std::string, Expr> &symbols, u64 &res, bool &floating, std::string &err, std::vector<std::string> &visited);
+		bool _Evaluate(std::unordered_map<std::string, Expr> &symbols, u64 &res, bool &floating, std::string &err, std::vector<std::string> &visited);
 
 		// helper function for the FindPath() variants
 		bool _FindPath(const std::string &value, std::vector<Expr*> &path, bool upper);

@@ -72,10 +72,10 @@ namespace CSX64
 		const u8 *content() const& noexcept { return _content.data(); }
 		const u8 *content() && noexcept = delete;
 		// gets the size of the content array
-		std::size_t content_size() const noexcept { return _content.size(); }
+		u64 content_size() const noexcept { return _content.size(); }
 
 		// returns the total size of all segments (including bss) (>= content_size)
-		std::size_t total_size() const noexcept { return _content.size() + _seglens[3]; }
+		u64 total_size() const noexcept { return _content.size() + _seglens[3]; }
 
 	public: // -- IO -- //
 

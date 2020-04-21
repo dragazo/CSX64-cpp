@@ -32,20 +32,20 @@ namespace CSX64
 
 	std::ostream &HoleData::WriteTo(std::ostream &writer, const HoleData &hole)
 	{
-		BinWrite(writer, hole.Address);
-		BinWrite(writer, hole.Size);
+		write<u64>(writer, hole.Address);
+		write<u8>(writer, hole.Size);
 
-		BinWrite(writer, hole.Line);
+		write<u32>(writer, (u32)hole.Line);
 		Expr::WriteTo(writer, hole.expr);
 
 		return writer;
 	}
 	std::istream &HoleData::ReadFrom(std::istream &reader, HoleData &hole)
 	{
-		BinRead(reader, hole.Address);
-		BinRead(reader, hole.Size);
+		read<u64>(reader, hole.Address);
+		read<u8>(reader, hole.Size);
 
-		BinRead(reader, hole.Line);
+		read<u32>(reader, hole.Line);
 		Expr::ReadFrom(reader, hole.expr);
 
 		return reader;
@@ -91,24 +91,24 @@ namespace CSX64
 
 		// -- write obj_header and CSX64 version number -- //
 
-		BinWrite(file, reinterpret_cast<const char*>(obj_header), sizeof(obj_header));
-		BinWrite(file, Version);
+		BinWrite(file, obj_header, sizeof(obj_header));
+		write<u64>(file, Version);
 
 		// -- write globals -- //
 
-		BinWrite<u64>(file, GlobalSymbols.size());
+		write<u64>(file, (u64)GlobalSymbols.size());
 		for (const std::string &symbol : GlobalSymbols)
 			BinWrite(file, symbol);
 		
 		// -- write externals -- //
 
-		BinWrite<u64>(file, ExternalSymbols.size());
+		write<u64>(file, (u64)ExternalSymbols.size());
 		for (const std::string &symbol : ExternalSymbols)
 			BinWrite(file, symbol);
 
 		// -- write symbols -- //
 
-		BinWrite<u64>(file, Symbols.size());
+		write<u64>(file, (u64)Symbols.size());
 		for(const auto &entry : Symbols)
 		{
 			BinWrite(file, entry.first);
@@ -117,34 +117,34 @@ namespace CSX64
 		
 		// -- write alignments -- //
 
-		BinWrite(file, TextAlign);
-		BinWrite(file, RodataAlign);
-		BinWrite(file, DataAlign);
-		BinWrite(file, BSSAlign);
+		write<u32>(file, TextAlign);
+		write<u32>(file, RodataAlign);
+		write<u32>(file, DataAlign);
+		write<u32>(file, BSSAlign);
 
 		// -- write segment holes -- //
 
-		BinWrite<u64>(file, TextHoles.size());
+		write<u64>(file, (u64)TextHoles.size());
 		for (const HoleData &hole : TextHoles) HoleData::WriteTo(file, hole);
 
-		BinWrite<u64>(file, RodataHoles.size());
+		write<u64>(file, (u64)RodataHoles.size());
 		for (const HoleData &hole : RodataHoles) HoleData::WriteTo(file, hole);
 
-		BinWrite<u64>(file, DataHoles.size());
+		write<u64>(file, (u64)DataHoles.size());
 		for (const HoleData &hole : DataHoles) HoleData::WriteTo(file, hole);
 		
 		// -- write segments -- //
 
-		BinWrite<u64>(file, Text.size());
-		BinWrite(file, reinterpret_cast<const char*>(Text.data()), Text.size());
+		write<u64>(file, (u64)Text.size());
+		BinWrite(file, Text.data(), Text.size());
 
-		BinWrite<u64>(file, Rodata.size());
-		BinWrite(file, reinterpret_cast<const char*>(Rodata.data()), Rodata.size());
+		write<u64>(file, (u64)Rodata.size());
+		BinWrite(file, Rodata.data(), Rodata.size());
 
-		BinWrite<u64>(file, Data.size());
-		BinWrite(file, reinterpret_cast<const char*>(Data.data()), Data.size());
+		write<u64>(file, (u64)Data.size());
+		BinWrite(file, Data.data(), Data.size());
 		
-		BinWrite<u64>(file, BssLen);
+		write<u64>(file, (u64)BssLen);
 
 		// -- write binary literals -- //
 
@@ -167,7 +167,7 @@ namespace CSX64
 		std::string str;
 		Expr expr;
 		HoleData hole;
-		char header_temp[sizeof(obj_header)];
+		u8 header_temp[sizeof(obj_header)];
 
 		// -- file validation -- //
 
@@ -179,17 +179,18 @@ namespace CSX64
 		}
 
 		// read the version number and make sure it matches - match failure is a version error, not a format error
-		if (!BinRead(file, val)) goto err;
+		if (!read<u64>(file, val)) goto err;
 		if (val != Version)
 		{
-			throw VersionError("Executable was from an incompatible version of CSX64");
+			throw VersionError("File was from an incompatible version of CSX64");
 		}
 
 		// -- read globals -- //
 
-		if (!BinRead(file, val)) goto err;
+		if (!read<u64>(file, val)) goto err;
+		if constexpr (std::numeric_limits<std::size_t>::max() < std::numeric_limits<u64>::max()) { if (val != (std::size_t)val) throw MemoryAllocException("File contents too large"); }
 		GlobalSymbols.clear();
-		GlobalSymbols.reserve(val);
+		GlobalSymbols.reserve((std::size_t)val);
 		for (u64 i = 0; i < val; ++i)
 		{
 			if (!BinRead(file, str)) goto err;
@@ -198,9 +199,10 @@ namespace CSX64
 
 		// -- read externals -- //
 
-		if (!BinRead(file, val)) goto err;
+		if (!read<u64>(file, val)) goto err;
+		if constexpr (std::numeric_limits<std::size_t>::max() < std::numeric_limits<u64>::max()) { if (val != (std::size_t)val) throw MemoryAllocException("File contents too large"); }
 		ExternalSymbols.clear();
-		ExternalSymbols.reserve(val);
+		ExternalSymbols.reserve((std::size_t)val);
 		for (u64 i = 0; i < val; ++i)
 		{
 			if (!BinRead(file, str)) goto err;
@@ -209,9 +211,10 @@ namespace CSX64
 
 		// -- read symbols -- //
 
-		if (!BinRead(file, val)) goto err;
+		if (!read<u64>(file, val)) goto err;
+		if constexpr (std::numeric_limits<std::size_t>::max() < std::numeric_limits<u64>::max()) { if (val != (std::size_t)val) throw MemoryAllocException("File contents too large"); }
 		Symbols.clear();
-		Symbols.reserve(val);
+		Symbols.reserve((std::size_t)val);
 		for (u64 i = 0; i < val; ++i)
 		{
 			if (!BinRead(file, str)) goto err;
@@ -221,34 +224,37 @@ namespace CSX64
 
 		// -- read alignments -- //
 
-		if (!BinRead(file, TextAlign) || !IsPowerOf2(TextAlign)) goto err;
-		if (!BinRead(file, RodataAlign) || !IsPowerOf2(RodataAlign)) goto err;
-		if (!BinRead(file, DataAlign) || !IsPowerOf2(DataAlign)) goto err;
-		if (!BinRead(file, BSSAlign) || !IsPowerOf2(BSSAlign)) goto err;
+		if (!read<u32>(file, TextAlign) || !IsPowerOf2(TextAlign)) goto err;
+		if (!read<u32>(file, RodataAlign) || !IsPowerOf2(RodataAlign)) goto err;
+		if (!read<u32>(file, DataAlign) || !IsPowerOf2(DataAlign)) goto err;
+		if (!read<u32>(file, BSSAlign) || !IsPowerOf2(BSSAlign)) goto err;
 
 		// -- read segment holes -- //
 
-		if (!BinRead(file, val)) goto err;
+		if (!read<u64>(file, val)) goto err;
+		if constexpr (std::numeric_limits<std::size_t>::max() < std::numeric_limits<u64>::max()) { if (val != (std::size_t)val) throw MemoryAllocException("File contents too large"); }
 		TextHoles.clear();
-		TextHoles.reserve(val);
+		TextHoles.reserve((std::size_t)val);
 		for (u64 i = 0; i < val; ++i)
 		{
 			if (!HoleData::ReadFrom(file, hole)) goto err;
 			TextHoles.emplace_back(std::move(hole));
 		}
 
-		if (!BinRead(file, val)) goto err;
+		if (!read<u64>(file, val)) goto err;
+		if constexpr (std::numeric_limits<std::size_t>::max() < std::numeric_limits<u64>::max()) { if (val != (std::size_t)val) throw MemoryAllocException("File contents too large"); }
 		RodataHoles.clear();
-		RodataHoles.reserve(val);
+		RodataHoles.reserve((std::size_t)val);
 		for (u64 i = 0; i < val; ++i)
 		{
 			if (!HoleData::ReadFrom(file, hole)) goto err;
 			RodataHoles.emplace_back(std::move(hole));
 		}
 
-		if (!BinRead(file, val)) goto err;
+		if (!read<u64>(file, val)) goto err;
+		if constexpr (std::numeric_limits<std::size_t>::max() < std::numeric_limits<u64>::max()) { if (val != (std::size_t)val) throw MemoryAllocException("File contents too large"); }
 		DataHoles.clear();
-		DataHoles.reserve(val);
+		DataHoles.reserve((std::size_t)val);
 		for (u64 i = 0; i < val; ++i)
 		{
 			if (!HoleData::ReadFrom(file, hole)) goto err;
@@ -257,22 +263,25 @@ namespace CSX64
 
 		// -- read segments -- //
 
-		if (!BinRead(file, val)) goto err;
+		if (!read<u64>(file, val)) goto err;
+		if constexpr (std::numeric_limits<std::size_t>::max() < std::numeric_limits<u64>::max()) { if (val != (std::size_t)val) throw MemoryAllocException("File contents too large"); }
 		Text.clear();
-		Text.resize(val);
-		if (!BinRead(file, reinterpret_cast<char*>(Text.data()), val)) goto err;
+		Text.resize((std::size_t)val);
+		if (!BinRead(file, Text.data(), (std::size_t)val)) goto err;
 
-		if (!BinRead(file, val)) goto err;
+		if (!read<u64>(file, val)) goto err;
+		if constexpr (std::numeric_limits<std::size_t>::max() < std::numeric_limits<u64>::max()) { if (val != (std::size_t)val) throw MemoryAllocException("File contents too large"); }
 		Rodata.clear();
-		Rodata.resize(val);
-		if (!BinRead(file, reinterpret_cast<char*>(Rodata.data()), val)) goto err;
+		Rodata.resize((std::size_t)val);
+		if (!BinRead(file, Rodata.data(), (std::size_t)val)) goto err;
 
-		if (!BinRead(file, val)) goto err;
+		if (!read<u64>(file, val)) goto err;
+		if constexpr (std::numeric_limits<std::size_t>::max() < std::numeric_limits<u64>::max()) { if (val != (std::size_t)val) throw MemoryAllocException("File contents too large"); }
 		Data.clear();
-		Data.resize(val);
-		if (!BinRead(file, reinterpret_cast<char*>(Data.data()), val)) goto err;
+		Data.resize((std::size_t)val);
+		if (!BinRead(file, Data.data(), (std::size_t)val)) goto err;
 
-		if (!BinRead(file, BssLen)) goto err;
+		if (!read<u64>(file, BssLen)) goto err;
 
 		// -- read binary literals -- //
 
@@ -751,7 +760,7 @@ namespace CSX64
 		// -- validate _start file -- //
 
 		// _start file must declare an external named "_start"
-		if (!Contains(objs.front().second.ExternalSymbols, "_start")) return LinkResult{LinkError::FormatError, "_start file must declare an external named \"_start\""};
+		if (!Contains(objs.front().second.ExternalSymbols, (std::string)"_start")) return LinkResult{LinkError::FormatError, "_start file must declare an external named \"_start\""};
 
 		// rename "_start" symbol in _start file to whatever the entry point is (makes _start dirty)
 		try { objs.front().second.make_dirty(); RenameSymbol(objs.front().second, "_start", entry_point); }
@@ -820,7 +829,7 @@ namespace CSX64
 		// -- merge things -- //
 
 		// while there are still things in queue
-		while (include_queue.size() > 0)
+		while (!include_queue.empty())
 		{
 			// get the object file we need to incorporate
 			std::pair<std::string, ObjectFile> *item = include_queue.front();

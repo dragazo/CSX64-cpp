@@ -124,7 +124,7 @@ namespace CSX64
 		_Floating = floating;
 	}
 
-	bool Expr::__Evaluate__(std::unordered_map<std::string, Expr> &symbols, u64 &res, bool &floating, std::string &err, std::vector<std::string> &visited)
+	bool Expr::_Evaluate(std::unordered_map<std::string, Expr> &symbols, u64 &res, bool &floating, std::string &err, std::vector<std::string> &visited)
 	{
 		Expr *expr;
 		const std::string *tok;
@@ -211,7 +211,7 @@ namespace CSX64
 				visited.push_back((*tok)); // mark token as visited
 
 				// if we can't evaluate it, fail
-				if (!expr->__Evaluate__(symbols, res, floating, err, visited)) { err = "Failed to evaluate referenced symbol \"" + (*tok) + "\"\n-> " + err; return false; }
+				if (!expr->_Evaluate(symbols, res, floating, err, visited)) { err = "Failed to evaluate referenced symbol \"" + (*tok) + "\"\n-> " + err; return false; }
 
 				visited.pop_back(); // unmark token (must be done for diamond expressions i.e. a=b+c, b=d, c=d, d=0)
 
@@ -223,8 +223,8 @@ namespace CSX64
 		// -- binary operators -- //
 
 		case OPs::Mul:
-			if (!Left->__Evaluate__(symbols, L, LF, err, visited)) ret = false;
-			if (!Right->__Evaluate__(symbols, R, RF, err, visited)) ret = false;
+			if (!Left->_Evaluate(symbols, L, LF, err, visited)) ret = false;
+			if (!Right->_Evaluate(symbols, R, RF, err, visited)) ret = false;
 			if (ret == false) return false;
 
 			if (LF || RF) { res = DoubleAsUInt64((LF ? AsDouble(L) : (i64)L) * (RF ? AsDouble(R) : (i64)R)); floating = true; }
@@ -232,8 +232,8 @@ namespace CSX64
 			break;
 
 		case OPs::UDiv:
-			if (!Left->__Evaluate__(symbols, L, LF, err, visited)) ret = false;
-			if (!Right->__Evaluate__(symbols, R, RF, err, visited)) ret = false;
+			if (!Left->_Evaluate(symbols, L, LF, err, visited)) ret = false;
+			if (!Right->_Evaluate(symbols, R, RF, err, visited)) ret = false;
 			if (ret == false) return false;
 
 			if (LF || RF)
@@ -256,8 +256,8 @@ namespace CSX64
 
 			break;
 		case OPs::UMod:
-			if (!Left->__Evaluate__(symbols, L, LF, err, visited)) ret = false;
-			if (!Right->__Evaluate__(symbols, R, RF, err, visited)) ret = false;
+			if (!Left->_Evaluate(symbols, L, LF, err, visited)) ret = false;
+			if (!Right->_Evaluate(symbols, R, RF, err, visited)) ret = false;
 			if (ret == false) return false;
 
 			if (LF || RF)
@@ -280,8 +280,8 @@ namespace CSX64
 			break;
 
 		case OPs::SDiv:
-			if (!Left->__Evaluate__(symbols, L, LF, err, visited)) ret = false;
-			if (!Right->__Evaluate__(symbols, R, RF, err, visited)) ret = false;
+			if (!Left->_Evaluate(symbols, L, LF, err, visited)) ret = false;
+			if (!Right->_Evaluate(symbols, R, RF, err, visited)) ret = false;
 			if (ret == false) return false;
 
 			if (LF || RF)
@@ -305,8 +305,8 @@ namespace CSX64
 
 			break;
 		case OPs::SMod:
-			if (!Left->__Evaluate__(symbols, L, LF, err, visited)) ret = false;
-			if (!Right->__Evaluate__(symbols, R, RF, err, visited)) ret = false;
+			if (!Left->_Evaluate(symbols, L, LF, err, visited)) ret = false;
+			if (!Right->_Evaluate(symbols, R, RF, err, visited)) ret = false;
 			if (ret == false) return false;
 
 			if (LF || RF)
@@ -329,16 +329,16 @@ namespace CSX64
 			break;
 
 		case OPs::Add:
-			if (!Left->__Evaluate__(symbols, L, LF, err, visited)) ret = false;
-			if (!Right->__Evaluate__(symbols, R, RF, err, visited)) ret = false;
+			if (!Left->_Evaluate(symbols, L, LF, err, visited)) ret = false;
+			if (!Right->_Evaluate(symbols, R, RF, err, visited)) ret = false;
 			if (ret == false) return false;
 
 			if (LF || RF) { res = DoubleAsUInt64((LF ? AsDouble(L) : (i64)L) + (RF ? AsDouble(R) : (i64)R)); floating = true; }
 			else res = L + R;
 			break;
 		case OPs::Sub:
-			if (!Left->__Evaluate__(symbols, L, LF, err, visited)) ret = false;
-			if (!Right->__Evaluate__(symbols, R, RF, err, visited)) ret = false;
+			if (!Left->_Evaluate(symbols, L, LF, err, visited)) ret = false;
+			if (!Right->_Evaluate(symbols, R, RF, err, visited)) ret = false;
 			if (ret == false) return false;
 
 			if (LF || RF) { res = DoubleAsUInt64((LF ? AsDouble(L) : (i64)L) - (RF ? AsDouble(R) : (i64)R)); floating = true; }
@@ -346,47 +346,47 @@ namespace CSX64
 			break;
 
 		case OPs::SL:
-			if (!Left->__Evaluate__(symbols, L, LF, err, visited)) ret = false;
-			if (!Right->__Evaluate__(symbols, R, RF, err, visited)) ret = false;
+			if (!Left->_Evaluate(symbols, L, LF, err, visited)) ret = false;
+			if (!Right->_Evaluate(symbols, R, RF, err, visited)) ret = false;
 			if (ret == false) return false;
 			
 			res = L << R; floating = LF || RF;
 			break;
 		case OPs::SR:
-			if (!Left->__Evaluate__(symbols, L, LF, err, visited)) ret = false;
-			if (!Right->__Evaluate__(symbols, R, RF, err, visited)) ret = false;
+			if (!Left->_Evaluate(symbols, L, LF, err, visited)) ret = false;
+			if (!Right->_Evaluate(symbols, R, RF, err, visited)) ret = false;
 			if (ret == false) return false;
 
 			res = L >> R; floating = LF || RF;
 			break;
 
 		case OPs::Less:
-			if (!Left->__Evaluate__(symbols, L, LF, err, visited)) ret = false;
-			if (!Right->__Evaluate__(symbols, R, RF, err, visited)) ret = false;
+			if (!Left->_Evaluate(symbols, L, LF, err, visited)) ret = false;
+			if (!Right->_Evaluate(symbols, R, RF, err, visited)) ret = false;
 			if (ret == false) return false;
 
 			if (LF || RF) res = (LF ? AsDouble(L) : (i64)L) < (RF ? AsDouble(R) : (i64)R) ? 1 : 0ul;
 			else res = (i64)L < (i64)R ? 1 : 0ul;
 			break;
 		case OPs::LessE:
-			if (!Left->__Evaluate__(symbols, L, LF, err, visited)) ret = false;
-			if (!Right->__Evaluate__(symbols, R, RF, err, visited)) ret = false;
+			if (!Left->_Evaluate(symbols, L, LF, err, visited)) ret = false;
+			if (!Right->_Evaluate(symbols, R, RF, err, visited)) ret = false;
 			if (ret == false) return false;
 
 			if (LF || RF) res = (LF ? AsDouble(L) : (i64)L) <= (RF ? AsDouble(R) : (i64)R) ? 1 : 0ul;
 			else res = (i64)L <= (i64)R ? 1 : 0ul;
 			break;
 		case OPs::Great:
-			if (!Left->__Evaluate__(symbols, L, LF, err, visited)) ret = false;
-			if (!Right->__Evaluate__(symbols, R, RF, err, visited)) ret = false;
+			if (!Left->_Evaluate(symbols, L, LF, err, visited)) ret = false;
+			if (!Right->_Evaluate(symbols, R, RF, err, visited)) ret = false;
 			if (ret == false) return false;
 
 			if (LF || RF) res = (LF ? AsDouble(L) : (i64)L) > (RF ? AsDouble(R) : (i64)R) ? 1 : 0ul;
 			else res = (i64)L > (i64)R ? 1 : 0ul;
 			break;
 		case OPs::GreatE:
-			if (!Left->__Evaluate__(symbols, L, LF, err, visited)) ret = false;
-			if (!Right->__Evaluate__(symbols, R, RF, err, visited)) ret = false;
+			if (!Left->_Evaluate(symbols, L, LF, err, visited)) ret = false;
+			if (!Right->_Evaluate(symbols, R, RF, err, visited)) ret = false;
 			if (ret == false) return false;
 
 			if (LF || RF) res = (LF ? AsDouble(L) : (i64)L) >= (RF ? AsDouble(R) : (i64)R) ? 1 : 0ul;
@@ -394,16 +394,16 @@ namespace CSX64
 			break;
 
 		case OPs::Eq:
-			if (!Left->__Evaluate__(symbols, L, LF, err, visited)) ret = false;
-			if (!Right->__Evaluate__(symbols, R, RF, err, visited)) ret = false;
+			if (!Left->_Evaluate(symbols, L, LF, err, visited)) ret = false;
+			if (!Right->_Evaluate(symbols, R, RF, err, visited)) ret = false;
 			if (ret == false) return false;
 
 			if (LF || RF) res = (LF ? AsDouble(L) : (i64)L) == (RF ? AsDouble(R) : (i64)R) ? 1 : 0ul;
 			else res = L == R ? 1 : 0ul;
 			break;
 		case OPs::Neq:
-			if (!Left->__Evaluate__(symbols, L, LF, err, visited)) ret = false;
-			if (!Right->__Evaluate__(symbols, R, RF, err, visited)) ret = false;
+			if (!Left->_Evaluate(symbols, L, LF, err, visited)) ret = false;
+			if (!Right->_Evaluate(symbols, R, RF, err, visited)) ret = false;
 			if (ret == false) return false;
 
 			if (LF || RF) res = (LF ? AsDouble(L) : (i64)L) != (RF ? AsDouble(R) : (i64)R) ? 1 : 0ul;
@@ -411,37 +411,37 @@ namespace CSX64
 			break;
 
 		case OPs::BitAnd:
-			if (!Left->__Evaluate__(symbols, L, LF, err, visited)) ret = false;
-			if (!Right->__Evaluate__(symbols, R, RF, err, visited)) ret = false;
+			if (!Left->_Evaluate(symbols, L, LF, err, visited)) ret = false;
+			if (!Right->_Evaluate(symbols, R, RF, err, visited)) ret = false;
 			if (ret == false) return false;
 
 			res = L & R; floating = LF || RF;
 			break;
 		case OPs::BitXor:
-			if (!Left->__Evaluate__(symbols, L, LF, err, visited)) ret = false;
-			if (!Right->__Evaluate__(symbols, R, RF, err, visited)) ret = false;
+			if (!Left->_Evaluate(symbols, L, LF, err, visited)) ret = false;
+			if (!Right->_Evaluate(symbols, R, RF, err, visited)) ret = false;
 			if (ret == false) return false;
 
 			res = L ^ R; floating = LF || RF;
 			break;
 		case OPs::BitOr:
-			if (!Left->__Evaluate__(symbols, L, LF, err, visited)) ret = false;
-			if (!Right->__Evaluate__(symbols, R, RF, err, visited)) ret = false;
+			if (!Left->_Evaluate(symbols, L, LF, err, visited)) ret = false;
+			if (!Right->_Evaluate(symbols, R, RF, err, visited)) ret = false;
 			if (ret == false) return false;
 
 			res = L | R; floating = LF || RF;
 			break;
 
 		case OPs::LogAnd:
-			if (!Left->__Evaluate__(symbols, L, LF, err, visited)) ret = false;
-			if (!Right->__Evaluate__(symbols, R, RF, err, visited)) ret = false;
+			if (!Left->_Evaluate(symbols, L, LF, err, visited)) ret = false;
+			if (!Right->_Evaluate(symbols, R, RF, err, visited)) ret = false;
 			if (ret == false) return false;
 
 			res = !IsZero(L, LF) && !IsZero(R, RF) ? 1 : 0ul;
 			break;
 		case OPs::LogOr:
-			if (!Left->__Evaluate__(symbols, L, LF, err, visited)) ret = false;
-			if (!Right->__Evaluate__(symbols, R, RF, err, visited)) ret = false;
+			if (!Left->_Evaluate(symbols, L, LF, err, visited)) ret = false;
+			if (!Right->_Evaluate(symbols, R, RF, err, visited)) ret = false;
 			if (ret == false) return false;
 
 			res = !IsZero(L, LF) || !IsZero(R, RF) ? 1 : 0ul;
@@ -450,29 +450,29 @@ namespace CSX64
 			// unary ops
 
 		case OPs::Neg:
-			if (!Left->__Evaluate__(symbols, L, LF, err, visited)) return false;
+			if (!Left->_Evaluate(symbols, L, LF, err, visited)) return false;
 
 			res = LF ? DoubleAsUInt64(-AsDouble(L)) : ~L + 1; floating = LF;
 			break;
 		case OPs::BitNot:
-			if (!Left->__Evaluate__(symbols, L, LF, err, visited)) return false;
+			if (!Left->_Evaluate(symbols, L, LF, err, visited)) return false;
 
 			res = ~L; floating = LF;
 			break;
 		case OPs::LogNot:
-			if (!Left->__Evaluate__(symbols, L, LF, err, visited)) return false;
+			if (!Left->_Evaluate(symbols, L, LF, err, visited)) return false;
 
 			res = IsZero(L, LF) ? 1 : 0ul;
 			break;
 
 		case OPs::Int:
-			if (!Left->__Evaluate__(symbols, L, LF, err, visited)) return false;
+			if (!Left->_Evaluate(symbols, L, LF, err, visited)) return false;
 
 			// float converts to int, otherwise pass-through
 			res = LF ? (u64)(i64)AsDouble(L) : L;
 			break;
 		case OPs::Float:
-			if (!Left->__Evaluate__(symbols, L, LF, err, visited)) return false;
+			if (!Left->_Evaluate(symbols, L, LF, err, visited)) return false;
 
 			// int converts to float, otherwise pass-through
 			res = LF ? L : DoubleAsUInt64((double)(i64)L);
@@ -480,28 +480,28 @@ namespace CSX64
 			break;
 
 		case OPs::Floor:
-			if (!Left->__Evaluate__(symbols, L, LF, err, visited)) return false;
+			if (!Left->_Evaluate(symbols, L, LF, err, visited)) return false;
 
 			// floor the result - results in a float
 			res = DoubleAsUInt64(std::floor(LF ? AsDouble(L) : (double)(i64)L));
 			floating = true;
 			break;
 		case OPs::Ceil:
-			if (!Left->__Evaluate__(symbols, L, LF, err, visited)) return false;
+			if (!Left->_Evaluate(symbols, L, LF, err, visited)) return false;
 
 			// ceil the result - results in a float
 			res = DoubleAsUInt64(std::ceil(LF ? AsDouble(L) : (double)(i64)L));
 			floating = true;
 			break;
 		case OPs::Round:
-			if (!Left->__Evaluate__(symbols, L, LF, err, visited)) return false;
+			if (!Left->_Evaluate(symbols, L, LF, err, visited)) return false;
 
 			// round the result - results in a float
 			res = DoubleAsUInt64(std::round(LF ? AsDouble(L) : (double)(i64)L));
 			floating = true;
 			break;
 		case OPs::Trunc:
-			if (!Left->__Evaluate__(symbols, L, LF, err, visited)) return false;
+			if (!Left->_Evaluate(symbols, L, LF, err, visited)) return false;
 
 			// trunc the result - results in a float
 			res = DoubleAsUInt64(std::trunc(LF ? AsDouble(L) : (double)(i64)L));
@@ -509,14 +509,14 @@ namespace CSX64
 			break;
 
 		case OPs::Repr64:
-			if (!Left->__Evaluate__(symbols, L, LF, err, visited)) return false;
+			if (!Left->_Evaluate(symbols, L, LF, err, visited)) return false;
 			if (!LF) { err = "REPR64 requires a floating-point argument"; return false; }
 
 			// convert the float to a 64-bit representation (already storing as 64-bit representation)
 			res = L;
 			break;
 		case OPs::Repr32:
-			if (!Left->__Evaluate__(symbols, L, LF, err, visited)) return false;
+			if (!Left->_Evaluate(symbols, L, LF, err, visited)) return false;
 			if (!LF) { err = "REPR32 requires a floating-point argument"; return false; }
 
 			// convert the float to a 32-bit representation
@@ -524,7 +524,7 @@ namespace CSX64
 			break;
 
 		case OPs::Float64:
-			if (!Left->__Evaluate__(symbols, L, LF, err, visited)) return false;
+			if (!Left->_Evaluate(symbols, L, LF, err, visited)) return false;
 			if (LF) { err = "FLOAT64 requires an integer argument"; return false; }
 
 			// convert the 64-bit representation to a float
@@ -532,7 +532,7 @@ namespace CSX64
 			floating = true;
 			break;
 		case OPs::Float32:
-			if (!Left->__Evaluate__(symbols, L, LF, err, visited)) return false;
+			if (!Left->_Evaluate(symbols, L, LF, err, visited)) return false;
 			if (LF) { err = "FLOAT32 requires an integer argument"; return false; }
 
 			// convert the 32-bit representation to a float
@@ -541,7 +541,7 @@ namespace CSX64
 			break;
 
 		case OPs::Prec64:
-			if (!Left->__Evaluate__(symbols, L, LF, err, visited)) return false;
+			if (!Left->_Evaluate(symbols, L, LF, err, visited)) return false;
 			if (!LF) { err = "PREC64 requires a floating-point argument"; return false; }
 
 			// truncate the precision to 64 bits (already storing in 64-bit floating point, so that would be no-op)
@@ -549,7 +549,7 @@ namespace CSX64
 			floating = true;
 			break;
 		case OPs::Prec32:
-			if (!Left->__Evaluate__(symbols, L, LF, err, visited)) return false;
+			if (!Left->_Evaluate(symbols, L, LF, err, visited)) return false;
 			if (!LF) { err = "PREC32 requires a floating-point argument"; return false; }
 
 			// truncate the precision to 32 bits (stored as a 64-bit floating, just chop off some precision from the end)
@@ -560,17 +560,17 @@ namespace CSX64
 		// -- misc operators -- //
 
 		case OPs::NullCoalesce:
-			if (!Left->__Evaluate__(symbols, L, LF, err, visited)) ret = false;
-			if (!Right->__Evaluate__(symbols, R, RF, err, visited)) ret = false;
+			if (!Left->_Evaluate(symbols, L, LF, err, visited)) ret = false;
+			if (!Right->_Evaluate(symbols, R, RF, err, visited)) ret = false;
 			if (ret == false) return false;
 
 			if (!IsZero(L, LF)) { res = L; floating = LF; }
 			else /*          */ { res = R; floating = RF; }
 			break;
 		case OPs::Condition:
-			if (!Left->__Evaluate__(symbols, Aux, AuxF, err, visited)) ret = false;
-			if (!Right->Left->__Evaluate__(symbols, L, LF, err, visited)) ret = false;
-			if (!Right->Right->__Evaluate__(symbols, R, RF, err, visited)) ret = false;
+			if (!Left->_Evaluate(symbols, Aux, AuxF, err, visited)) ret = false;
+			if (!Right->Left->_Evaluate(symbols, L, LF, err, visited)) ret = false;
+			if (!Right->Right->_Evaluate(symbols, R, RF, err, visited)) ret = false;
 			if (ret == false) return false;
 
 			if (!IsZero(Aux, AuxF)) { res = L; floating = LF; }
@@ -629,7 +629,7 @@ namespace CSX64
 	{
 		// refer to helper function
 		std::vector<std::string> visited;
-		return __Evaluate__(symbols, res, floating, err, visited);
+		return _Evaluate(symbols, res, floating, err, visited);
 	}
 	bool Expr::Evaluatable(std::unordered_map<std::string, Expr> &symbols)
 	{
@@ -807,7 +807,7 @@ namespace CSX64
 	std::ostream &Expr::WriteTo(std::ostream &writer, const Expr &expr)
 	{
 		// write type header
-		BinWrite<u8>(writer, (!expr._Token.empty() ? 128 : 0) | (expr._Floating ? 64 : 0) | (expr.Right ? 32 : 0) | (int)expr.OP);
+		write<u8>(writer, (u8)((!expr._Token.empty() ? 128 : 0) | (expr._Floating ? 64 : 0) | (expr.Right ? 32 : 0) | (int)expr.OP));
 
 		// if it's a leaf
 		if (expr.OP == OPs::None)
@@ -815,7 +815,7 @@ namespace CSX64
 			// if it's a token, write that
 			if (!expr._Token.empty()) BinWrite(writer, expr._Token);
 			// otherwise write the cached data
-			else BinWrite(writer, expr._Result);
+			else write<u64>(writer, expr._Result);
 		}
 		// otherwise it's an expression
 		else
@@ -835,7 +835,7 @@ namespace CSX64
 
 		// read the type header
 		u8 type;
-		BinRead(istr, type);
+		read<u8>(istr, type);
 
 		// extract op
 		expr->OP = (OPs)(type & 0x1f);
@@ -848,7 +848,7 @@ namespace CSX64
 			// otherwise read the cached data
 			else
 			{
-				BinRead(istr, expr->_Result);
+				read<u64>(istr, expr->_Result);
 				expr->_Floating = type & 64;
 			}
 		}

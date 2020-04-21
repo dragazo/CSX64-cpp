@@ -96,7 +96,7 @@ namespace CSX64
 
 		// write exe header and CSX64 version number
 		file.write(reinterpret_cast<const char*>(header), sizeof(header));
-		BinWrite(file, Version);
+		write<u64>(file, Version);
 
 		// write the segment lengths
 		file.write(reinterpret_cast<const char*>(_seglens), sizeof(_seglens));
@@ -134,7 +134,7 @@ namespace CSX64
 		}
 
 		// read the version number from the file and make sure it matches - match failure is a version error, not a format error.
-		if (!BinRead(file, Version_temp)) goto err;
+		if (!read<u64>(file, Version_temp)) goto err;
 		if (Version_temp != Version)
 		{
 			clear(); // if we throw an exception we must set to the empty state first
@@ -159,7 +159,13 @@ namespace CSX64
 
 		// allocate space to hold the executable content - if that fails set the exe to empty state and rethrow
 		_content.clear();
-		try { _content.resize(_seglens[0] + _seglens[1] + _seglens[2]); }
+		try
+		{
+			const u64 v = _seglens[0] + _seglens[1] + _seglens[2];
+			if constexpr (std::numeric_limits<std::size_t>::max() < std::numeric_limits<u64>::max()) { if (v != (std::size_t)v) throw MemoryAllocException("Executable content too large"); }
+			_content.resize((std::size_t)v);
+
+		}
 		catch (...) { clear(); throw; }
 
 		// read the content - make sure we got everything

@@ -191,14 +191,14 @@ namespace CSX64
 		bool TryProcessLEA(OPCode op);
 		bool TryProcessPOP(OPCode op);
 
-		bool __TryProcessShift_mid();
+		bool _TryProcessShift_mid();
 		bool TryProcessShift(OPCode op);
 
-		bool __TryProcessMOVxX_settings_byte(bool sign, u64 dest, u64 dest_sizecode, u64 src_sizecode);
+		bool _TryProcessMOVxX_settings_byte(bool sign, u64 dest, u64 dest_sizecode, u64 src_sizecode);
 		bool TryProcessMOVxX(OPCode op, bool sign);
 
 		// gets the sizecode specified by a binary string operation (e.g. MOVS (string))
-		bool __TryGetBinaryStringOpSize(u64 &sizecode);
+		bool _TryGetBinaryStringOpSize(u64 &sizecode);
 
 		bool TryProcessMOVS_string(OPCode op, bool rep);
 		bool TryProcessCMPS_string(OPCode op, bool repe, bool repne);
@@ -253,8 +253,8 @@ namespace CSX64
 		bool TryProcessVPUCVT_scalar_f2f(OPCode op, bool extend);
 
 		// these are helpers for the packed cvt formatters to reduce code duplication
-		bool __TryProcessVPUCVT_packed_formatter_reg(OPCode op, u8 mode, u64 elem_count, u64 dest, Expr *mask, bool zmask, u64 src);
-		bool __TryProcessVPUCVT_packed_formatter_mem(OPCode op, u8 mode, u64 elem_count, u64 dest, Expr *mask, bool zmask, u64 a, u64 b, Expr &&ptr_base);
+		bool _TryProcessVPUCVT_packed_formatter_reg(OPCode op, u8 mode, u64 elem_count, u64 dest, Expr *mask, bool zmask, u64 src);
+		bool _TryProcessVPUCVT_packed_formatter_mem(OPCode op, u8 mode, u64 elem_count, u64 dest, Expr *mask, bool zmask, u64 a, u64 b, Expr &&ptr_base);
 
 		// these internally handle all the vpu conversion encodings
 		bool TryProcessVPUCVT_packed_f2i(OPCode op, bool trunc, bool single);

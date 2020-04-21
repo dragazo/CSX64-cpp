@@ -1,46 +1,26 @@
+#include <cassert>
+
 #include "../include/Computer.h"
 
-#define __OPCODE_COUNTS 0
+#define OPCODE_COUNTS 0
 
-#if __OPCODE_COUNTS
+#if OPCODE_COUNTS
 u64 op_exe_count[256];
 #endif
 
 namespace CSX64
 {
-    bool Computer::realloc(u64 size, bool preserve_contents, bool force_realloc)
+    bool Computer::realloc(u64 size, bool preserve_contents)
     {
-        // if we have enough space already, just use that unless we were told not to
-        if (size <= mem_cap && !force_realloc)
-        {
-            // just need to update size (we already have the requisite capacity)
-            mem_size = size;
-            return true;
-        }
-        // otherwise we need to reallocate
-        else
-        {
-            // get the new array (64-byte aligned in case we want to use mm512 intrinsics later on)
-            void *ptr = CSX64::aligned_malloc(size, MemAlignment);
-            // make sure that succeeded
-            if (!ptr) return false;
-
-            // copy over the data if requested
-            if (preserve_contents) std::memcpy(ptr, mem, std::min(mem_size, size));
-
-            // delete old array
-            CSX64::aligned_free(mem);
-
-            // use new array
-            mem = ptr;
-            mem_size = mem_cap = size;
-
-            return true;
-        }
+		if (!preserve_contents) mem.clear();
+		mem.resize(size);
+		return true;
     }
 
     void Computer::Initialize(const Executable &exe, const std::vector<std::string> &args, u64 stacksize)
 	{
+		assert(max_mem_size == (std::size_t)max_mem_size);
+
 		// get size of memory we need to allocate
 		u64 size = exe.total_size() + stacksize;
 
@@ -56,14 +36,14 @@ namespace CSX64
 		min_mem_size = size;
 
 		// copy the executable content into our memory array
-		std::memcpy(mem, exe.content(), exe.content_size());
+		std::memcpy(mem.data(), exe.content(), (std::size_t)exe.content_size());
 		// zero the bss segment
-		std::memset(reinterpret_cast<char*>(mem) + exe.content_size(), 0, exe.bss_seglen());
+		std::memset(mem.data() + exe.content_size(), 0, (std::size_t)exe.bss_seglen());
 
 		// set up memory barriers
-		ExeBarrier = exe.text_seglen();
-		ReadonlyBarrier = exe.text_seglen() + exe.rodata_seglen();
-		StackBarrier = exe.text_seglen() + exe.rodata_seglen() + exe.data_seglen() + exe.bss_seglen();
+		exe_barrier = exe.text_seglen();
+		readonly_barrier = exe.text_seglen() + exe.rodata_seglen();
+		stack_barrier = exe.text_seglen() + exe.rodata_seglen() + exe.data_seglen() + exe.bss_seglen();
 
 		// set up cpu registers
 		for (int i = 0; i < 16; ++i) CPURegisters[i].x64() = Rand();
@@ -92,10 +72,10 @@ namespace CSX64
 		std::vector<u64> cmdarg_pointers(args.size() + 1);
 
 		// put each arg on the stack and get their addresses
-		for (u64 i = 0; i < args.size(); ++i)
+		for (std::size_t i = 0; i < args.size(); ++i)
 		{
 			// push the arg onto the stack
-			stack -= args[i].size() + 1;
+			stack -= (u64)args[i].size() + 1;
 			SetCString(stack, args[i]);
 
 			// record pointer to this arg
@@ -105,9 +85,9 @@ namespace CSX64
 		cmdarg_pointers[args.size()] = 0;
 
 		// make room for the command line pointer array
-		stack -= 8 * cmdarg_pointers.size();
+		stack -= 8 * (u64)cmdarg_pointers.size();
 		// write pointer array to memory
-		for (u64 i = 0; i < cmdarg_pointers.size(); ++i) SetMem(stack + i * 8, cmdarg_pointers[i]);
+		for (std::size_t i = 0; i < cmdarg_pointers.size(); ++i) SetMem(stack + i * 8, cmdarg_pointers[i]);
 
 		// load arg count and arg array pointer to RDI, RSI
 		RDI() = args.size();
@@ -120,7 +100,7 @@ namespace CSX64
 		Push(RSI());
 		Push(RDI());
 
-		#if __OPCODE_COUNTS
+		#if OPCODE_COUNTS
 		// clear op_exe_count
 		for (u64 i = 0; i < 256; ++i) op_exe_count[i] = 0;
 		#endif
@@ -135,12 +115,12 @@ namespace CSX64
 			if (!running || suspended_read) break;
 
 			// make sure we're before the executable barrier
-			if (RIP() >= ExeBarrier) { Terminate(ErrorCode::AccessViolation); break; }
+			if (RIP() >= exe_barrier) { Terminate(ErrorCode::AccessViolation); break; }
 
 			// fetch the instruction
 			if (!GetMemAdv<u8>(op)) break;
 
-			#if __OPCODE_COUNTS
+			#if OPCODE_COUNTS
 			// update op exe count
 			++op_exe_count[op];
 			#endif
@@ -171,7 +151,7 @@ namespace CSX64
         // only do this if we're currently running (so we don't override the "real" return value)
         if (running)
         {
-			#if __OPCODE_COUNTS
+			#if OPCODE_COUNTS
 			std::cout << "\n\nOPCode Counts:\n" << std::dec << std::setfill(' ');
 			for (u64 i = 0; i < 256; ++i)
 			{

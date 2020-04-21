@@ -7,11 +7,11 @@ namespace CSX64
         str.clear();
 
         // read the string
-        const char *ptr = reinterpret_cast<const char*>(mem) + pos; // aliasing is ok because casting to char type
+        const u8 *ptr = mem.data() + pos; // aliasing is ok because casting to char type
         for (; ; ++pos, ++ptr)
         {
             // ensure we're in bounds
-            if (pos >= mem_size) { Terminate(ErrorCode::OutOfBounds); return false; }
+            if (pos >= mem.size()) { Terminate(ErrorCode::OutOfBounds); return false; }
 
             // if it's not a terminator, append it
             if (*ptr != 0) str.push_back(*ptr);
@@ -24,15 +24,15 @@ namespace CSX64
     bool Computer::SetCString(u64 pos, const std::string &str)
     {
         // make sure we're in bounds
-        if (pos >= mem_size || pos + (str.size() + 1) > mem_size) return false;
+        if (pos >= mem.size() || pos + (str.size() + 1) > mem.size()) return false;
 
         // make sure we're not in the readonly segment
-        if (pos < ReadonlyBarrier) { Terminate(ErrorCode::AccessViolation); return false; }
+        if (pos < readonly_barrier) { Terminate(ErrorCode::AccessViolation); return false; }
 
         // write the string
-        std::memcpy(reinterpret_cast<char*>(mem) + pos, str.data(), str.size()); // aliasing ok because casting to char type
+        std::memcpy(mem.data() + pos, str.data(), str.size()); // aliasing ok because casting to char type
         // write a null terminator
-        (reinterpret_cast<char*>(mem) + pos)[str.size()] = 0; // aliasing ok because casting to char type
+        (mem.data() + pos)[str.size()] = 0; // aliasing ok because casting to char type
 
         return true;
     }
@@ -40,12 +40,12 @@ namespace CSX64
     bool Computer::PushRaw(u64 size, u64 val)
     {
         RSP() -= size;
-        if (RSP() < StackBarrier) { Terminate(ErrorCode::StackOverflow); return false; }
+        if (RSP() < stack_barrier) { Terminate(ErrorCode::StackOverflow); return false; }
         return SetMemRaw(RSP(), size, val);
     }
     bool Computer::PopRaw(u64 size, u64 &val)
     {
-        if (RSP() < StackBarrier) { Terminate(ErrorCode::StackOverflow); return false; }
+        if (RSP() < stack_barrier) { Terminate(ErrorCode::StackOverflow); return false; }
         if (!GetMemRaw(RSP(), size, val)) return false;
         RSP() += size;
         return true;
@@ -53,28 +53,28 @@ namespace CSX64
 
     bool Computer::GetMemRaw(u64 pos, u64 size, u64 &res)
     {
-        if (pos >= mem_size || pos + size > mem_size) { Terminate(ErrorCode::OutOfBounds); return false; }
+        if (pos >= mem.size() || pos + size > mem.size()) { Terminate(ErrorCode::OutOfBounds); return false; }
 
         switch (size)
         {
-        case 1: res = bin_read<u8>(reinterpret_cast<const char*>(mem) + pos); return true; // aliasing ok because casting to char type
-        case 2: res = bin_read<u16>(reinterpret_cast<const char*>(mem) + pos); return true; // aliasing ok because casting to char type
-        case 4: res = bin_read<u32>(reinterpret_cast<const char*>(mem) + pos); return true; // aliasing ok because casting to char type
-        case 8: res = bin_read<u64>(reinterpret_cast<const char*>(mem) + pos); return true; // aliasing ok because casting to char type
+        case 1: res = read<u8>(mem.data() + pos); return true;
+        case 2: res = read<u16>(mem.data() + pos); return true;
+        case 4: res = read<u32>(mem.data() + pos); return true;
+        case 8: res = read<u64>(mem.data() + pos); return true;
 
         default: throw std::runtime_error("GetMemRaw size was non-standard");
         }
     }
     bool Computer::GetMemRaw_szc(u64 pos, u64 sizecode, u64 &res)
     {
-        if (pos >= mem_size || pos + Size(sizecode) > mem_size) { Terminate(ErrorCode::OutOfBounds); return false; }
+        if (pos >= mem.size() || pos + Size(sizecode) > mem.size()) { Terminate(ErrorCode::OutOfBounds); return false; }
 
         switch (sizecode)
         {
-        case 0: res = bin_read<u8>(reinterpret_cast<const char*>(mem) + pos); return true; // aliasing ok because casting to char type
-        case 1: res = bin_read<u16>(reinterpret_cast<const char*>(mem) + pos); return true; // aliasing ok because casting to char type
-        case 2: res = bin_read<u32>(reinterpret_cast<const char*>(mem) + pos); return true; // aliasing ok because casting to char type
-        case 3: res = bin_read<u64>(reinterpret_cast<const char*>(mem) + pos); return true; // aliasing ok because casting to char type
+        case 0: res = read<u8>(mem.data() + pos); return true;
+        case 1: res = read<u16>(mem.data() + pos); return true;
+        case 2: res = read<u32>(mem.data() + pos); return true;
+        case 3: res = read<u64>(mem.data() + pos); return true;
 
         default: throw std::runtime_error("GetMemRaw size was non-standard");
         }
@@ -82,30 +82,30 @@ namespace CSX64
 
     bool Computer::SetMemRaw(u64 pos, u64 size, u64 val)
     {
-        if (pos >= mem_size || pos + size > mem_size) { Terminate(ErrorCode::OutOfBounds); return false; }
-        if (pos < ReadonlyBarrier) { Terminate(ErrorCode::AccessViolation); return false; }
+        if (pos >= mem.size() || pos + size > mem.size()) { Terminate(ErrorCode::OutOfBounds); return false; }
+        if (pos < readonly_barrier) { Terminate(ErrorCode::AccessViolation); return false; }
 
         switch (size)
         {
-        case 1: bin_write<u8>(reinterpret_cast<char*>(mem) + pos, (u8)val); return true; // aliasing ok because casting to char type
-        case 2: bin_write<u16>(reinterpret_cast<char*>(mem) + pos, (u16)val); return true; // aliasing ok because casting to char type
-        case 4: bin_write<u32>(reinterpret_cast<char*>(mem) + pos, (u32)val); return true; // aliasing ok because casting to char type
-        case 8: bin_write<u64>(reinterpret_cast<char*>(mem) + pos, (u64)val); return true; // aliasing ok because casting to char type
+        case 1: write<u8>(mem.data() + pos, (u8)val); return true;
+        case 2: write<u16>(mem.data() + pos, (u16)val); return true;
+        case 4: write<u32>(mem.data() + pos, (u32)val); return true;
+        case 8: write<u64>(mem.data() + pos, (u64)val); return true;
 
         default: throw std::runtime_error("GetMemRaw size was non-standard");
         }
     }
     bool Computer::SetMemRaw_szc(u64 pos, u64 sizecode, u64 val)
     {
-        if (pos >= mem_size || pos + Size(sizecode) > mem_size) { Terminate(ErrorCode::OutOfBounds); return false; }
-        if (pos < ReadonlyBarrier) { Terminate(ErrorCode::AccessViolation); std::cerr << "\ntried to access: " << std::hex << pos << std::dec << '\n'; return false; }
+        if (pos >= mem.size() || pos + Size(sizecode) > mem.size()) { Terminate(ErrorCode::OutOfBounds); return false; }
+        if (pos < readonly_barrier) { Terminate(ErrorCode::AccessViolation); std::cerr << "\ntried to access: " << std::hex << pos << std::dec << '\n'; return false; }
 
         switch (sizecode)
         {
-        case 0: bin_write<u8>(reinterpret_cast<char*>(mem) + pos, (u8)val); return true; // aliasing ok because casting to char type
-        case 1: bin_write<u16>(reinterpret_cast<char*>(mem) + pos, (u16)val); return true; // aliasing ok because casting to char type
-        case 2: bin_write<u32>(reinterpret_cast<char*>(mem) + pos, (u32)val); return true; // aliasing ok because casting to char type
-        case 3: bin_write<u64>(reinterpret_cast<char*>(mem) + pos, (u64)val); return true; // aliasing ok because casting to char type
+        case 0: write<u8>(mem.data() + pos, (u8)val); return true;
+        case 1: write<u16>(mem.data() + pos, (u16)val); return true;
+        case 2: write<u32>(mem.data() + pos, (u32)val); return true;
+        case 3: write<u64>(mem.data() + pos, (u64)val); return true;
 
         default: throw std::runtime_error("GetMemRaw size was non-standard");
         }
@@ -126,9 +126,9 @@ namespace CSX64
 
     bool Computer::GetByteAdv(u8 &res)
     {
-        if (RIP() >= mem_size) { Terminate(ErrorCode::OutOfBounds); return false; }
+        if (RIP() >= mem.size()) { Terminate(ErrorCode::OutOfBounds); return false; }
 
-        res = bin_read<u8>(reinterpret_cast<const char*>(mem) + RIP()++); // aliasing ok because casting to char type
+        res = read<u8>(mem.data() + RIP()++); // aliasing ok because casting to char type
 
         return true;
     }

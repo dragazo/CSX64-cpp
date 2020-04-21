@@ -45,9 +45,6 @@
     <ClInclude Include="include\FastRng.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="include\punning.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="include\Utility.h">
       <Filter>Header Files</Filter>
     </ClInclude>

@@ -14,7 +14,7 @@
 #include <unordered_map>
 
 #include "CoreTypes.h"
-#include "punning.h"
+#include "Utility.h"
 #include "csx_exceptions.h"
 
 namespace CSX64
@@ -101,8 +101,8 @@ namespace CSX64
 	{
 		T &data;
 
-		static constexpr T __mask = (T)1 << (len - 1);
-		static constexpr T low_mask = __mask | (__mask - 1);
+		static constexpr T _mask = (T)1 << (len - 1);
+		static constexpr T low_mask = _mask | (_mask - 1);
 		static constexpr T mask = low_mask << pos;
 
 		constexpr operator T() const noexcept { return (data >> pos) & low_mask; }
@@ -149,9 +149,9 @@ namespace CSX64
 	{
 		void *loc;
 
-		operator T() const noexcept { return bin_read<T>(loc); }
-		bin_cpy_wrapper operator=(T val) noexcept { bin_write<T>(loc, val); return *this; }
-		bin_cpy_wrapper operator=(bin_cpy_wrapper other) { bin_write<T>(loc, (T)other); return *this; }
+		operator T() const noexcept { return read<T>(loc); }
+		bin_cpy_wrapper operator=(T val) noexcept { write<T>(loc, val); return *this; }
+		bin_cpy_wrapper operator=(bin_cpy_wrapper other) { write<T>(loc, (T)other); return *this; }
 
 		bin_cpy_wrapper operator++() noexcept { *this = *this + 1; return *this; }
 		bin_cpy_wrapper operator--() noexcept { *this = *this - 1; return *this; }
@@ -261,7 +261,7 @@ namespace CSX64
 
 		// gets the value of type T at the specified index (index offsets based on T)
 		template<typename T> bin_cpy_wrapper<T> get(u64 index) noexcept { return {data + index * sizeof(T)}; }
-		template<typename T> T get(u64 index) const noexcept { return bin_read<T>(data + index * sizeof(T)); }
+		template<typename T> T get(u64 index) const noexcept { return read<T>(data + index * sizeof(T)); }
 
 	public: // -- sizecode access utilities -- //
 

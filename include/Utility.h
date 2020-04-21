@@ -1,127 +1,142 @@
 #ifndef CSX64_UTILITY_H
 #define CSX64_UTILITY_H
 
-#include <utility>
-#include <cmath>
-#include <limits>
-#include <cstdlib>
-#include <string>
-#include <cstring>
-#include <sstream>
-#include <iomanip>
-#include <vector>
-#include <list>
-#include <deque>
-#include <exception>
-#include <stdexcept>
-#include <cctype>
-#include <iostream>
-#include <unordered_map>
-#include <unordered_set>
-#include <algorithm>
 #include <type_traits>
+#include <utility>
+#include <iostream>
+#include <stdexcept>
+#include <vector>
+#include <deque>
+#include <unordered_set>
+#include <unordered_map>
+#include <string>
+#include <cctype>
+#include <sstream>
+#include <bit>
 
 #include "CoreTypes.h"
-#include "punning.h"
 
 namespace CSX64
 {
 	// -- versioning info -- //
 
-	const u64 Version = 0x500;
+	const u64 Version = 0x501;
 
-	// -- arch encoding helpers -- //
+	// -- helpers -- //
 
-	// returns true iff the current system is little-endian
-	bool IsLittleEndian();
+	template<typename T> inline constexpr bool is_uint = std::is_same_v<T, u8> || std::is_same_v<T, u16> || std::is_same_v<T, u32> || std::is_same_v<T, u64>;
 
 	// -- serialization -- //
 
-	// writes count bytes from the buffer to the stream.
-	std::ostream &BinWrite(std::ostream &ostr, const char *p, std::size_t count);
-	// reads count bytes from the stream to the buffer.
-	// if this fails to extract exactly count bytes, sets the stream's failbit.
-	std::istream &BinRead(std::istream &istr, char *p, std::size_t count);
+	inline constexpr u8 bswap(u8 v) { return v; }
+	inline constexpr u16 bswap(u16 v) { return (v << 8) | (v >> 8); }
+	inline constexpr u32 bswap(u32 v)
+	{
+		u32 res = (v << 16) | (v >> 16);
+		res = ((v & 0x00ff00ff) << 8) | ((v & 0xff00ff00) >> 8);
+		return res;
+	}
+	inline constexpr u64 bswap(u64 v)
+	{
+		u64 res = (v << 32) | (v >> 32);
+		res = ((v & 0x0000ffff0000ffff) << 16) | ((v & 0xffff0000ffff0000) >> 16);
+		res = ((v & 0x00ff00ff00ff00ff) << 8) | ((v & 0xff00ff00ff00ff00) >> 8);
+		return res;
+	}
 
-	// writes a binary representation of val to the stream.
-	template<typename T, std::enable_if_t<std::is_trivial<T>::value, int> = 0>
-	std::ostream &BinWrite(std::ostream &ostr, const T &val)
-	{ return BinWrite(ostr, reinterpret_cast<const char*>(&val), sizeof(T)); }
-	// reads a binary representation of val from the stream.
-	template<typename T, std::enable_if_t<std::is_trivial<T>::value, int> = 0>
-	std::istream &BinRead(std::istream &istr, T &val)
-	{ return BinRead(istr, reinterpret_cast<char*>(&val), sizeof(T)); }
+	inline constexpr u64 bswap(u64 val, u64 sizecode)
+	{
+		switch (sizecode)
+		{
+		case 3: return bswap(val);
+		case 2: return bswap((u32)val);
+		case 1: return bswap((u16)val);
+		case 0: return bswap((u8)val);
 
-	// writes a binary representation of str to the stream.
+		default: return 0; // this should never happen
+		}
+	}
+
+	// reads/writes a binary buffer from/to a file.
+	// if this fails to read/write exactly count bytes, sets the stream's failbit.
+	std::ostream &BinWrite(std::ostream &ostr, const void *p, std::size_t count);
+	std::istream &BinRead(std::istream &istr, void *p, std::size_t count);
+
+	// writes a little-endian value to the stream
+	template<typename T, typename U, std::enable_if_t<is_uint<T> && std::is_same_v<T, U>, int> = 0>
+	std::ostream &write(std::ostream &ostr, U val)
+	{
+		if constexpr (std::endian::native == std::endian::big) val = bswap(val);
+		return BinWrite(ostr, &val, sizeof(val));
+	}
+
+	// reads a little-endian value from the stream
+	template<typename T, typename U, std::enable_if_t<is_uint<T> && std::is_same_v<T, U>, int> = 0>
+	std::istream &read(std::istream &istr, U &val)
+	{
+		if constexpr (std::endian::native == std::endian::little) return BinRead(istr, &val, sizeof(val));
+		else
+		{
+			BinRead(istr, &val, sizeof(val));
+			val = bswap(val);
+			return istr;
+		}
+	}
+
+	// reads/writes a binary representation of a string to the stream.
 	std::ostream &BinWrite(std::ostream &ostr, const std::string &str);
-	// reads a binary representation of str from the stream.
 	std::istream &BinRead(std::istream &istr, std::string &str);
+
+	// -- binary access -- //
+
+	// writes a little-endian value to the given memory location
+	template<typename T, typename U, std::enable_if_t<is_uint<T> && std::is_same_v<T, U>, int> = 0>
+	void write(void *dest, U val)
+	{
+		if constexpr (std::endian::native == std::endian::big) val = bswap(val);
+		std::memcpy(dest, &val, sizeof(val));
+	}
+
+	// reads a little-endian value from the given memory location
+	template<typename T, std::enable_if_t<is_uint<T>, int> = 0>
+	T read(const void *src)
+	{
+		T val;
+		std::memcpy(&val, src, sizeof(T));
+		if constexpr (std::endian::native == std::endian::big) val = bswap(val);
+		return val;
+	}
 
 	// -- container utilities -- //
 
-	// returns true if the container has at least one entry equal to val
-	template<typename T, typename U> bool Contains(const std::vector<T> &c, const U &val) { return std::find(c.begin(), c.end(), val) != c.end(); }
-	template<typename T, typename U> bool Contains(const std::deque<T> &c, const U &val) { return std::find(c.begin(), c.end(), val) != c.end(); }
+	template<typename T> bool Contains(const std::vector<T> &c, const T &val) { return std::find(c.begin(), c.end(), val) != c.end(); }
+	template<typename T> bool Contains(const std::deque<T> &c, const T &val) { return std::find(c.begin(), c.end(), val) != c.end(); }
+	template<typename T> bool Contains(const std::unordered_set<T> &set, const T &value) { return set.find(value) != set.end(); }
 
-	template<typename T, typename U>
-	bool Contains(const std::unordered_set<T> &set, const U &value) { return set.find(value) != set.end(); }
-
-	// returns true if the map contains a node with the specified key
-	template<typename T, typename U>
-	bool ContainsKey(const std::unordered_map<T, U> &map, const T &key) { return map.find(key) != map.end(); }
-	// returns true if the map contains a node with the specified value
-	template<typename T, typename U>
-	bool ContainsValue(const std::unordered_map<T, U> &map, const U &value)
+	template<typename T, typename U> bool ContainsKey(const std::unordered_map<T, U> &map, const T &key) { return map.find(key) != map.end(); }
+	template<typename T, typename U> bool ContainsValue(const std::unordered_map<T, U> &map, const U &value)
 	{
 		for (const auto &entry : map) if (entry.second == value) return true;
 		return false;
 	}
 
-	// returns a pointer to the node with specified key if it exists, otherwise null
-	template<typename T, typename V>
-	bool TryGetValue(const std::unordered_set<T> &set, const V &value, T *&ptr)
+	// returns true if the map contains the key - if so, stores the address of the associated value in ptr
+	template<typename T, typename U> bool TryGetValue(const std::unordered_map<T, U> &map, const T &key, const U *&ptr)
 	{
-		auto iter = set.find(value);
-		return ptr = (iter == set.end() ? nullptr : &*iter);
+		if (auto i = map.find(key); i != map.end()) { ptr = &i->second; return true; } else return false;
 	}
-
-	// returns a pointer to the node with specified key if it exists, otherwise null
-	template<typename T, typename U, typename K>
-	bool TryGetValue(const std::unordered_map<T, U> &map, const K &key, const U *&ptr)
+	template<typename T, typename U> bool TryGetValue(std::unordered_map<T, U> &map, const T &key, U *&ptr)
 	{
-		auto iter = map.find(key);
-		ptr = (iter == map.end() ? nullptr : &iter->second);
-		return ptr;
-	}
-	template<typename T, typename U, typename K>
-	bool TryGetValue(std::unordered_map<T, U> &map, const K &key, U *&ptr)
-	{
-		auto iter = map.find(key);
-		ptr = (iter == map.end() ? nullptr : &iter->second);
-		return ptr;
+		if (auto i = map.find(key); i != map.end()) { ptr = &i->second; return true; } else return false;
 	}
 
 	// returns true if the map contains the key - if so, stores the associated value in dest (by copy)
-	template<typename T, typename U, typename K>
-	bool TryGetValue(const std::unordered_map<T, U> &map, const K &key, U &dest)
+	template<typename T, typename U> bool TryGetValue(const std::unordered_map<T, U> &map, const T &key, U &dest)
 	{
-		auto iter = map.find(key);
-		if (iter != map.end()) { dest = iter->second; return true; }
-		else return false;
+		if (auto i = map.find(key); i != map.end()) { dest = i->second; return true; } else return false;
 	}
-
+	
 	// -- memory utilities -- //
-
-	// allocates space and returns a pointer to at least <size> bytes which is aligned to <align>.
-	// it is undefined behavior if align is not a power of 2.
-	// allocating zero bytes returns null.
-	// on failure, returns null.
-	// must be deallocated via aligned_free().
-	[[nodiscard]]
-	void *aligned_malloc(std::size_t size, std::size_t align);
-	// deallocates a block of memory allocated by aligned_malloc().
-	// if <ptr> is null, does nothing.
-	void aligned_free(void *ptr);
 
 	/// <summary>
 	/// Writes a value to the array
@@ -277,16 +292,13 @@ namespace CSX64
 	// isolates the highest set bit. if val is zero, returns zero.
 	inline constexpr u64 IsolateHighBit(u64 val)
 	{
-		// while there are multiple set bits, clear the low one
 		while (val & (val - 1)) val = val & (val - 1);
 		return val;
 	}
 	// isolates the lowest set bit. if val is zero, returns zero.
 	inline constexpr u64 IsolateLowBit(u64 val) { return val & (~val + 1); }
 
-	/// <summary>
-	/// Returns true if this value is a power of two. (zero returns false)
-	/// </summary>
+	// Returns true if this value is a power of two. (zero returns false)
 	inline constexpr bool IsPowerOf2(u64 val) { return val != 0 && (val & (val - 1)) == 0; }
 
 	/// <summary>
@@ -297,12 +309,12 @@ namespace CSX64
 	/// <param name="b">the second (smaller) power of 2</param>
 	bool Extract2PowersOf2(u64 val, u64 &a, u64 &b);
 
-	constexpr u64  _SignMasks[] = {0x80, 0x8000, 0x80000000, 0x8000000000000000};
-	constexpr u64 _TruncMasks[] = {0xff, 0xffff, 0xffffffff, 0xffffffffffffffff};
-	constexpr u64 _ExtendMasks[] = {0xffffffffffffff00, 0xffffffffffff0000, 0xffffffff00000000, 0x00};
+	static constexpr u64  _SignMasks[] = {0x80, 0x8000, 0x80000000, 0x8000000000000000};
+	static constexpr u64 _TruncMasks[] = {0xff, 0xffff, 0xffffffff, 0xffffffffffffffff};
+	static constexpr u64 _ExtendMasks[] = {0xffffffffffffff00, 0xffffffffffff0000, 0xffffffff00000000, 0x00};
 
-	constexpr u64     _Sizes[] = {1, 2, 4, 8};
-	constexpr u64 _SizesBits[] = {8, 16, 32, 64};
+	static constexpr u64     _Sizes[] = {1, 2, 4, 8};
+	static constexpr u64 _SizesBits[] = {8, 16, 32, 64};
 
 	/// <summary>
 	/// Gets the bitmask for the sign bit of an integer with the specified sizecode. sizecode must be [0,3]
@@ -382,35 +394,34 @@ namespace CSX64
 		else throw std::invalid_argument("bit size must be in range [0,64]");
 	}
 
-	/// <summary>
-	/// Interprets a double as its raw bits
-	/// </summary>
-	/// <param name="val">value to interpret</param>
+	// safely puns an object of type U into an object of type T.
+	// this function only participates in overload resolution if T and U are both trivial types and equal in size.
+	template<typename T, typename U, std::enable_if_t<std::is_trivial<T>::value && std::is_trivial<U>::value && sizeof(T) == sizeof(U), int> = 0>
+	constexpr T pun(const U &value)
+	{
+		T temp;
+		std::memcpy(std::addressof(temp), std::addressof(value), sizeof(T));
+		return temp;
+	}
+
+	// Interprets a double as its raw bits
 	inline u64 DoubleAsUInt64(double val)
 	{
+
 		return pun<u64>(val);
 	}
-	/// <summary>
-	/// Interprets raw bits as a double
-	/// </summary>
-	/// <param name="val">value to interpret</param>
+	// Interprets raw bits as a double
 	inline double AsDouble(u64 val)
 	{
 		return pun<double>(val);
 	}
 
-	/// <summary>
-	/// Interprets a float as its raw bits (placed in low 32 bits)
-	/// </summary>
-	/// <param name="val">the float to interpret</param>
+	// Interprets a float as its raw bits (placed in low 32 bits)
 	inline u64 FloatAsUInt64(float val)
 	{
 		return pun<u32>(val);
 	}
-	/// <summary>
-	/// Interprets raw bits as a float (low 32 bits)
-	/// </summary>
-	/// <param name="val">the bits to interpret</param>
+	// Interprets raw bits as a float (low 32 bits)
 	inline float AsFloat(u32 val)
 	{
 		return pun<float>(val);
@@ -418,27 +429,6 @@ namespace CSX64
 
 	void ExtractDouble(double val, double &exp, double &sig);
 	double AssembleDouble(double exp, double sig);
-
-	// returns the result of swaping the byte positions of the specified value
-	inline constexpr u64 ByteSwap(u64 val, u64 sizecode)
-	{
-		u64 res = 0;
-		switch (sizecode)
-		{
-		case 3:
-			res = (val << 32) | (val >> 32);
-			res = ((val & 0x0000ffff0000ffff) << 16) | ((val & 0xffff0000ffff0000) >> 16);
-			res = ((val & 0x00ff00ff00ff00ff) << 8) | ((val & 0xff00ff00ff00ff00) >> 8);
-			break;
-		case 2:
-			res = (val << 16) | (val >> 16);
-			res = ((val & 0x00ff00ff) << 8) | ((val & 0xff00ff00) >> 8);
-			break;
-		case 1: res = (val << 8) | (val >> 8); break;
-		case 0: res = val; break;
-		}
-		return res;
-	}
 
 	/// <summary>
 	/// Returns true if the floating-point value is denormalized (including +-0)

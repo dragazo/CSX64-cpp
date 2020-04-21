@@ -167,6 +167,11 @@ void AddPredefines()
 	DefineSymbol("SEEK_SET", (u64)SeekMode::set);
 	DefineSymbol("SEEK_CUR", (u64)SeekMode::cur);
 	DefineSymbol("SEEK_END", (u64)SeekMode::end);
+
+	// -- standard stuff -- //
+
+	DefineSymbol("NULL", (u64)0);
+	DefineSymbol("EOF", (u64)0xffffffffffffffff);
 }
 
 // ------------------ //
@@ -665,20 +670,6 @@ bool cmdln_pack::parse(int _argc, const char *const *_argv)
 
 int main(int argc, char *argv[]) try
 {
-	// we make a lot of assumptions about the current platform being little-endian (in fact some code still artificially simulates it)
-	// however, the majority isn't simulated since that'd be ridiculously-slow - so we need to make sure this system is really little-endian.
-
-	if (!IsLittleEndian())
-	{
-		std::cerr <<
-			"Uhoh!! Looks like this platform isn't little-endian!\n"
-			"Most everything in CSX64 assumes little-endian,\n"
-			"so most of it won't work on this system!\n\n";
-		return -1;
-	}
-
-	// ------------------------------------ //
-
 	cmdln_pack dat; // command line option parsing pack
 
 	// parse our command line args - on failure a message is printed to stdout, just return 0.

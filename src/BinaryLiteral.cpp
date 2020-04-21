@@ -4,6 +4,7 @@
 
 #include "../include/Utility.h"
 #include "../include/Assembly.h"
+#include "../include/csx_exceptions.h"
 
 namespace CSX64
 {
@@ -17,7 +18,7 @@ namespace CSX64
 		if (super.size() < sub.size()) return npos;
 
 		// for each possible starting position for this to work
-		for (u64 start = super.size() - sub.size(); start != npos; --start)
+		for (std::size_t start = super.size() - sub.size(); start != npos; --start)
 		{
 			// if this subregion contains the same data, return the start position (success)
 			if (std::memcmp(super.data() + start, sub.data(), sub.size()) == 0) return start;
@@ -114,22 +115,22 @@ namespace CSX64
 	std::ostream &BinaryLiteralCollection::write_to(std::ostream &writer) const
 	{
 		// write number of top level literals
-		BinWrite<u64>(writer, top_level_literals.size());
+		write<u64>(writer, (u64)top_level_literals.size());
 		// then write each of them (length-prefixed)
 		for (const auto &i : top_level_literals)
 		{
-			BinWrite<u64>(writer, i.size());
-			BinWrite(writer, (const char*)i.data(), i.size());
+			write<u64>(writer, (u64)i.size());
+			BinWrite(writer, i.data(), i.size());
 		}
 
 		// write number of literals
-		BinWrite<u64>(writer, literals.size());
+		write<u64>(writer, (u64)literals.size());
 		// then write each of them
 		for (const auto &i : literals)
 		{
-			BinWrite(writer, i.top_level_index);
-			BinWrite(writer, i.start);
-			BinWrite(writer, i.length);
+			write<u64>(writer, (u64)i.top_level_index);
+			write<u64>(writer, (u64)i.start);
+			write<u64>(writer, (u64)i.length);
 		}
 
 		return writer;
@@ -142,22 +143,33 @@ namespace CSX64
 		u64 temp, temp2;
 
 		// read top level literals
-		if (!BinRead<u64>(reader, temp)) return reader;
-		top_level_literals.reserve(temp);
+		if (!read<u64>(reader, temp)) return reader;
+		if constexpr (std::numeric_limits<std::size_t>::max() < std::numeric_limits<u64>::max()) { if (temp != (std::size_t)temp) throw MemoryAllocException("Binary literal too large"); }
+		top_level_literals.reserve((std::size_t)temp);
 		for (u64 i = 0; i < temp; ++i)
 		{
-			if (!BinRead<u64>(reader, temp2)) return reader;
-			std::vector<u8> v(temp2);
-			if (!BinRead(reader, (char*)&v[0], temp2)) return reader;
+			if (!read<u64>(reader, temp2)) return reader;
+			if constexpr (std::numeric_limits<std::size_t>::max() < std::numeric_limits<u64>::max()) { if (temp2 != (std::size_t)temp2) throw MemoryAllocException("Binary literal too large"); }
+			std::vector<u8> v((std::size_t)temp2);
+			if (!BinRead(reader, v.data(), (std::size_t)temp2)) return reader;
 			top_level_literals.emplace_back(std::move(v));
 		}
 
 		// read literals
-		if (!BinRead<u64>(reader, temp)) return reader;
-		literals.resize(temp);
+		if (!read<u64>(reader, temp)) return reader;
+		if constexpr (std::numeric_limits<std::size_t>::max() < std::numeric_limits<u64>::max()) { if (temp != (std::size_t)temp) throw MemoryAllocException("Binary literal too large"); }
+		literals.resize((std::size_t)temp);
 		for (auto &i : literals)
 		{
-			if (!BinRead(reader, i.top_level_index) || !BinRead(reader, i.start) || !BinRead(reader, i.length)) return reader;
+			u64 a, b, c;
+			if (!read<u64>(reader, a) || !read<u64>(reader, b) || !read<u64>(reader, c)) return reader;
+			if constexpr (std::numeric_limits<std::size_t>::max() < std::numeric_limits<u64>::max())
+			{
+				if (a != (std::size_t)a || b != (std::size_t)b || c != (std::size_t)c) throw MemoryAllocException("Binary literal too large");
+			}
+			i.top_level_index = (std::size_t)a;
+			i.start = (std::size_t)b;
+			i.length = (std::size_t)c;
 		}
 
 		return reader;

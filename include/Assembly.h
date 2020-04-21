@@ -58,7 +58,7 @@ namespace CSX64
 		u8 Size;
 
 		// The line where this hole was created
-		int Line;
+		u32 Line;
 		// The expression that represents this hole's value
 		Expr expr;
 

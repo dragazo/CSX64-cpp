@@ -4,6 +4,8 @@
 #include <iostream>
 #include <memory>
 #include <type_traits>
+#include <iomanip>
+#include <vector>
 
 #include "CoreTypes.h"
 #include "ExeTypes.h"
@@ -20,18 +22,21 @@ namespace CSX64
 	public: // -- info -- //
 
 		// the number of file descriptors available to this computer
-		static constexpr int FDCount = 16;
+		inline static constexpr int FDCount = 16;
 
 		// the alignment of the internal memory array
-		static constexpr u64 MemAlignment = 64;
+		inline static constexpr std::size_t MemAlignment = 64;
 		
+		// default value for max memory used by any given Computer
+		inline static constexpr std::size_t DefaultMaxMemSize = (std::size_t)(sizeof(std::size_t) > sizeof(u32) ? (u64)8 * 1024 * 1024 * 1024 : (u64)2 * 1024 * 1024 * 1024);
+
 		// CSX64 considers many valid, but non-intel things to be undefined behavior at runtime (e.g. 8-bit addressing).
 		// however, these types of things are already blocked by the assembler.
 		// if this is set to true, emits ErrorCode::UndefinedBehavior in these cases - otherwise permits them (more efficient).
-		static constexpr bool StrictUND = false;
+		inline static constexpr bool StrictUND = false;
 
 		// if set to true, uses mask unions to perform the UpdateFlagsZSP() function - otherwise uses flag accessors (slower)
-		static constexpr bool FlagAccessMasking = true;
+		inline static constexpr bool FlagAccessMasking = true;
 
 	public: // -- special types -- //
 
@@ -148,21 +153,19 @@ namespace CSX64
 
 	private: // -- data -- //
 
-		void *mem;    // pointer to position 0 of memory array (alloc/dealloc with CSX64::aligned_malloc/free)
-		u64 mem_size; // current size of memory array
-		u64 mem_cap;  // current capacity of memory array (cap >= size) (size is the user-accessible portion)
+		std::vector<u8> mem; // internal execution memory
 
-		u64 min_mem_size; // memory size after initialization (acts as a minimum for sys_brk)
-		u64 max_mem_size; // requested limit on memory size (acts as a maximum for sys_brk)
+		std::size_t min_mem_size = 0;                 // memory size after initialization (acts as a minimum for sys_brk)
+		std::size_t max_mem_size = DefaultMaxMemSize; // requested limit on memory size (acts as a maximum for sys_brk)
 
-		u64 ExeBarrier;      // The barrier before which memory is executable
-		u64 ReadonlyBarrier; // The barrier before which memory is read-only
-		u64 StackBarrier;    // Gets the barrier before which the stack can't enter
-
-		bool running;
-		bool suspended_read;
-		ErrorCode error;
-		int return_value;
+		std::size_t exe_barrier = 0;      // The barrier before which memory is executable
+		std::size_t readonly_barrier = 0; // The barrier before which memory is read-only
+		std::size_t stack_barrier = 0;    // Gets the barrier before which the stack can't enter
+		
+		bool running = false;
+		bool suspended_read = false;
+		ErrorCode error = ErrorCode::None;
+		int return_value = 0;
 
 		CPURegister CPURegisters[16];
 		u64 _RFLAGS, _RIP;
@@ -180,12 +183,12 @@ namespace CSX64
 	public: // -- data access -- //
 
 		// Gets the maximum amount of memory the client can request
-		u64 MaxMemory() const noexcept { return max_mem_size; }
+		std::size_t MaxMemory() const noexcept { return max_mem_size; }
 		// Sets the maximum amount of memory the client can request in the future. Does not impact the current memory array.
-		void MaxMemory(u64 max) noexcept { max_mem_size = max; }
+		void MaxMemory(std::size_t max) noexcept { max_mem_size = max; }
 
 		// Gets the amount of memory (in bytes) the computer currently has access to
-		u64 MemorySize() const noexcept { return mem_size; }
+		std::size_t MemorySize() const noexcept { return mem.size(); }
 
 		// Flag marking if the program is still executing (still true even in halted state)
 		bool Running() const noexcept { return running; }
@@ -199,12 +202,8 @@ namespace CSX64
 	public: // -- ctor/dtor -- //
 
 		// Validates the machine for operation, but does not prepare it for execute (see Initialize)
-		Computer() :
-			mem(nullptr), mem_size(0), mem_cap(0), max_mem_size((u64)8 * 1024 * 1024 * 1024),
-			running(false), error(ErrorCode::None),
-			Rand((unsigned int)std::time(nullptr))
-		{}
-		virtual ~Computer() { CSX64::aligned_free(mem); }
+		Computer() : Rand((unsigned int)std::time(nullptr)) {}
+		virtual ~Computer() = default;
 		
 		Computer(const Computer&) = delete;
 		Computer(Computer&&) = delete;
@@ -219,7 +218,7 @@ namespace CSX64
 		// this will attempt to resize the array in-place; however, if force_realloc is true it will guarantee a full reallocation operation (e.g. for releasing extraneous memory).
 		// on success, the memory size is updated to the specified size.
 		// on failure, nothing is changed (as if the request was not made) - strong guarantee.
-		bool realloc(u64 size, bool preserve_contents, bool force_realloc = false);
+		bool realloc(u64 size, bool preserve_contents);
 
 		// Initializes the computer for execution
 		// exe       - the memory to load before starting execution (memory beyond this range is undefined)</param>
@@ -307,23 +306,23 @@ namespace CSX64
 		bool SetCString(u64 pos, const std::string &str);
 
 		// reads a POD type T from memory. returns true on success
-		template<typename T, std::enable_if_t<std::is_trivial<T>::value, int> = 0>
+		template<typename T, std::enable_if_t<is_uint<T>, int> = 0>
 		bool GetMem(u64 pos, T &val)
 		{
-			if (pos >= mem_size || pos + sizeof(T) > mem_size) { Terminate(ErrorCode::OutOfBounds); return false; }
+			if (pos >= mem.size() || pos + sizeof(T) > mem.size()) { Terminate(ErrorCode::OutOfBounds); return false; }
 
-			val = bin_read<T>(reinterpret_cast<const char*>(mem) + pos); // aliasing ok because casting to char type
+			val = bin_read<T>(mem.data() + pos); // aliasing ok because casting to char type
 
 			return true;
 		}
 		// writes a POD type T to memory. returns true on success
-		template<typename T, std::enable_if_t<std::is_trivial<T>::value, int> = 0>
-		bool SetMem(u64 pos, const T &val)
+		template<typename T, std::enable_if_t<is_uint<T>, int> = 0>
+		bool SetMem(u64 pos, T val)
 		{
-			if (pos >= mem_size || pos + sizeof(T) > mem_size) { Terminate(ErrorCode::OutOfBounds); return false; }
-			if (pos < ReadonlyBarrier) { Terminate(ErrorCode::AccessViolation);  return false; }
+			if (pos >= mem.size() || pos + sizeof(T) > mem.size()) { Terminate(ErrorCode::OutOfBounds); return false; }
+			if (pos < readonly_barrier) { Terminate(ErrorCode::AccessViolation);  return false; }
 
-			bin_write<T>(reinterpret_cast<char*>(mem) + pos, val); // aliasing ok because casting to char type
+			write<T>(mem.data() + pos, val); // aliasing ok because casting to char type
 
 			return true;
 		}
@@ -333,7 +332,7 @@ namespace CSX64
 		bool Push(const T &val)
 		{
 			RSP() -= sizeof(T);
-			if (RSP() < StackBarrier) { Terminate(ErrorCode::StackOverflow); return false; }
+			if (RSP() < stack_barrier) { Terminate(ErrorCode::StackOverflow); return false; }
 			if (!SetMem(RSP(), val)) return false;
 			return true;
 		}
@@ -341,7 +340,7 @@ namespace CSX64
 		template<typename T, std::enable_if_t<std::is_trivial<T>::value, int> = 0>
 		bool Pop(T &val)
 		{
-			if (RSP() < StackBarrier) { Terminate(ErrorCode::StackOverflow); return false; }
+			if (RSP() < stack_barrier) { Terminate(ErrorCode::StackOverflow); return false; }
 			if (!GetMem(RSP(), val)) return false;
 			RSP() += sizeof(T);
 			return true;
@@ -355,7 +354,7 @@ namespace CSX64
 		bool PushRaw(u64 val)
 		{
 			RSP() -= sizeof(T);
-			if (RSP() < StackBarrier) { Terminate(ErrorCode::StackOverflow); return false; }
+			if (RSP() < stack_barrier) { Terminate(ErrorCode::StackOverflow); return false; }
 			return SetMemRaw<T>(RSP(), val);
 		}
 
@@ -364,7 +363,7 @@ namespace CSX64
 		template<typename T, std::enable_if_t<std::is_trivial<T>::value, int> = 0>
 		bool PopRaw(u64 &val)
 		{
-			if (RSP() < StackBarrier) { Terminate(ErrorCode::StackOverflow); return false; }
+			if (RSP() < stack_barrier) { Terminate(ErrorCode::StackOverflow); return false; }
 			if (!GetMemRaw<T>(RSP(), val)) return false;
 			RSP() += sizeof(T);
 			return true;
@@ -375,9 +374,9 @@ namespace CSX64
 		template<typename T, std::enable_if_t<std::is_trivial<T>::value, int> = 0>
 		bool GetMemRaw(u64 pos, u64 &res)
 		{
-			if (pos >= mem_size || pos + sizeof(T) > mem_size) { Terminate(ErrorCode::OutOfBounds); return false; }
+			if (pos >= mem.size() || pos + sizeof(T) > mem.size()) { Terminate(ErrorCode::OutOfBounds); return false; }
 			
-			res = bin_read<T>(reinterpret_cast<const char*>(mem) + pos);
+			res = read<T>(mem.data() + pos);
 
 			return true;
 		}
@@ -387,13 +386,13 @@ namespace CSX64
 
 		// writes a raw value to memory. returns true on success
 		bool SetMemRaw(u64 pos, u64 size, u64 val);
-		template<typename T, std::enable_if_t<std::is_trivial<T>::value, int> = 0>
+		template<typename T, std::enable_if_t<is_uint<T>, int> = 0>
 		bool SetMemRaw(u64 pos, u64 val)
 		{
-			if (pos >= mem_size || pos + sizeof(T) > mem_size) { Terminate(ErrorCode::OutOfBounds); return false; }
-			if (pos < ReadonlyBarrier) { Terminate(ErrorCode::AccessViolation); return false; }
+			if (pos >= mem.size() || pos + sizeof(T) > mem.size()) { Terminate(ErrorCode::OutOfBounds); return false; }
+			if (pos < readonly_barrier) { Terminate(ErrorCode::AccessViolation); return false; }
 
-			bin_write<T>(reinterpret_cast<char*>(mem) + pos, (T)val); // aliasing ok because casting to char type
+			write<T>(mem.data() + pos, (T)val); // aliasing ok because casting to char type
 
 			return true;
 		}
@@ -755,7 +754,7 @@ namespace CSX64
 		typedef bool (Computer::* VPUCVTDelegate)(u64 &res, u64 a);
 
 		// holds cpu delegates for simd fp comparisons
-		static const VPUBinaryDelegate __TryProcessVEC_FCMP_lookup[];
+		static const VPUBinaryDelegate _TryProcessVEC_FCMP_lookup[];
 
 	private: // -- operators -- //
 
@@ -908,15 +907,15 @@ namespace CSX64
 		bool ProcessADXX();
 		bool ProcessAAX();
 
-		bool __ProcessSTRING_MOVS(u64 sizecode);
-		bool __ProcessSTRING_CMPS(u64 sizecode);
-		bool __ProcessSTRING_LODS(u64 sizecode);
-		bool __ProcessSTRING_STOS(u64 sizecode);
-		bool __ProcessSTRING_SCAS(u64 sizecode);
+		bool _ProcessSTRING_MOVS(u64 sizecode);
+		bool _ProcessSTRING_CMPS(u64 sizecode);
+		bool _ProcessSTRING_LODS(u64 sizecode);
+		bool _ProcessSTRING_STOS(u64 sizecode);
+		bool _ProcessSTRING_SCAS(u64 sizecode);
 
 		bool ProcessSTRING();
 
-		bool __Process_BSx_common(u64 &s, u64 &src, u64 &sizecode);
+		bool _Process_BSx_common(u64 &s, u64 &src, u64 &sizecode);
 		bool ProcessBSx();
 
 		bool ProcessTZCNT();
@@ -1001,138 +1000,138 @@ namespace CSX64
 		bool ProcessVPUCVT_scalar_reg_xmm(u64 to_elem_sizecode, u64 from_elem_sizecode, VPUCVTDelegate func);
 		bool ProcessVPUCVT_scalar_reg_mem(u64 to_elem_sizecode, u64 from_elem_sizecode, VPUCVTDelegate func);
 
-		bool __TryPerformVEC_FADD(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
-		bool __TryPerformVEC_FSUB(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
-		bool __TryPerformVEC_FMUL(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
-		bool __TryPerformVEC_FDIV(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
+		bool _TryPerformVEC_FADD(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
+		bool _TryPerformVEC_FSUB(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
+		bool _TryPerformVEC_FMUL(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
+		bool _TryPerformVEC_FDIV(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
 
 		bool TryProcessVEC_FADD();
 		bool TryProcessVEC_FSUB();
 		bool TryProcessVEC_FMUL();
 		bool TryProcessVEC_FDIV();
 
-		bool __TryPerformVEC_AND(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
-		bool __TryPerformVEC_OR(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
-		bool __TryPerformVEC_XOR(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
-		bool __TryPerformVEC_ANDN(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
+		bool _TryPerformVEC_AND(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
+		bool _TryPerformVEC_OR(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
+		bool _TryPerformVEC_XOR(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
+		bool _TryPerformVEC_ANDN(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
 
 		bool TryProcessVEC_AND();
 		bool TryProcessVEC_OR();
 		bool TryProcessVEC_XOR();
 		bool TryProcessVEC_ANDN();
 
-		bool __TryPerformVEC_ADD(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
-		bool __TryPerformVEC_ADDS(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
-		bool __TryPerformVEC_ADDUS(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
+		bool _TryPerformVEC_ADD(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
+		bool _TryPerformVEC_ADDS(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
+		bool _TryPerformVEC_ADDUS(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
 
 		bool TryProcessVEC_ADD();
 		bool TryProcessVEC_ADDS();
 		bool TryProcessVEC_ADDUS();
 
-		bool __TryPerformVEC_SUB(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
-		bool __TryPerformVEC_SUBS(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
-		bool __TryPerformVEC_SUBUS(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
+		bool _TryPerformVEC_SUB(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
+		bool _TryPerformVEC_SUBS(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
+		bool _TryPerformVEC_SUBUS(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
 
 		bool TryProcessVEC_SUB();
 		bool TryProcessVEC_SUBS();
 		bool TryProcessVEC_SUBUS();
 
-		bool __TryPerformVEC_MULL(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
+		bool _TryPerformVEC_MULL(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
 
 		bool TryProcessVEC_MULL();
 
-		bool __TryProcessVEC_FMIN(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
-		bool __TryProcessVEC_FMAX(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
+		bool _TryProcessVEC_FMIN(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
+		bool _TryProcessVEC_FMAX(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
 
 		bool TryProcessVEC_FMIN();
 		bool TryProcessVEC_FMAX();
 
-		bool __TryProcessVEC_UMIN(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
-		bool __TryProcessVEC_SMIN(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
-		bool __TryProcessVEC_UMAX(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
-		bool __TryProcessVEC_SMAX(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
+		bool _TryProcessVEC_UMIN(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
+		bool _TryProcessVEC_SMIN(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
+		bool _TryProcessVEC_UMAX(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
+		bool _TryProcessVEC_SMAX(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
 
 		bool TryProcessVEC_UMIN();
 		bool TryProcessVEC_SMIN();
 		bool TryProcessVEC_UMAX();
 		bool TryProcessVEC_SMAX();
 
-		bool __TryPerformVEC_FADDSUB(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
+		bool _TryPerformVEC_FADDSUB(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
 
 		bool TryProcessVEC_FADDSUB();
 
-		bool __TryPerformVEC_AVG(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
+		bool _TryPerformVEC_AVG(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
 
 		bool TryProcessVEC_AVG();
 
-		bool __TryProcessVEC_FCMP_helper(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index,
+		bool _TryProcessVEC_FCMP_helper(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index,
 			bool great, bool less, bool equal, bool unord, bool signal);
 		
-		bool __TryProcessVEC_FCMP_EQ_OQ(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
-		bool __TryProcessVEC_FCMP_LT_OS(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
-		bool __TryProcessVEC_FCMP_LE_OS(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
-		bool __TryProcessVEC_FCMP_UNORD_Q(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
-		bool __TryProcessVEC_FCMP_NEQ_UQ(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
-		bool __TryProcessVEC_FCMP_NLT_US(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
-		bool __TryProcessVEC_FCMP_NLE_US(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
-		bool __TryProcessVEC_FCMP_ORD_Q(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
-		bool __TryProcessVEC_FCMP_EQ_UQ(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
-		bool __TryProcessVEC_FCMP_NGE_US(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
-		bool __TryProcessVEC_FCMP_NGT_US(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
-		bool __TryProcessVEC_FCMP_FALSE_OQ(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
-		bool __TryProcessVEC_FCMP_NEQ_OQ(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
-		bool __TryProcessVEC_FCMP_GE_OS(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
-		bool __TryProcessVEC_FCMP_GT_OS(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
-		bool __TryProcessVEC_FCMP_TRUE_UQ(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
-		bool __TryProcessVEC_FCMP_EQ_OS(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
-		bool __TryProcessVEC_FCMP_LT_OQ(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
-		bool __TryProcessVEC_FCMP_LE_OQ(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
-		bool __TryProcessVEC_FCMP_UNORD_S(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
-		bool __TryProcessVEC_FCMP_NEQ_US(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
-		bool __TryProcessVEC_FCMP_NLT_UQ(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
-		bool __TryProcessVEC_FCMP_NLE_UQ(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
-		bool __TryProcessVEC_FCMP_ORD_S(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
-		bool __TryProcessVEC_FCMP_EQ_US(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
-		bool __TryProcessVEC_FCMP_NGE_UQ(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
-		bool __TryProcessVEC_FCMP_NGT_UQ(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
-		bool __TryProcessVEC_FCMP_FALSE_OS(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
-		bool __TryProcessVEC_FCMP_NEQ_OS(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
-		bool __TryProcessVEC_FCMP_GE_OQ(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
-		bool __TryProcessVEC_FCMP_GT_OQ(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
-		bool __TryProcessVEC_FCMP_TRUE_US(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
+		bool _TryProcessVEC_FCMP_EQ_OQ(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
+		bool _TryProcessVEC_FCMP_LT_OS(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
+		bool _TryProcessVEC_FCMP_LE_OS(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
+		bool _TryProcessVEC_FCMP_UNORD_Q(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
+		bool _TryProcessVEC_FCMP_NEQ_UQ(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
+		bool _TryProcessVEC_FCMP_NLT_US(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
+		bool _TryProcessVEC_FCMP_NLE_US(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
+		bool _TryProcessVEC_FCMP_ORD_Q(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
+		bool _TryProcessVEC_FCMP_EQ_UQ(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
+		bool _TryProcessVEC_FCMP_NGE_US(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
+		bool _TryProcessVEC_FCMP_NGT_US(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
+		bool _TryProcessVEC_FCMP_FALSE_OQ(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
+		bool _TryProcessVEC_FCMP_NEQ_OQ(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
+		bool _TryProcessVEC_FCMP_GE_OS(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
+		bool _TryProcessVEC_FCMP_GT_OS(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
+		bool _TryProcessVEC_FCMP_TRUE_UQ(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
+		bool _TryProcessVEC_FCMP_EQ_OS(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
+		bool _TryProcessVEC_FCMP_LT_OQ(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
+		bool _TryProcessVEC_FCMP_LE_OQ(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
+		bool _TryProcessVEC_FCMP_UNORD_S(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
+		bool _TryProcessVEC_FCMP_NEQ_US(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
+		bool _TryProcessVEC_FCMP_NLT_UQ(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
+		bool _TryProcessVEC_FCMP_NLE_UQ(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
+		bool _TryProcessVEC_FCMP_ORD_S(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
+		bool _TryProcessVEC_FCMP_EQ_US(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
+		bool _TryProcessVEC_FCMP_NGE_UQ(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
+		bool _TryProcessVEC_FCMP_NGT_UQ(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
+		bool _TryProcessVEC_FCMP_FALSE_OS(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
+		bool _TryProcessVEC_FCMP_NEQ_OS(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
+		bool _TryProcessVEC_FCMP_GE_OQ(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
+		bool _TryProcessVEC_FCMP_GT_OQ(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
+		bool _TryProcessVEC_FCMP_TRUE_US(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
 
 		bool TryProcessVEC_FCMP();
 
-		bool __TryProcessVEC_FCOMI(u64 elem_sizecode, u64 &res, u64 _a, u64 _b, u64 index);
+		bool _TryProcessVEC_FCOMI(u64 elem_sizecode, u64 &res, u64 _a, u64 _b, u64 index);
 
 		bool TryProcessVEC_FCOMI();
 
-		bool __TryProcessVEC_FSQRT(u64 elem_sizecode, u64 &res, u64 a, u64 index);
-		bool __TryProcessVEC_FRSQRT(u64 elem_sizecode, u64 &res, u64 a, u64 index);
+		bool _TryProcessVEC_FSQRT(u64 elem_sizecode, u64 &res, u64 a, u64 index);
+		bool _TryProcessVEC_FRSQRT(u64 elem_sizecode, u64 &res, u64 a, u64 index);
 
 		bool TryProcessVEC_FSQRT();
 		bool TryProcessVEC_FRSQRT();
 
-		bool __double_to_i32(u64 &res, u64 val);
-		bool __single_to_i32(u64 &res, u64 val);
+		bool _double_to_i32(u64 &res, u64 val);
+		bool _single_to_i32(u64 &res, u64 val);
 
-		bool __double_to_i64(u64 &res, u64 val);
-		bool __single_to_i64(u64 &res, u64 val);
+		bool _double_to_i64(u64 &res, u64 val);
+		bool _single_to_i64(u64 &res, u64 val);
 
-		bool __double_to_ti32(u64 &res, u64 val);
-		bool __single_to_ti32(u64 &res, u64 val);
+		bool _double_to_ti32(u64 &res, u64 val);
+		bool _single_to_ti32(u64 &res, u64 val);
 
-		bool __double_to_ti64(u64 &res, u64 val);
-		bool __single_to_ti64(u64 &res, u64 val);
+		bool _double_to_ti64(u64 &res, u64 val);
+		bool _single_to_ti64(u64 &res, u64 val);
 
-		bool __i32_to_double(u64 &res, u64 val);
-		bool __i32_to_single(u64 &res, u64 val);
+		bool _i32_to_double(u64 &res, u64 val);
+		bool _i32_to_single(u64 &res, u64 val);
 
-		bool __i64_to_double(u64 &res, u64 val);
-		bool __i64_to_single(u64 &res, u64 val);
+		bool _i64_to_double(u64 &res, u64 val);
+		bool _i64_to_single(u64 &res, u64 val);
 
-		bool __double_to_single(u64 &res, u64 val);
-		bool __single_to_double(u64 &res, u64 val);
+		bool _double_to_single(u64 &res, u64 val);
+		bool _single_to_double(u64 &res, u64 val);
 
 		bool TryProcessVEC_CVT();
 

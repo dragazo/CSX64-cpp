@@ -40,8 +40,6 @@
 #define MASK_UNION_15(a,b,c,d,e,f,g,h,i,j,k,l,m,n,o)   (MASK_UNION_1(a) | MASK_UNION_14(b,c,d,e,f,g,h,i,j,k,l,m,n,o))
 #define MASK_UNION_16(a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p) (MASK_UNION_1(a) | MASK_UNION_15(b,c,d,e,f,g,h,i,j,k,l,m,n,o,p))
 
-#define COMMA ,
-
 namespace CSX64
 {
     bool Computer::FetchTernaryOpFormat(u64 &s, u64 &a, u64 &b)
@@ -1573,7 +1571,7 @@ namespace CSX64
         if (!FetchUnaryOpFormat(s, m, a)) return false;
         u64 sizecode = (s >> 2) & 3;
 
-        return StoreUnaryOpFormat(s, m, ByteSwap(a, sizecode));
+        return StoreUnaryOpFormat(s, m, bswap(a, sizecode));
     }
     bool Computer::ProcessBEXTR()
     {
@@ -1969,7 +1967,7 @@ namespace CSX64
     }
 
     // helper for MOVS - performs the actual move
-    bool Computer::__ProcessSTRING_MOVS(u64 sizecode)
+    bool Computer::_ProcessSTRING_MOVS(u64 sizecode)
     {
         u64 size = Size(sizecode);
         u64 temp;
@@ -1981,7 +1979,7 @@ namespace CSX64
 
         return true;
     }
-    bool Computer::__ProcessSTRING_CMPS(u64 sizecode)
+    bool Computer::_ProcessSTRING_CMPS(u64 sizecode)
     {
         u64 size = Size(sizecode);
         u64 a, b;
@@ -2001,7 +1999,7 @@ namespace CSX64
 
         return true;
     }
-    bool Computer::__ProcessSTRING_LODS(u64 sizecode)
+    bool Computer::_ProcessSTRING_LODS(u64 sizecode)
     {
         u64 size = Size(sizecode);
         u64 temp;
@@ -2015,7 +2013,7 @@ namespace CSX64
 
         return true;
     }
-    bool Computer::__ProcessSTRING_STOS(u64 sizecode)
+    bool Computer::_ProcessSTRING_STOS(u64 sizecode)
     {
         u64 size = Size(sizecode);
 
@@ -2026,7 +2024,7 @@ namespace CSX64
 
         return true;
     }
-    bool Computer::__ProcessSTRING_SCAS(u64 sizecode)
+    bool Computer::_ProcessSTRING_SCAS(u64 sizecode)
     {
         u64 size = Size(sizecode);
         u64 a = CPURegisters[0][sizecode];
@@ -2074,7 +2072,7 @@ namespace CSX64
         switch (s >> 2)
         {
         case 0: // MOVS
-            if (!__ProcessSTRING_MOVS(sizecode)) return false;
+            if (!_ProcessSTRING_MOVS(sizecode)) return false;
             break;
 
         case 1: // REP MOVS
@@ -2084,21 +2082,21 @@ namespace CSX64
             {
                 while (RCX())
                 {
-                    if (!__ProcessSTRING_MOVS(sizecode)) return false;
+                    if (!_ProcessSTRING_MOVS(sizecode)) return false;
                     --RCX();
                 }
             }
             // otherwise perform a single iteration (if count is nonzero)
             else if (RCX())
             {
-                if (!__ProcessSTRING_MOVS(sizecode)) return false;
+                if (!_ProcessSTRING_MOVS(sizecode)) return false;
                 --RCX();
                 RIP() -= 2; // reset RIP to repeat instruction
             }
             break;
 
         case 2: // CMPS
-            if (!__ProcessSTRING_CMPS(sizecode)) return false;
+            if (!_ProcessSTRING_CMPS(sizecode)) return false;
             break;
 
         case 3: // REPE CMPS
@@ -2108,7 +2106,7 @@ namespace CSX64
             {
                 while (RCX())
                 {
-                    if (!__ProcessSTRING_CMPS(sizecode)) return false;
+                    if (!_ProcessSTRING_CMPS(sizecode)) return false;
                     --RCX();
                     if (!ZF()) break;
                 }
@@ -2116,7 +2114,7 @@ namespace CSX64
             // otherwise perform a single iteration (if count is nonzero)
             else if (RCX())
             {
-                if (!__ProcessSTRING_CMPS(sizecode)) return false;
+                if (!_ProcessSTRING_CMPS(sizecode)) return false;
                 --RCX();
                 if (ZF()) RIP() -= 2; // if condition met, reset RIP to repeat instruction
             }
@@ -2129,7 +2127,7 @@ namespace CSX64
             {
                 while (RCX())
                 {
-                    if (!__ProcessSTRING_CMPS(sizecode)) return false;
+                    if (!_ProcessSTRING_CMPS(sizecode)) return false;
                     --RCX();
                     if (ZF()) break;
                 }
@@ -2137,14 +2135,14 @@ namespace CSX64
             // otherwise perform a single iteration (if count is nonzero)
             else if (RCX())
             {
-                if (!__ProcessSTRING_CMPS(sizecode)) return false;
+                if (!_ProcessSTRING_CMPS(sizecode)) return false;
                 --RCX();
                 if (!ZF()) RIP() -= 2; // if condition met, reset RIP to repeat instruction
             }
             break;
 
         case 5: // LODS
-            if (!__ProcessSTRING_LODS(sizecode)) return false;
+            if (!_ProcessSTRING_LODS(sizecode)) return false;
             break;
 
         case 6: // REP LODS
@@ -2153,20 +2151,20 @@ namespace CSX64
             {
                 while (RCX())
                 {
-                    if (!__ProcessSTRING_LODS(sizecode)) return false;
+                    if (!_ProcessSTRING_LODS(sizecode)) return false;
                     --RCX();
                 }
             }
             else if (RCX())
             {
-                if (!__ProcessSTRING_LODS(sizecode)) return false;
+                if (!_ProcessSTRING_LODS(sizecode)) return false;
                 --RCX();
                 RIP() -= 2; // reset RIP to repeat instruction
             }
             break;
 
         case 7: // STOS
-            if (!__ProcessSTRING_STOS(sizecode)) return false;
+            if (!_ProcessSTRING_STOS(sizecode)) return false;
             break;
 
         case 8: // REP STOS
@@ -2175,20 +2173,20 @@ namespace CSX64
             {
                 while (RCX())
                 {
-                    if (!__ProcessSTRING_STOS(sizecode)) return false;
+                    if (!_ProcessSTRING_STOS(sizecode)) return false;
                     --RCX();
                 }
             }
             else if (RCX())
             {
-                if (!__ProcessSTRING_STOS(sizecode)) return false;
+                if (!_ProcessSTRING_STOS(sizecode)) return false;
                 --RCX();
                 RIP() -= 2; // reset RIP to repeat instruction
             }
             break;
 
         case 9: // SCAS
-            if (!__ProcessSTRING_SCAS(sizecode)) return false;
+            if (!_ProcessSTRING_SCAS(sizecode)) return false;
             break;
 
         case 10: // REPE SCAS
@@ -2198,7 +2196,7 @@ namespace CSX64
             {
                 while (RCX())
                 {
-                    if (!__ProcessSTRING_SCAS(sizecode)) return false;
+                    if (!_ProcessSTRING_SCAS(sizecode)) return false;
                     --RCX();
                     if (!ZF()) break;
                 }
@@ -2206,7 +2204,7 @@ namespace CSX64
             // otherwise perform a single iteration (if count is nonzero)
             else if (RCX())
             {
-                if (!__ProcessSTRING_SCAS(sizecode)) return false;
+                if (!_ProcessSTRING_SCAS(sizecode)) return false;
                 --RCX();
                 if (ZF()) RIP() -= 2; // if condition met, reset RIP to repeat instruction
             }
@@ -2219,7 +2217,7 @@ namespace CSX64
             {
                 while (RCX())
                 {
-                    if (!__ProcessSTRING_SCAS(sizecode)) return false;
+                    if (!_ProcessSTRING_SCAS(sizecode)) return false;
                     --RCX();
                     if (ZF()) break;
                 }
@@ -2227,7 +2225,7 @@ namespace CSX64
             // otherwise perform a single iteration (if count is nonzero)
             else if (RCX())
             {
-                if (!__ProcessSTRING_SCAS(sizecode)) return false;
+                if (!_ProcessSTRING_SCAS(sizecode)) return false;
                 --RCX();
                 if (!ZF()) RIP() -= 2; // if condition met, reset RIP to repeat instruction
             }
@@ -2245,7 +2243,7 @@ namespace CSX64
         mem = 0: [4:][4: src]
         mem = 1: [address]
     */
-    bool Computer::__Process_BSx_common(u64 &s, u64 &src, u64 &sizecode)
+    bool Computer::_Process_BSx_common(u64 &s, u64 &src, u64 &sizecode)
     {
         if (!GetMemAdv<u8>(s)) return false;
         sizecode = (s >> 4) & 3;
@@ -2267,7 +2265,7 @@ namespace CSX64
     bool Computer::ProcessBSx()
     {
         u64 s, src, sizecode, res;
-        if (!__Process_BSx_common(s, src, sizecode)) return false;
+        if (!_Process_BSx_common(s, src, sizecode)) return false;
 
         // if src is zero
         if (src == 0)
@@ -2292,7 +2290,7 @@ namespace CSX64
     bool Computer::ProcessTZCNT()
     {
         u64 s, src, sizecode, res;
-        if (!__Process_BSx_common(s, src, sizecode)) return false;
+        if (!_Process_BSx_common(s, src, sizecode)) return false;
 
         // if src is zero
         if (src == 0)
@@ -3667,7 +3665,7 @@ namespace CSX64
         return true;
     }
 
-    bool Computer::__TryPerformVEC_FADD(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64)
+    bool Computer::_TryPerformVEC_FADD(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64)
     {
         // 64-bit fp
         if (elem_sizecode == 3) res = DoubleAsUInt64(AsDouble(a) + AsDouble(b));
@@ -3676,7 +3674,7 @@ namespace CSX64
 
         return true;
     }
-    bool Computer::__TryPerformVEC_FSUB(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64)
+    bool Computer::_TryPerformVEC_FSUB(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64)
     {
         // 64-bit fp
         if (elem_sizecode == 3) res = DoubleAsUInt64(AsDouble(a) - AsDouble(b));
@@ -3685,7 +3683,7 @@ namespace CSX64
 
         return true;
     }
-    bool Computer::__TryPerformVEC_FMUL(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64)
+    bool Computer::_TryPerformVEC_FMUL(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64)
     {
         // 64-bit fp
         if (elem_sizecode == 3) res = DoubleAsUInt64(AsDouble(a) * AsDouble(b));
@@ -3694,7 +3692,7 @@ namespace CSX64
 
         return true;
     }
-    bool Computer::__TryPerformVEC_FDIV(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64)
+    bool Computer::_TryPerformVEC_FDIV(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64)
     {
         // 64-bit fp
         if (elem_sizecode == 3) res = DoubleAsUInt64(AsDouble(a) / AsDouble(b));
@@ -3704,43 +3702,43 @@ namespace CSX64
         return true;
     }
 
-    bool Computer::TryProcessVEC_FADD() { return ProcessVPUBinary(12, &Computer::__TryPerformVEC_FADD); }
-    bool Computer::TryProcessVEC_FSUB() { return ProcessVPUBinary(12, &Computer::__TryPerformVEC_FSUB); }
-    bool Computer::TryProcessVEC_FMUL() { return ProcessVPUBinary(12, &Computer::__TryPerformVEC_FMUL); }
-    bool Computer::TryProcessVEC_FDIV() { return ProcessVPUBinary(12, &Computer::__TryPerformVEC_FDIV); }
+    bool Computer::TryProcessVEC_FADD() { return ProcessVPUBinary(12, &Computer::_TryPerformVEC_FADD); }
+    bool Computer::TryProcessVEC_FSUB() { return ProcessVPUBinary(12, &Computer::_TryPerformVEC_FSUB); }
+    bool Computer::TryProcessVEC_FMUL() { return ProcessVPUBinary(12, &Computer::_TryPerformVEC_FMUL); }
+    bool Computer::TryProcessVEC_FDIV() { return ProcessVPUBinary(12, &Computer::_TryPerformVEC_FDIV); }
 
-    bool Computer::__TryPerformVEC_AND(u64, u64 &res, u64 a, u64 b, u64)
+    bool Computer::_TryPerformVEC_AND(u64, u64 &res, u64 a, u64 b, u64)
     {
         res = a & b;
         return true;
     }
-    bool Computer::__TryPerformVEC_OR(u64, u64 &res, u64 a, u64 b, u64)
+    bool Computer::_TryPerformVEC_OR(u64, u64 &res, u64 a, u64 b, u64)
     {
         res = a | b;
         return true;
     }
-    bool Computer::__TryPerformVEC_XOR(u64, u64 &res, u64 a, u64 b, u64)
+    bool Computer::_TryPerformVEC_XOR(u64, u64 &res, u64 a, u64 b, u64)
     {
         res = a ^ b;
         return true;
     }
-    bool Computer::__TryPerformVEC_ANDN(u64, u64 &res, u64 a, u64 b, u64)
+    bool Computer::_TryPerformVEC_ANDN(u64, u64 &res, u64 a, u64 b, u64)
     {
         res = ~a & b;
         return true;
     }
 
-    bool Computer::TryProcessVEC_AND()  { return ProcessVPUBinary(15, &Computer::__TryPerformVEC_AND); }
-    bool Computer::TryProcessVEC_OR()   { return ProcessVPUBinary(15, &Computer::__TryPerformVEC_OR); }
-    bool Computer::TryProcessVEC_XOR()  { return ProcessVPUBinary(15, &Computer::__TryPerformVEC_XOR); }
-    bool Computer::TryProcessVEC_ANDN() { return ProcessVPUBinary(15, &Computer::__TryPerformVEC_ANDN); }
+    bool Computer::TryProcessVEC_AND()  { return ProcessVPUBinary(15, &Computer::_TryPerformVEC_AND); }
+    bool Computer::TryProcessVEC_OR()   { return ProcessVPUBinary(15, &Computer::_TryPerformVEC_OR); }
+    bool Computer::TryProcessVEC_XOR()  { return ProcessVPUBinary(15, &Computer::_TryPerformVEC_XOR); }
+    bool Computer::TryProcessVEC_ANDN() { return ProcessVPUBinary(15, &Computer::_TryPerformVEC_ANDN); }
 
-    bool Computer::__TryPerformVEC_ADD(u64, u64 &res, u64 a, u64 b, u64)
+    bool Computer::_TryPerformVEC_ADD(u64, u64 &res, u64 a, u64 b, u64)
     {
         res = a + b;
         return true;
     }
-    bool Computer::__TryPerformVEC_ADDS(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64)
+    bool Computer::_TryPerformVEC_ADDS(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64)
     {
         // get sign mask
         u64 smask = SignMask(elem_sizecode);
@@ -3757,7 +3755,7 @@ namespace CSX64
 
         return true;
     }
-    bool Computer::__TryPerformVEC_ADDUS(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64)
+    bool Computer::_TryPerformVEC_ADDUS(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64)
     {
         // get trunc mask
         u64 tmask = TruncMask(elem_sizecode);
@@ -3770,40 +3768,40 @@ namespace CSX64
         return true;
     }
 
-    bool Computer::TryProcessVEC_ADD()   { return ProcessVPUBinary(15, &Computer::__TryPerformVEC_ADD); }
-    bool Computer::TryProcessVEC_ADDS()  { return ProcessVPUBinary(15, &Computer::__TryPerformVEC_ADDS); }
-    bool Computer::TryProcessVEC_ADDUS() { return ProcessVPUBinary(15, &Computer::__TryPerformVEC_ADDUS); }
+    bool Computer::TryProcessVEC_ADD()   { return ProcessVPUBinary(15, &Computer::_TryPerformVEC_ADD); }
+    bool Computer::TryProcessVEC_ADDS()  { return ProcessVPUBinary(15, &Computer::_TryPerformVEC_ADDS); }
+    bool Computer::TryProcessVEC_ADDUS() { return ProcessVPUBinary(15, &Computer::_TryPerformVEC_ADDUS); }
 
-    bool Computer::__TryPerformVEC_SUB(u64, u64 &res, u64 a, u64 b, u64)
+    bool Computer::_TryPerformVEC_SUB(u64, u64 &res, u64 a, u64 b, u64)
     {
         res = a - b;
         return true;
     }
-    bool Computer::__TryPerformVEC_SUBS(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index)
+    bool Computer::_TryPerformVEC_SUBS(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index)
     {
         // since this one's signed, we can just add the negative
-        return __TryPerformVEC_ADDS(elem_sizecode, res, a, Truncate(~b + 1, elem_sizecode), index);
+        return _TryPerformVEC_ADDS(elem_sizecode, res, a, Truncate(~b + 1, elem_sizecode), index);
     }
-    bool Computer::__TryPerformVEC_SUBUS(u64, u64 &res, u64 a, u64 b, u64)
+    bool Computer::_TryPerformVEC_SUBUS(u64, u64 &res, u64 a, u64 b, u64)
     {
         // handle unsigned sub saturation
         res = a > b ? a - b : 0;
         return true;
     }
 
-    bool Computer::TryProcessVEC_SUB()   { return ProcessVPUBinary(15, &Computer::__TryPerformVEC_SUB); }
-    bool Computer::TryProcessVEC_SUBS()  { return ProcessVPUBinary(15, &Computer::__TryPerformVEC_SUBS); }
-    bool Computer::TryProcessVEC_SUBUS() { return ProcessVPUBinary(15, &Computer::__TryPerformVEC_SUBUS); }
+    bool Computer::TryProcessVEC_SUB()   { return ProcessVPUBinary(15, &Computer::_TryPerformVEC_SUB); }
+    bool Computer::TryProcessVEC_SUBS()  { return ProcessVPUBinary(15, &Computer::_TryPerformVEC_SUBS); }
+    bool Computer::TryProcessVEC_SUBUS() { return ProcessVPUBinary(15, &Computer::_TryPerformVEC_SUBUS); }
 
-    bool Computer::__TryPerformVEC_MULL(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64)
+    bool Computer::_TryPerformVEC_MULL(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64)
     {
         res = (i64)SignExtend(a, elem_sizecode) * (i64)SignExtend(b, elem_sizecode);
         return true;
     }
 
-    bool Computer::TryProcessVEC_MULL() { return ProcessVPUBinary(15, &Computer::__TryPerformVEC_MULL); }
+    bool Computer::TryProcessVEC_MULL() { return ProcessVPUBinary(15, &Computer::_TryPerformVEC_MULL); }
 
-    bool Computer::__TryProcessVEC_FMIN(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64)
+    bool Computer::_TryProcessVEC_FMIN(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64)
     {
         // this exploits c++ returning false on comparison to NaN. see http://www.felixcloutier.com/x86/MINPD.html for the actual algorithm
         if (elem_sizecode == 3) res = AsDouble(a) < AsDouble(b) ? a : b;
@@ -3811,7 +3809,7 @@ namespace CSX64
 
         return true;
     }
-    bool Computer::__TryProcessVEC_FMAX(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64)
+    bool Computer::_TryProcessVEC_FMAX(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64)
     {
         // this exploits c++ returning false on comparison to NaN. see http://www.felixcloutier.com/x86/MAXPD.html for the actual algorithm
         if (elem_sizecode == 3) res = AsDouble(a) > AsDouble(b) ? a : b;
@@ -3820,38 +3818,38 @@ namespace CSX64
         return true;
     }
 
-    bool Computer::TryProcessVEC_FMIN() { return ProcessVPUBinary(12, &Computer::__TryProcessVEC_FMIN); }
-    bool Computer::TryProcessVEC_FMAX() { return ProcessVPUBinary(12, &Computer::__TryProcessVEC_FMAX); }
+    bool Computer::TryProcessVEC_FMIN() { return ProcessVPUBinary(12, &Computer::_TryProcessVEC_FMIN); }
+    bool Computer::TryProcessVEC_FMAX() { return ProcessVPUBinary(12, &Computer::_TryProcessVEC_FMAX); }
 
-    bool Computer::__TryProcessVEC_UMIN(u64, u64 &res, u64 a, u64 b, u64)
+    bool Computer::_TryProcessVEC_UMIN(u64, u64 &res, u64 a, u64 b, u64)
     {
         res = a < b ? a : b; // a and b are guaranteed to be properly truncated, so this is invariant of size
         return true;
     }
-    bool Computer::__TryProcessVEC_SMIN(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64)
+    bool Computer::_TryProcessVEC_SMIN(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64)
     {
         // just extend to 64-bit and do a signed compare
         res = (i64)SignExtend(a, elem_sizecode) < (i64)SignExtend(b, elem_sizecode) ? a : b;
         return true;
     }
-    bool Computer::__TryProcessVEC_UMAX(u64, u64 &res, u64 a, u64 b, u64)
+    bool Computer::_TryProcessVEC_UMAX(u64, u64 &res, u64 a, u64 b, u64)
     {
         res = a > b ? a : b; // a and b are guaranteed to be properly truncated, so this is invariant of size
         return true;
     }
-    bool Computer::__TryProcessVEC_SMAX(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64)
+    bool Computer::_TryProcessVEC_SMAX(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64)
     {
         // just extend to 64-bit and do a signed compare
         res = (i64)SignExtend(a, elem_sizecode) > (i64)SignExtend(b, elem_sizecode) ? a : b;
         return true;
     }
 
-    bool Computer::TryProcessVEC_UMIN() { return ProcessVPUBinary(15, &Computer::__TryProcessVEC_UMIN); }
-    bool Computer::TryProcessVEC_SMIN() { return ProcessVPUBinary(15, &Computer::__TryProcessVEC_SMIN); }
-    bool Computer::TryProcessVEC_UMAX() { return ProcessVPUBinary(15, &Computer::__TryProcessVEC_UMAX); }
-    bool Computer::TryProcessVEC_SMAX() { return ProcessVPUBinary(15, &Computer::__TryProcessVEC_SMAX); }
+    bool Computer::TryProcessVEC_UMIN() { return ProcessVPUBinary(15, &Computer::_TryProcessVEC_UMIN); }
+    bool Computer::TryProcessVEC_SMIN() { return ProcessVPUBinary(15, &Computer::_TryProcessVEC_SMIN); }
+    bool Computer::TryProcessVEC_UMAX() { return ProcessVPUBinary(15, &Computer::_TryProcessVEC_UMAX); }
+    bool Computer::TryProcessVEC_SMAX() { return ProcessVPUBinary(15, &Computer::_TryProcessVEC_SMAX); }
 
-    bool Computer::__TryPerformVEC_FADDSUB(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index)
+    bool Computer::_TryPerformVEC_FADDSUB(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index)
     {
         // 64-bit fp
         if (elem_sizecode == 3) res = DoubleAsUInt64(index % 2 == 0 ? AsDouble(a) - AsDouble(b) : AsDouble(a) + AsDouble(b));
@@ -3861,21 +3859,21 @@ namespace CSX64
         return true;
     }
 
-    bool Computer::TryProcessVEC_FADDSUB() { return ProcessVPUBinary(12, &Computer::__TryPerformVEC_FADDSUB); }
+    bool Computer::TryProcessVEC_FADDSUB() { return ProcessVPUBinary(12, &Computer::_TryPerformVEC_FADDSUB); }
 
-    bool Computer::__TryPerformVEC_AVG(u64, u64 &res, u64 a, u64 b, u64)
+    bool Computer::_TryPerformVEC_AVG(u64, u64 &res, u64 a, u64 b, u64)
     {
         res = (a + b + 1) >> 1; // doesn't work for 64-bit, but Intel doesn't offer a 64-bit variant anyway, so that's fine
         return true;
     }
 
-    bool Computer::TryProcessVEC_AVG() { return ProcessVPUBinary(3, &Computer::__TryPerformVEC_AVG); }
+    bool Computer::TryProcessVEC_AVG() { return ProcessVPUBinary(3, &Computer::_TryPerformVEC_AVG); }
 
     // constants used to represent the result of a "true" simd floatint-point comparison
-    static constexpr u64 __fp64_simd_cmp_true = 0xffffffffffffffff;
-    static constexpr u64 __fp32_simd_cmp_true = 0xffffffff;
+    inline static constexpr u64 _fp64_simd_cmp_true = 0xffffffffffffffff;
+    inline static constexpr u64 _fp32_simd_cmp_true = 0xffffffff;
 
-    bool Computer::__TryProcessVEC_FCMP_helper(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 /*index*/,
+    bool Computer::_TryProcessVEC_FCMP_helper(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 /*index*/,
         bool great, bool less, bool equal, bool unord, bool signal) 
     {
         if (elem_sizecode == 3)
@@ -3891,7 +3889,7 @@ namespace CSX64
             else if (fa <  fb) cmp = less;
             else if (fa == fb) cmp = equal;
             else cmp = false; /* if something weird happens, catch as false */
-            res = cmp ? __fp64_simd_cmp_true : 0;
+            res = cmp ? _fp64_simd_cmp_true : 0;
         }
         else
         {
@@ -3906,43 +3904,43 @@ namespace CSX64
             else if (fa <  fb) cmp = less;
             else if (fa == fb) cmp = equal;
             else cmp = false; /* if something weird happens, catch as false */
-            res = cmp ? __fp32_simd_cmp_true : 0;
+            res = cmp ? _fp32_simd_cmp_true : 0;
         }
         return true;
     }
 
-    bool Computer::__TryProcessVEC_FCMP_EQ_OQ(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index) { return __TryProcessVEC_FCMP_helper(elem_sizecode, res, a, b, index, false, false, true, false, false); }
-    bool Computer::__TryProcessVEC_FCMP_LT_OS(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index) { return __TryProcessVEC_FCMP_helper(elem_sizecode, res, a, b, index, false, true, false, false, true); }
-    bool Computer::__TryProcessVEC_FCMP_LE_OS(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index) { return __TryProcessVEC_FCMP_helper(elem_sizecode, res, a, b, index, false, true, true, false, true); }
-    bool Computer::__TryProcessVEC_FCMP_UNORD_Q(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index) { return __TryProcessVEC_FCMP_helper(elem_sizecode, res, a, b, index, false, false, false, true, false); }
-    bool Computer::__TryProcessVEC_FCMP_NEQ_UQ(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index) { return __TryProcessVEC_FCMP_helper(elem_sizecode, res, a, b, index, true, true, false, true, false); }
-    bool Computer::__TryProcessVEC_FCMP_NLT_US(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index) { return __TryProcessVEC_FCMP_helper(elem_sizecode, res, a, b, index, true, false, true, true, true); }
-    bool Computer::__TryProcessVEC_FCMP_NLE_US(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index) { return __TryProcessVEC_FCMP_helper(elem_sizecode, res, a, b, index, true, false, false, true, true); }
-    bool Computer::__TryProcessVEC_FCMP_ORD_Q(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index) { return __TryProcessVEC_FCMP_helper(elem_sizecode, res, a, b, index, true, true, true, false, false); }
-    bool Computer::__TryProcessVEC_FCMP_EQ_UQ(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index) { return __TryProcessVEC_FCMP_helper(elem_sizecode, res, a, b, index, false, false, true, true, false); }
-    bool Computer::__TryProcessVEC_FCMP_NGE_US(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index) { return __TryProcessVEC_FCMP_helper(elem_sizecode, res, a, b, index, false, true, false, true, true); }
-    bool Computer::__TryProcessVEC_FCMP_NGT_US(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index) { return __TryProcessVEC_FCMP_helper(elem_sizecode, res, a, b, index, false, true, true, true, true); }
-    bool Computer::__TryProcessVEC_FCMP_FALSE_OQ(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index) { return __TryProcessVEC_FCMP_helper(elem_sizecode, res, a, b, index, false, false, false, false, false); }
-    bool Computer::__TryProcessVEC_FCMP_NEQ_OQ(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index) { return __TryProcessVEC_FCMP_helper(elem_sizecode, res, a, b, index, true, true, false, false, false); }
-    bool Computer::__TryProcessVEC_FCMP_GE_OS(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index) { return __TryProcessVEC_FCMP_helper(elem_sizecode, res, a, b, index, true, false, true, false, true); }
-    bool Computer::__TryProcessVEC_FCMP_GT_OS(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index) { return __TryProcessVEC_FCMP_helper(elem_sizecode, res, a, b, index, true, false, false, false, true); }
-    bool Computer::__TryProcessVEC_FCMP_TRUE_UQ(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index) { return __TryProcessVEC_FCMP_helper(elem_sizecode, res, a, b, index, true, true, true, true, false); }
-    bool Computer::__TryProcessVEC_FCMP_EQ_OS(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index) { return __TryProcessVEC_FCMP_helper(elem_sizecode, res, a, b, index, false, false, true, false, true); }
-    bool Computer::__TryProcessVEC_FCMP_LT_OQ(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index) { return __TryProcessVEC_FCMP_helper(elem_sizecode, res, a, b, index, false, true, false, false, false); }
-    bool Computer::__TryProcessVEC_FCMP_LE_OQ(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index) { return __TryProcessVEC_FCMP_helper(elem_sizecode, res, a, b, index, false, true, true, false, false); }
-    bool Computer::__TryProcessVEC_FCMP_UNORD_S(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index) { return __TryProcessVEC_FCMP_helper(elem_sizecode, res, a, b, index, false, false, false, true, true); }
-    bool Computer::__TryProcessVEC_FCMP_NEQ_US(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index) { return __TryProcessVEC_FCMP_helper(elem_sizecode, res, a, b, index, true, true, false, true, true); }
-    bool Computer::__TryProcessVEC_FCMP_NLT_UQ(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index) { return __TryProcessVEC_FCMP_helper(elem_sizecode, res, a, b, index, true, false, true, true, false); }
-    bool Computer::__TryProcessVEC_FCMP_NLE_UQ(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index) { return __TryProcessVEC_FCMP_helper(elem_sizecode, res, a, b, index, true, false, false, true, false); }
-    bool Computer::__TryProcessVEC_FCMP_ORD_S(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index) { return __TryProcessVEC_FCMP_helper(elem_sizecode, res, a, b, index, true, true, true, false, true); }
-    bool Computer::__TryProcessVEC_FCMP_EQ_US(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index) { return __TryProcessVEC_FCMP_helper(elem_sizecode, res, a, b, index, false, false, true, true, true); }
-    bool Computer::__TryProcessVEC_FCMP_NGE_UQ(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index) { return __TryProcessVEC_FCMP_helper(elem_sizecode, res, a, b, index, false, true, false, true, false); }
-    bool Computer::__TryProcessVEC_FCMP_NGT_UQ(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index) { return __TryProcessVEC_FCMP_helper(elem_sizecode, res, a, b, index, false, true, true, true, false); }
-    bool Computer::__TryProcessVEC_FCMP_FALSE_OS(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index) { return __TryProcessVEC_FCMP_helper(elem_sizecode, res, a, b, index, false, false, false, false, true); }
-    bool Computer::__TryProcessVEC_FCMP_NEQ_OS(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index) { return __TryProcessVEC_FCMP_helper(elem_sizecode, res, a, b, index, true, true, false, false, true); }
-    bool Computer::__TryProcessVEC_FCMP_GE_OQ(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index) { return __TryProcessVEC_FCMP_helper(elem_sizecode, res, a, b, index, true, false, true, false, false); }
-    bool Computer::__TryProcessVEC_FCMP_GT_OQ(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index) { return __TryProcessVEC_FCMP_helper(elem_sizecode, res, a, b, index, true, false, false, false, false); }
-    bool Computer::__TryProcessVEC_FCMP_TRUE_US(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index) { return __TryProcessVEC_FCMP_helper(elem_sizecode, res, a, b, index, true, true, true, true, true); }
+    bool Computer::_TryProcessVEC_FCMP_EQ_OQ(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index) { return _TryProcessVEC_FCMP_helper(elem_sizecode, res, a, b, index, false, false, true, false, false); }
+    bool Computer::_TryProcessVEC_FCMP_LT_OS(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index) { return _TryProcessVEC_FCMP_helper(elem_sizecode, res, a, b, index, false, true, false, false, true); }
+    bool Computer::_TryProcessVEC_FCMP_LE_OS(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index) { return _TryProcessVEC_FCMP_helper(elem_sizecode, res, a, b, index, false, true, true, false, true); }
+    bool Computer::_TryProcessVEC_FCMP_UNORD_Q(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index) { return _TryProcessVEC_FCMP_helper(elem_sizecode, res, a, b, index, false, false, false, true, false); }
+    bool Computer::_TryProcessVEC_FCMP_NEQ_UQ(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index) { return _TryProcessVEC_FCMP_helper(elem_sizecode, res, a, b, index, true, true, false, true, false); }
+    bool Computer::_TryProcessVEC_FCMP_NLT_US(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index) { return _TryProcessVEC_FCMP_helper(elem_sizecode, res, a, b, index, true, false, true, true, true); }
+    bool Computer::_TryProcessVEC_FCMP_NLE_US(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index) { return _TryProcessVEC_FCMP_helper(elem_sizecode, res, a, b, index, true, false, false, true, true); }
+    bool Computer::_TryProcessVEC_FCMP_ORD_Q(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index) { return _TryProcessVEC_FCMP_helper(elem_sizecode, res, a, b, index, true, true, true, false, false); }
+    bool Computer::_TryProcessVEC_FCMP_EQ_UQ(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index) { return _TryProcessVEC_FCMP_helper(elem_sizecode, res, a, b, index, false, false, true, true, false); }
+    bool Computer::_TryProcessVEC_FCMP_NGE_US(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index) { return _TryProcessVEC_FCMP_helper(elem_sizecode, res, a, b, index, false, true, false, true, true); }
+    bool Computer::_TryProcessVEC_FCMP_NGT_US(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index) { return _TryProcessVEC_FCMP_helper(elem_sizecode, res, a, b, index, false, true, true, true, true); }
+    bool Computer::_TryProcessVEC_FCMP_FALSE_OQ(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index) { return _TryProcessVEC_FCMP_helper(elem_sizecode, res, a, b, index, false, false, false, false, false); }
+    bool Computer::_TryProcessVEC_FCMP_NEQ_OQ(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index) { return _TryProcessVEC_FCMP_helper(elem_sizecode, res, a, b, index, true, true, false, false, false); }
+    bool Computer::_TryProcessVEC_FCMP_GE_OS(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index) { return _TryProcessVEC_FCMP_helper(elem_sizecode, res, a, b, index, true, false, true, false, true); }
+    bool Computer::_TryProcessVEC_FCMP_GT_OS(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index) { return _TryProcessVEC_FCMP_helper(elem_sizecode, res, a, b, index, true, false, false, false, true); }
+    bool Computer::_TryProcessVEC_FCMP_TRUE_UQ(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index) { return _TryProcessVEC_FCMP_helper(elem_sizecode, res, a, b, index, true, true, true, true, false); }
+    bool Computer::_TryProcessVEC_FCMP_EQ_OS(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index) { return _TryProcessVEC_FCMP_helper(elem_sizecode, res, a, b, index, false, false, true, false, true); }
+    bool Computer::_TryProcessVEC_FCMP_LT_OQ(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index) { return _TryProcessVEC_FCMP_helper(elem_sizecode, res, a, b, index, false, true, false, false, false); }
+    bool Computer::_TryProcessVEC_FCMP_LE_OQ(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index) { return _TryProcessVEC_FCMP_helper(elem_sizecode, res, a, b, index, false, true, true, false, false); }
+    bool Computer::_TryProcessVEC_FCMP_UNORD_S(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index) { return _TryProcessVEC_FCMP_helper(elem_sizecode, res, a, b, index, false, false, false, true, true); }
+    bool Computer::_TryProcessVEC_FCMP_NEQ_US(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index) { return _TryProcessVEC_FCMP_helper(elem_sizecode, res, a, b, index, true, true, false, true, true); }
+    bool Computer::_TryProcessVEC_FCMP_NLT_UQ(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index) { return _TryProcessVEC_FCMP_helper(elem_sizecode, res, a, b, index, true, false, true, true, false); }
+    bool Computer::_TryProcessVEC_FCMP_NLE_UQ(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index) { return _TryProcessVEC_FCMP_helper(elem_sizecode, res, a, b, index, true, false, false, true, false); }
+    bool Computer::_TryProcessVEC_FCMP_ORD_S(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index) { return _TryProcessVEC_FCMP_helper(elem_sizecode, res, a, b, index, true, true, true, false, true); }
+    bool Computer::_TryProcessVEC_FCMP_EQ_US(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index) { return _TryProcessVEC_FCMP_helper(elem_sizecode, res, a, b, index, false, false, true, true, true); }
+    bool Computer::_TryProcessVEC_FCMP_NGE_UQ(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index) { return _TryProcessVEC_FCMP_helper(elem_sizecode, res, a, b, index, false, true, false, true, false); }
+    bool Computer::_TryProcessVEC_FCMP_NGT_UQ(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index) { return _TryProcessVEC_FCMP_helper(elem_sizecode, res, a, b, index, false, true, true, true, false); }
+    bool Computer::_TryProcessVEC_FCMP_FALSE_OS(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index) { return _TryProcessVEC_FCMP_helper(elem_sizecode, res, a, b, index, false, false, false, false, true); }
+    bool Computer::_TryProcessVEC_FCMP_NEQ_OS(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index) { return _TryProcessVEC_FCMP_helper(elem_sizecode, res, a, b, index, true, true, false, false, true); }
+    bool Computer::_TryProcessVEC_FCMP_GE_OQ(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index) { return _TryProcessVEC_FCMP_helper(elem_sizecode, res, a, b, index, true, false, true, false, false); }
+    bool Computer::_TryProcessVEC_FCMP_GT_OQ(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index) { return _TryProcessVEC_FCMP_helper(elem_sizecode, res, a, b, index, true, false, false, false, false); }
+    bool Computer::_TryProcessVEC_FCMP_TRUE_US(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index) { return _TryProcessVEC_FCMP_helper(elem_sizecode, res, a, b, index, true, true, true, true, true); }
 
     bool Computer::TryProcessVEC_FCMP()
     {
@@ -3954,14 +3952,14 @@ namespace CSX64
         if (cond >= 32) { Terminate(ErrorCode::UndefinedBehavior); return false; }
 
         // perform the comparison
-        return ProcessVPUBinary(12, __TryProcessVEC_FCMP_lookup[cond]);
+        return ProcessVPUBinary(12, _TryProcessVEC_FCMP_lookup[cond]);
     }
 
     // in order to avoid creating another format just for this, will use VPUBinary.
     // the result will be src1, thus creating the desired no-modification behavior so long as dest == src1.
     // each pair of elements will update the flags in turn, thus the total comparison is on the last pair processed - standard behavior requires it be scalar operation.
     // the assembler will ensure all of this is the case.
-    bool Computer::__TryProcessVEC_FCOMI(u64 elem_sizecode, u64 &res, u64 _a, u64 _b, u64)
+    bool Computer::_TryProcessVEC_FCOMI(u64 elem_sizecode, u64 &res, u64 _a, u64 _b, u64)
     {
         // temporaries for cmp results
         bool x, y, z;
@@ -4001,10 +3999,10 @@ namespace CSX64
         return true;
     }
 
-    bool Computer::TryProcessVEC_FCOMI() { return ProcessVPUBinary(12, &Computer::__TryProcessVEC_FCOMI); }
+    bool Computer::TryProcessVEC_FCOMI() { return ProcessVPUBinary(12, &Computer::_TryProcessVEC_FCOMI); }
 
     // these trigger ArithmeticError on negative sqrt - spec doesn't specify explicitly what to do
-    bool Computer::__TryProcessVEC_FSQRT(u64 elem_sizecode, u64 &res, u64 a, u64)
+    bool Computer::_TryProcessVEC_FSQRT(u64 elem_sizecode, u64 &res, u64 a, u64)
     {
         if (elem_sizecode == 3)
         {
@@ -4020,7 +4018,7 @@ namespace CSX64
         }
         return true;
     }
-    bool Computer::__TryProcessVEC_FRSQRT(u64 elem_sizecode, u64 &res, u64 a, u64)
+    bool Computer::_TryProcessVEC_FRSQRT(u64 elem_sizecode, u64 &res, u64 a, u64)
     {
         if (elem_sizecode == 3)
         {
@@ -4037,82 +4035,82 @@ namespace CSX64
         return true;
     }
 
-    bool Computer::TryProcessVEC_FSQRT() { return ProcessVPUUnary(12, &Computer::__TryProcessVEC_FSQRT); }
-    bool Computer::TryProcessVEC_FRSQRT() { return ProcessVPUUnary(12, &Computer::__TryProcessVEC_FRSQRT); }
+    bool Computer::TryProcessVEC_FSQRT() { return ProcessVPUUnary(12, &Computer::_TryProcessVEC_FSQRT); }
+    bool Computer::TryProcessVEC_FRSQRT() { return ProcessVPUUnary(12, &Computer::_TryProcessVEC_FRSQRT); }
 
     // VPUCVTDelegates for conversions
-    bool Computer::__double_to_i32(u64 &res, u64 val)
+    bool Computer::_double_to_i32(u64 &res, u64 val)
     {
         res = (u32)(i32)PerformRoundTrip(AsDouble(val), MXCSR_RC());
         return true;
     }
-    bool Computer::__single_to_i32(u64 &res, u64 val)
+    bool Computer::_single_to_i32(u64 &res, u64 val)
     {
         res = (u32)(i32)PerformRoundTrip(AsFloat((u32)val), MXCSR_RC());
         return true;
     }
 
-    bool Computer::__double_to_i64(u64 &res, u64 val)
+    bool Computer::_double_to_i64(u64 &res, u64 val)
     {
         res = (u64)(i64)PerformRoundTrip(AsDouble(val), MXCSR_RC());
         return true;
     }
-    bool Computer::__single_to_i64(u64 &res, u64 val)
+    bool Computer::_single_to_i64(u64 &res, u64 val)
     {
         res = (u64)(i64)PerformRoundTrip(AsFloat((u32)val), MXCSR_RC());
         return true;
     }
 
-    bool Computer::__double_to_ti32(u64 &res, u64 val)
+    bool Computer::_double_to_ti32(u64 &res, u64 val)
     {
         res = (u32)(i32)AsDouble(val);
         return true;
     }
-    bool Computer::__single_to_ti32(u64 &res, u64 val)
+    bool Computer::_single_to_ti32(u64 &res, u64 val)
     {
         res = (u32)(i32)AsFloat((u32)val);
         return true;
     }
 
-    bool Computer::__double_to_ti64(u64 &res, u64 val)
+    bool Computer::_double_to_ti64(u64 &res, u64 val)
     {
         res = (u64)(i64)AsDouble(val);
         return true;
     }
-    bool Computer::__single_to_ti64(u64 &res, u64 val)
+    bool Computer::_single_to_ti64(u64 &res, u64 val)
     {
         res = (u64)(i64)AsFloat((u32)val);
         return true;
     }
 
-    bool Computer::__i32_to_double(u64 &res, u64 val)
+    bool Computer::_i32_to_double(u64 &res, u64 val)
     {
         res = DoubleAsUInt64((double)(i32)val);
         return true;
     }
-    bool Computer::__i32_to_single(u64 &res, u64 val)
+    bool Computer::_i32_to_single(u64 &res, u64 val)
     {
         res = FloatAsUInt64((float)(i32)val);
         return true;
     }
 
-    bool Computer::__i64_to_double(u64 &res, u64 val)
+    bool Computer::_i64_to_double(u64 &res, u64 val)
     {
         res = DoubleAsUInt64((double)(i64)val);
         return true;
     }
-    bool Computer::__i64_to_single(u64 &res, u64 val)
+    bool Computer::_i64_to_single(u64 &res, u64 val)
     {
         res = FloatAsUInt64((float)(i64)val);
         return true;
     }
 
-    bool Computer::__double_to_single(u64 &res, u64 val)
+    bool Computer::_double_to_single(u64 &res, u64 val)
     {
         res = FloatAsUInt64((float)AsDouble(val));
         return true;
     }
-    bool Computer::__single_to_double(u64 &res, u64 val)
+    bool Computer::_single_to_double(u64 &res, u64 val)
     {
         res = DoubleAsUInt64((double)AsFloat((u32)val));
         return true;
@@ -4202,75 +4200,75 @@ namespace CSX64
         // route to handlers
         switch (mode)
         {
-        case 0: return ProcessVPUCVT_scalar_reg_xmm(2, 3, &Computer::__double_to_i32);
-        case 1: return ProcessVPUCVT_scalar_reg_mem(2, 3, &Computer::__double_to_i32);
-        case 2: return ProcessVPUCVT_scalar_reg_xmm(3, 3, &Computer::__double_to_i64);
-        case 3: return ProcessVPUCVT_scalar_reg_mem(3, 3, &Computer::__double_to_i64);
+        case 0: return ProcessVPUCVT_scalar_reg_xmm(2, 3, &Computer::_double_to_i32);
+        case 1: return ProcessVPUCVT_scalar_reg_mem(2, 3, &Computer::_double_to_i32);
+        case 2: return ProcessVPUCVT_scalar_reg_xmm(3, 3, &Computer::_double_to_i64);
+        case 3: return ProcessVPUCVT_scalar_reg_mem(3, 3, &Computer::_double_to_i64);
 
-        case 4: return ProcessVPUCVT_scalar_reg_xmm(2, 2, &Computer::__single_to_i32);
-        case 5: return ProcessVPUCVT_scalar_reg_mem(2, 2, &Computer::__single_to_i32);
-        case 6: return ProcessVPUCVT_scalar_reg_xmm(3, 2, &Computer::__single_to_i64);
-        case 7: return ProcessVPUCVT_scalar_reg_mem(3, 2, &Computer::__single_to_i64);
+        case 4: return ProcessVPUCVT_scalar_reg_xmm(2, 2, &Computer::_single_to_i32);
+        case 5: return ProcessVPUCVT_scalar_reg_mem(2, 2, &Computer::_single_to_i32);
+        case 6: return ProcessVPUCVT_scalar_reg_xmm(3, 2, &Computer::_single_to_i64);
+        case 7: return ProcessVPUCVT_scalar_reg_mem(3, 2, &Computer::_single_to_i64);
 
-        case 8: return ProcessVPUCVT_scalar_reg_xmm(2, 3, &Computer::__double_to_ti32);
-        case 9: return ProcessVPUCVT_scalar_reg_mem(2, 3, &Computer::__double_to_ti32);
-        case 10: return ProcessVPUCVT_scalar_reg_xmm(3, 3, &Computer::__double_to_ti64);
-        case 11: return ProcessVPUCVT_scalar_reg_mem(3, 3, &Computer::__double_to_ti64);
+        case 8: return ProcessVPUCVT_scalar_reg_xmm(2, 3, &Computer::_double_to_ti32);
+        case 9: return ProcessVPUCVT_scalar_reg_mem(2, 3, &Computer::_double_to_ti32);
+        case 10: return ProcessVPUCVT_scalar_reg_xmm(3, 3, &Computer::_double_to_ti64);
+        case 11: return ProcessVPUCVT_scalar_reg_mem(3, 3, &Computer::_double_to_ti64);
 
-        case 12: return ProcessVPUCVT_scalar_reg_xmm(2, 2, &Computer::__single_to_ti32);
-        case 13: return ProcessVPUCVT_scalar_reg_mem(2, 2, &Computer::__single_to_ti32);
-        case 14: return ProcessVPUCVT_scalar_reg_xmm(3, 2, &Computer::__single_to_ti64);
-        case 15: return ProcessVPUCVT_scalar_reg_mem(3, 2, &Computer::__single_to_ti64);
+        case 12: return ProcessVPUCVT_scalar_reg_xmm(2, 2, &Computer::_single_to_ti32);
+        case 13: return ProcessVPUCVT_scalar_reg_mem(2, 2, &Computer::_single_to_ti32);
+        case 14: return ProcessVPUCVT_scalar_reg_xmm(3, 2, &Computer::_single_to_ti64);
+        case 15: return ProcessVPUCVT_scalar_reg_mem(3, 2, &Computer::_single_to_ti64);
 
-        case 16: return ProcessVPUCVT_scalar_xmm_reg(3, 2, &Computer::__i32_to_double);
-        case 17: return ProcessVPUCVT_scalar_xmm_mem(3, 2, &Computer::__i32_to_double);
-        case 18: return ProcessVPUCVT_scalar_xmm_reg(3, 3, &Computer::__i64_to_double);
-        case 19: return ProcessVPUCVT_scalar_xmm_mem(3, 3, &Computer::__i64_to_double);
+        case 16: return ProcessVPUCVT_scalar_xmm_reg(3, 2, &Computer::_i32_to_double);
+        case 17: return ProcessVPUCVT_scalar_xmm_mem(3, 2, &Computer::_i32_to_double);
+        case 18: return ProcessVPUCVT_scalar_xmm_reg(3, 3, &Computer::_i64_to_double);
+        case 19: return ProcessVPUCVT_scalar_xmm_mem(3, 3, &Computer::_i64_to_double);
 
-        case 20: return ProcessVPUCVT_scalar_xmm_reg(2, 2, &Computer::__i32_to_single);
-        case 21: return ProcessVPUCVT_scalar_xmm_mem(2, 2, &Computer::__i32_to_single);
-        case 22: return ProcessVPUCVT_scalar_xmm_reg(2, 3, &Computer::__i64_to_single);
-        case 23: return ProcessVPUCVT_scalar_xmm_mem(2, 3, &Computer::__i64_to_single);
+        case 20: return ProcessVPUCVT_scalar_xmm_reg(2, 2, &Computer::_i32_to_single);
+        case 21: return ProcessVPUCVT_scalar_xmm_mem(2, 2, &Computer::_i32_to_single);
+        case 22: return ProcessVPUCVT_scalar_xmm_reg(2, 3, &Computer::_i64_to_single);
+        case 23: return ProcessVPUCVT_scalar_xmm_mem(2, 3, &Computer::_i64_to_single);
 
-        case 24: return ProcessVPUCVT_scalar_xmm_xmm(2, 3, &Computer::__double_to_single);
-        case 25: return ProcessVPUCVT_scalar_xmm_mem(2, 3, &Computer::__double_to_single);
+        case 24: return ProcessVPUCVT_scalar_xmm_xmm(2, 3, &Computer::_double_to_single);
+        case 25: return ProcessVPUCVT_scalar_xmm_mem(2, 3, &Computer::_double_to_single);
 
-        case 26: return ProcessVPUCVT_scalar_xmm_xmm(3, 2, &Computer::__single_to_double);
-        case 27: return ProcessVPUCVT_scalar_xmm_mem(3, 2, &Computer::__single_to_double);
+        case 26: return ProcessVPUCVT_scalar_xmm_xmm(3, 2, &Computer::_single_to_double);
+        case 27: return ProcessVPUCVT_scalar_xmm_mem(3, 2, &Computer::_single_to_double);
 
         // ------------------------------------------------------------------------ //
 
-        case 28: return ProcessVPUCVT_packed(2, 2, 3, &Computer::__double_to_i32);
-        case 29: return ProcessVPUCVT_packed(4, 2, 3, &Computer::__double_to_i32);
-        case 30: return ProcessVPUCVT_packed(8, 2, 3, &Computer::__double_to_i32);
+        case 28: return ProcessVPUCVT_packed(2, 2, 3, &Computer::_double_to_i32);
+        case 29: return ProcessVPUCVT_packed(4, 2, 3, &Computer::_double_to_i32);
+        case 30: return ProcessVPUCVT_packed(8, 2, 3, &Computer::_double_to_i32);
 
-        case 31: return ProcessVPUCVT_packed(4, 2, 2, &Computer::__single_to_i32);
-        case 32: return ProcessVPUCVT_packed(8, 2, 2, &Computer::__single_to_i32);
-        case 33: return ProcessVPUCVT_packed(16, 2, 2, &Computer::__single_to_i32);
+        case 31: return ProcessVPUCVT_packed(4, 2, 2, &Computer::_single_to_i32);
+        case 32: return ProcessVPUCVT_packed(8, 2, 2, &Computer::_single_to_i32);
+        case 33: return ProcessVPUCVT_packed(16, 2, 2, &Computer::_single_to_i32);
 
-        case 34: return ProcessVPUCVT_packed(2, 2, 3, &Computer::__double_to_ti32);
-        case 35: return ProcessVPUCVT_packed(4, 2, 3, &Computer::__double_to_ti32);
-        case 36: return ProcessVPUCVT_packed(8, 2, 3, &Computer::__double_to_ti32);
+        case 34: return ProcessVPUCVT_packed(2, 2, 3, &Computer::_double_to_ti32);
+        case 35: return ProcessVPUCVT_packed(4, 2, 3, &Computer::_double_to_ti32);
+        case 36: return ProcessVPUCVT_packed(8, 2, 3, &Computer::_double_to_ti32);
 
-        case 37: return ProcessVPUCVT_packed(4, 2, 2, &Computer::__single_to_ti32);
-        case 38: return ProcessVPUCVT_packed(8, 2, 2, &Computer::__single_to_ti32);
-        case 39: return ProcessVPUCVT_packed(16, 2, 2, &Computer::__single_to_ti32);
+        case 37: return ProcessVPUCVT_packed(4, 2, 2, &Computer::_single_to_ti32);
+        case 38: return ProcessVPUCVT_packed(8, 2, 2, &Computer::_single_to_ti32);
+        case 39: return ProcessVPUCVT_packed(16, 2, 2, &Computer::_single_to_ti32);
 
-        case 40: return ProcessVPUCVT_packed(2, 3, 2, &Computer::__i32_to_double);
-        case 41: return ProcessVPUCVT_packed(4, 3, 2, &Computer::__i32_to_double);
-        case 42: return ProcessVPUCVT_packed(8, 3, 2, &Computer::__i32_to_double);
+        case 40: return ProcessVPUCVT_packed(2, 3, 2, &Computer::_i32_to_double);
+        case 41: return ProcessVPUCVT_packed(4, 3, 2, &Computer::_i32_to_double);
+        case 42: return ProcessVPUCVT_packed(8, 3, 2, &Computer::_i32_to_double);
 
-        case 43: return ProcessVPUCVT_packed(4, 2, 2, &Computer::__i32_to_single);
-        case 44: return ProcessVPUCVT_packed(8, 2, 2, &Computer::__i32_to_single);
-        case 45: return ProcessVPUCVT_packed(16, 2, 2, &Computer::__i32_to_single);
+        case 43: return ProcessVPUCVT_packed(4, 2, 2, &Computer::_i32_to_single);
+        case 44: return ProcessVPUCVT_packed(8, 2, 2, &Computer::_i32_to_single);
+        case 45: return ProcessVPUCVT_packed(16, 2, 2, &Computer::_i32_to_single);
 
-        case 46: return ProcessVPUCVT_packed(2, 2, 3, &Computer::__double_to_single);
-        case 47: return ProcessVPUCVT_packed(4, 2, 3, &Computer::__double_to_single);
-        case 48: return ProcessVPUCVT_packed(8, 2, 3, &Computer::__double_to_single);
+        case 46: return ProcessVPUCVT_packed(2, 2, 3, &Computer::_double_to_single);
+        case 47: return ProcessVPUCVT_packed(4, 2, 3, &Computer::_double_to_single);
+        case 48: return ProcessVPUCVT_packed(8, 2, 3, &Computer::_double_to_single);
 
-        case 49: return ProcessVPUCVT_packed(2, 3, 2, &Computer::__single_to_double);
-        case 50: return ProcessVPUCVT_packed(4, 3, 2, &Computer::__single_to_double);
-        case 51: return ProcessVPUCVT_packed(8, 3, 2, &Computer::__single_to_double);
+        case 49: return ProcessVPUCVT_packed(2, 3, 2, &Computer::_single_to_double);
+        case 50: return ProcessVPUCVT_packed(4, 3, 2, &Computer::_single_to_double);
+        case 51: return ProcessVPUCVT_packed(8, 3, 2, &Computer::_single_to_double);
 
         default: Terminate(ErrorCode::UndefinedBehavior); return false;
         }
@@ -4324,7 +4322,7 @@ namespace CSX64
 			if (!FetchBinaryOpFormat(s1, s2, m, a, b, false)) return false;
 			u64 sizecode = (s1 >> 2) & 3;
 
-			return StoreBinaryOpFormat(s1, s2, m, ByteSwap(b, sizecode));
+			return StoreBinaryOpFormat(s1, s2, m, bswap(b, sizecode));
 		}
 
 		// -----------------------------------
@@ -4349,12 +4347,12 @@ namespace CSX64
 			if (!GetAddressAdv(op) || !GetMemAdv<u64>(temp)) { Terminate(ErrorCode::UndefinedBehavior); return false; }
 
 			// if starting position is out of bounds, print 0 characters (don't no-op cause then user might think it's not working)
-			if (op >= mem_size) temp = 0;
+			if (op >= mem.size()) temp = 0;
 			// otherwise if printing more than exists, print as many as possible instead
-			else if (temp > mem_size || op + temp > mem_size) temp = mem_size - op;
+			else if (temp > mem.size() || op + temp > mem.size()) temp = mem.size() - op;
 
 			std::cout << '\n';
-			Dump(std::cout, mem, op, temp);
+			Dump(std::cout, mem.data(), op, temp);
 			break;
 
         default: Terminate(ErrorCode::UndefinedBehavior); return false;

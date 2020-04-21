@@ -49,14 +49,14 @@ namespace CSX64
 		if (!fd->CanRead()) { Terminate(ErrorCode::FilePermissions); return false; }
 
 		// make sure we're in bounds
-		if (RCX() >= mem_size || RDX() >= mem_size || RCX() + RDX() > mem_size) { Terminate(ErrorCode::OutOfBounds); return false; }
+		if (RCX() >= mem.size() || RDX() >= mem.size() || RCX() + RDX() > mem.size()) { Terminate(ErrorCode::OutOfBounds); return false; }
 		// make sure we're not in the readonly segment
-		if (RCX() < ReadonlyBarrier) { Terminate(ErrorCode::AccessViolation); return false; }
+		if (RCX() < readonly_barrier) { Terminate(ErrorCode::AccessViolation); return false; }
 
 		// read from the file
 		try
 		{
-			i64 n = fd->Read(reinterpret_cast<char*>(mem) + RCX(), (i64)RDX()); // aliasing is ok because casting to char type
+			i64 n = fd->Read(mem.data() + RCX(), (i64)RDX()); // aliasing is ok because casting to char type
 
 			// if we got nothing but the wrapper is interactive
 			if (n == 0 && fd->IsInteractive())
@@ -86,10 +86,10 @@ namespace CSX64
 		if (!fd->CanWrite()) { Terminate(ErrorCode::FilePermissions); return false; }
 
 		// make sure we're in bounds
-		if (RCX() >= mem_size || RDX() >= mem_size || RCX() + RDX() > mem_size) { Terminate(ErrorCode::OutOfBounds); return false; }
+		if (RCX() >= mem.size() || RDX() >= mem.size() || RCX() + RDX() > mem.size()) { Terminate(ErrorCode::OutOfBounds); return false; }
 
 		// attempt to write from memory to the file - success = num written, fail = -1
-		try { RAX() = (u64)fd->Write(reinterpret_cast<char*>(mem) + RCX(), (i64)RDX()) ? RDX() : ~(u64)0; } // aliasing is ok because casting to char type
+		try { RAX() = (u64)fd->Write(mem.data() + RCX(), (i64)RDX()) ? RDX() : ~(u64)0; } // aliasing is ok because casting to char type
 		catch (...) { RAX() = ~(u64)0; }
 		
 		return true;
@@ -223,7 +223,7 @@ namespace CSX64
 	bool Computer::Process_sys_brk()
 	{
 		// special request of 0 returns current break
-		if (RBX() == 0) RAX() = mem_size;
+		if (RBX() == 0) RAX() = mem.size();
 		// if the request is too high or goes below init size, don't do it - return -1
 		else if (RBX() > max_mem_size || RBX() < min_mem_size) { RAX() = ~(u64)0; }
 		// otherwise perform the reallocation

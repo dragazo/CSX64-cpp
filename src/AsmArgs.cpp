@@ -4,6 +4,7 @@
 #include <iostream>
 #include <fstream>
 #include <cstdlib>
+#include <algorithm>
 
 #include "../include/AsmTables.h"
 #include "../include/AsmArgs.h"
@@ -2193,7 +2194,7 @@ bool AssembleArgs::TryProcessPOP(OPCode opcode)
 	return true;
 }
 
-bool AssembleArgs::__TryProcessShift_mid()
+bool AssembleArgs::_TryProcessShift_mid()
 {
 	// reg/mem, reg
 	u64 src, b_sizecode;
@@ -2238,7 +2239,7 @@ bool AssembleArgs::TryProcessShift(OPCode opcode)
 	if (TryParseCPURegister(args[0], dest, a_sizecode, a_high))
 	{
 		if (!TryAppendVal(1, (dest << 4) | (a_sizecode << 2) | (a_high ? 2 : 0ul))) return false;
-		if (!__TryProcessShift_mid()) return false;
+		if (!_TryProcessShift_mid()) return false;
 	}
 	// mem, *
 	else if (args[0][args[0].size() - 1] == ']')
@@ -2254,7 +2255,7 @@ bool AssembleArgs::TryProcessShift(OPCode opcode)
 		if (a_sizecode > 3) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Specified size is not supported"}; return false; }
 
 		if (!TryAppendVal(1, (a_sizecode << 2) | 1)) return false;
-		if (!__TryProcessShift_mid()) return false;
+		if (!_TryProcessShift_mid()) return false;
 		if (!TryAppendAddress(1, b, std::move(ptr_base))) return false;
 	}
 	else { res = {AssembleError::UsageError, "line " + tostr(line) + ": Expected a cpu register or memory value as first operand"}; return false; }
@@ -2263,7 +2264,7 @@ bool AssembleArgs::TryProcessShift(OPCode opcode)
 }
 
 // helper for MOVxX formatter - additionally, ensures the sizes for dest/src are valid
-bool AssembleArgs::__TryProcessMOVxX_settings_byte(bool sign, u64 dest, u64 dest_sizecode, u64 src_sizecode)
+bool AssembleArgs::_TryProcessMOVxX_settings_byte(bool sign, u64 dest, u64 dest_sizecode, u64 src_sizecode)
 {
 	// switch through mode (using 4 bits for sizecodes in case either is a nonstandard size e.g. xmmword memory)
 	u64 mode;
@@ -2291,8 +2292,8 @@ bool AssembleArgs::TryProcessMOVxX(OPCode opcode, bool sign)
 	if (args.size() != 2) { res = {AssembleError::ArgCount, "line " + tostr(line) + ": Expected 2 operands"}; return false; }
 
 	u64 dest, dest_sizecode;
-	bool __dest_high;
-	if (!TryParseCPURegister(args[0], dest, dest_sizecode, __dest_high)) { res = {AssembleError::UsageError, "line " + tostr(line) + ": First operand must be a cpu register"}; return false; }
+	bool _dest_high;
+	if (!TryParseCPURegister(args[0], dest, dest_sizecode, _dest_high)) { res = {AssembleError::UsageError, "line " + tostr(line) + ": First operand must be a cpu register"}; return false; }
 
 	// write op code
 	if (!TryAppendByte((u8)opcode)) return false;
@@ -2303,7 +2304,7 @@ bool AssembleArgs::TryProcessMOVxX(OPCode opcode, bool sign)
 	if (TryParseCPURegister(args[1], src, src_sizecode, src_high))
 	{
 		// write the settings byte
-		if (!__TryProcessMOVxX_settings_byte(sign, dest, dest_sizecode, src_sizecode)) return false;
+		if (!_TryProcessMOVxX_settings_byte(sign, dest, dest_sizecode, src_sizecode)) return false;
 
 		// mark source as register
 		if (!TryAppendVal(1, (src_high ? 64 : 0ul) | src)) return false;
@@ -2319,7 +2320,7 @@ bool AssembleArgs::TryProcessMOVxX(OPCode opcode, bool sign)
 		if (!explicit_size) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Could not deduce operand size"}; return false; }
 
 		// write the settings byte
-		if (!__TryProcessMOVxX_settings_byte(sign, dest, dest_sizecode, src_sizecode)) return false;
+		if (!_TryProcessMOVxX_settings_byte(sign, dest, dest_sizecode, src_sizecode)) return false;
 
 		// mark source as a memory value and append the address
 		if (!TryAppendByte(0x80)) return false;
@@ -2330,7 +2331,7 @@ bool AssembleArgs::TryProcessMOVxX(OPCode opcode, bool sign)
 	return true;
 }
 
-bool AssembleArgs::__TryGetBinaryStringOpSize(u64 &sizecode)
+bool AssembleArgs::_TryGetBinaryStringOpSize(u64 &sizecode)
 {
 	// must have 2 args
 	if (args.size() != 2) { res = {AssembleError::ArgCount, "line " + tostr(line) + ": Expected 2 operands"}; return false; }
@@ -2356,7 +2357,7 @@ bool AssembleArgs::__TryGetBinaryStringOpSize(u64 &sizecode)
 bool AssembleArgs::TryProcessMOVS_string(OPCode opcode, bool rep)
 {
 	u64 sizecode;
-	if (!__TryGetBinaryStringOpSize(sizecode)) return false;
+	if (!_TryGetBinaryStringOpSize(sizecode)) return false;
 	
 	if (!TryAppendByte((u8)opcode)) return false;
 	if (!TryAppendByte((u8)(((rep ? 1 : 0) << 2) | sizecode))) return false;
@@ -2366,7 +2367,7 @@ bool AssembleArgs::TryProcessMOVS_string(OPCode opcode, bool rep)
 bool AssembleArgs::TryProcessCMPS_string(OPCode opcode, bool repe, bool repne)
 {
 	u64 sizecode;
-	if (!__TryGetBinaryStringOpSize(sizecode)) return false;
+	if (!_TryGetBinaryStringOpSize(sizecode)) return false;
 
 	if (!TryAppendByte((u8)opcode)) return false;
 	if (!TryAppendByte((u8)(((repne ? 4 : repe ? 3 : 2) << 2) | sizecode))) return false;
@@ -3465,7 +3466,7 @@ bool AssembleArgs::TryProcessVPUCVT_scalar_f2f(OPCode opcode, bool extend)
 	return true;
 }
 
-bool AssembleArgs::__TryProcessVPUCVT_packed_formatter_reg(OPCode opcode, u8 mode, u64 elem_count, u64 dest, Expr *mask, bool zmask, u64 src)
+bool AssembleArgs::_TryProcessVPUCVT_packed_formatter_reg(OPCode opcode, u8 mode, u64 elem_count, u64 dest, Expr *mask, bool zmask, u64 src)
 {
 	bool mask_present = VPUMaskPresent(mask, elem_count);
 
@@ -3477,7 +3478,7 @@ bool AssembleArgs::__TryProcessVPUCVT_packed_formatter_reg(OPCode opcode, u8 mod
 
 	return true;
 }
-bool AssembleArgs::__TryProcessVPUCVT_packed_formatter_mem(OPCode opcode, u8 mode, u64 elem_count, u64 dest, Expr *mask, bool zmask, u64 a, u64 b, Expr &&ptr_base)
+bool AssembleArgs::_TryProcessVPUCVT_packed_formatter_mem(OPCode opcode, u8 mode, u64 elem_count, u64 dest, Expr *mask, bool zmask, u64 a, u64 b, Expr &&ptr_base)
 {
 	bool mask_present = VPUMaskPresent(mask, elem_count);
 
@@ -3518,7 +3519,7 @@ bool AssembleArgs::TryProcessVPUCVT_packed_f2i(OPCode opcode, bool trunc, bool s
 		u64 elem_count = (single ? 4 : 2) << (src_sizecode - 4);
 
 		// write the data
-		if (!__TryProcessVPUCVT_packed_formatter_reg(opcode, mode, elem_count, dest, mask.get(), zmask, src)) return false;
+		if (!_TryProcessVPUCVT_packed_formatter_reg(opcode, mode, elem_count, dest, mask.get(), zmask, src)) return false;
 	}
 	// if src is mem
 	else if (args[1].back() == ']')
@@ -3554,7 +3555,7 @@ bool AssembleArgs::TryProcessVPUCVT_packed_f2i(OPCode opcode, bool trunc, bool s
 		else { res = {AssembleError::UsageError, "line " + tostr(line) + ": Could not deduce operand size"}; return false; }
 
 		// write the data
-		if (!__TryProcessVPUCVT_packed_formatter_mem(opcode, mode, elem_count, dest, mask.get(), zmask, a, b, std::move(ptr_base))) return false;
+		if (!_TryProcessVPUCVT_packed_formatter_mem(opcode, mode, elem_count, dest, mask.get(), zmask, a, b, std::move(ptr_base))) return false;
 	}
 	else { res = {AssembleError::UsageError, "line " + tostr(line) + ": Expected a VPU register or memory value as second operand"}; return false; }
 
@@ -3587,7 +3588,7 @@ bool AssembleArgs::TryProcessVPUCVT_packed_i2f(OPCode opcode, bool single)
 		u64 elem_count = (single ? 4 : 2) << (dest_sizecode - 4);
 
 		// write the data
-		if (!__TryProcessVPUCVT_packed_formatter_reg(opcode, mode, elem_count, dest, mask.get(), zmask, src)) return false;
+		if (!_TryProcessVPUCVT_packed_formatter_reg(opcode, mode, elem_count, dest, mask.get(), zmask, src)) return false;
 	}
 	// if src is mem
 	else if (args[1].back() == ']')
@@ -3605,7 +3606,7 @@ bool AssembleArgs::TryProcessVPUCVT_packed_i2f(OPCode opcode, bool single)
 		u64 elem_count = (single ? 4 : 2) << (dest_sizecode - 4);
 
 		// write the data
-		if (!__TryProcessVPUCVT_packed_formatter_mem(opcode, mode, elem_count, dest, mask.get(), zmask, a, b, std::move(ptr_base))) return false;
+		if (!_TryProcessVPUCVT_packed_formatter_mem(opcode, mode, elem_count, dest, mask.get(), zmask, a, b, std::move(ptr_base))) return false;
 	}
 	else { res = {AssembleError::UsageError, "line " + tostr(line) + ": Expected a VPU register or memory value as second operand"}; return false; }
 
@@ -3651,7 +3652,7 @@ bool AssembleArgs::TryProcessVPUCVT_packed_f2f(OPCode opcode, bool extend)
 		}
 
 		// write the data
-		if (!__TryProcessVPUCVT_packed_formatter_reg(opcode, mode, elem_count, dest, mask.get(), zmask, src)) return false;
+		if (!_TryProcessVPUCVT_packed_formatter_reg(opcode, mode, elem_count, dest, mask.get(), zmask, src)) return false;
 	}
 	// if src is mem
 	else if (args[1].back() == ']')
@@ -3692,7 +3693,7 @@ bool AssembleArgs::TryProcessVPUCVT_packed_f2f(OPCode opcode, bool extend)
 		}
 
 		// write the data
-		if (!__TryProcessVPUCVT_packed_formatter_mem(opcode, mode, elem_count, dest, mask.get(), zmask, a, b, std::move(ptr_base))) return false;
+		if (!_TryProcessVPUCVT_packed_formatter_mem(opcode, mode, elem_count, dest, mask.get(), zmask, a, b, std::move(ptr_base))) return false;
 	}
 	else { res = { AssembleError::UsageError, "line " + tostr(line) + ": Expected a VPU register or memory value as second operand" }; return false; }
 
