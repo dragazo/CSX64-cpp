@@ -448,12 +448,12 @@ int RunConsole(const Executable &exe, const std::vector<std::string> &args, bool
 	Computer computer;
 
 	// for this usage, remove max memory restrictions
-	computer.MaxMemory(~(u64)0);
+	computer.max_memory(~(u64)0);
 
 	try
 	{
 		// initialize program
-		computer.Initialize(exe, args);
+		computer.initialize(exe, args);
 	}
 	catch (const FormatError &ex)
 	{
@@ -479,20 +479,20 @@ int RunConsole(const Executable &exe, const std::vector<std::string> &args, bool
 
 	// begin execution
 	auto start = std::chrono::high_resolution_clock::now();
-	while (computer.Running()) computer.Tick(~(u64)0);
+	while (computer.running()) computer.tick(~(u64)0);
 	auto stop = std::chrono::high_resolution_clock::now();
 
 	// if there was an error
-	if (computer.Error() != ErrorCode::None)
+	if (computer.error() != ErrorCode::None)
 	{
-		std::cerr << "\n\nError Encountered: (" << (int)computer.Error() << ") " << ErrorCodeToString.at(computer.Error()) << '\n';
+		std::cerr << "\n\nError Encountered: (" << (int)computer.error() << ") " << ErrorCodeToString.at(computer.error()) << '\n';
 		return ExecErrorReturnCode;
 	}
 	// otherwise no error
 	else
 	{
 		if (time) std::cout << "\n\nElapsed Time: " << FormatTime(std::chrono::duration_cast<std::chrono::nanoseconds>(stop - start).count()) << '\n';
-		return computer.ReturnValue();
+		return computer.return_value();
 	}
 }
 

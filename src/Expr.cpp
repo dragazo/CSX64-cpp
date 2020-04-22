@@ -520,7 +520,7 @@ namespace CSX64
 			if (!LF) { err = "REPR32 requires a floating-point argument"; return false; }
 
 			// convert the float to a 32-bit representation
-			res = FloatAsUInt64((float)AsDouble(L));
+			res = FloatAsUInt32((float)AsDouble(L));
 			break;
 
 		case OPs::Float64:

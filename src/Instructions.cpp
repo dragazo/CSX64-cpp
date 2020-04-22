@@ -42,7 +42,7 @@
 
 namespace CSX64
 {
-    bool Computer::FetchTernaryOpFormat(u64 &s, u64 &a, u64 &b)
+    bool Computer::FetchTernaryOpFormat(u8 &s, u64 &a, u64 &b)
     {
         if (!GetMemAdv<u8>(s)) return false;
         u64 sizecode = (s >> 2) & 3;
@@ -50,46 +50,46 @@ namespace CSX64
         if constexpr (StrictUND)
         {
             // make sure dest will be valid for storing (high flag)
-            if ((s & 2) != 0 && ((s & 0xc0) != 0 || sizecode != 0)) { Terminate(ErrorCode::UndefinedBehavior); return false; }
+            if ((s & 2) != 0 && ((s & 0xc0) != 0 || sizecode != 0)) { terminate_err(ErrorCode::UndefinedBehavior); return false; }
         }
 
         // get b (imm)
-        if (!GetMemAdv(Size(sizecode), b)) { a = 0; return false; }
+        if (!GetMemAdv(Size(sizecode), b)) return false;
 
         // get a (reg or mem)
         if ((s & 1) == 0)
         {
-            if (!GetMemAdv<u8>(a)) return false;
-            if ((a & 128) != 0)
+            u8 t;
+            if (!GetMemAdv<u8>(t)) return false;
+            if ((t & 128) != 0)
             {
                 if constexpr (StrictUND)
                 {
                     // make sure we're in (ABCD)H
-                    if ((a & 0x0c) != 0 || sizecode != 0) { Terminate(ErrorCode::UndefinedBehavior); return false; }
+                    if ((t & 0x0c) != 0 || sizecode != 0) { terminate_err(ErrorCode::UndefinedBehavior); return false; }
                 }
 
-                a = CPURegisters[a & 15].x8h();
+                a = CPURegisters[t & 15].x8h();
             }
-            else a = CPURegisters[a & 15][sizecode];
+            else a = CPURegisters[t & 15][sizecode];
             return true;
         }
         else return GetAddressAdv(a) && GetMemRaw(a, Size(sizecode), a);
     }
-    bool Computer::StoreTernaryOPFormat(u64 s, u64 res)
+    bool Computer::StoreTernaryOPFormat(u8 s, u64 res)
     {
         if ((s & 2) != 0) CPURegisters[s >> 4].x8h() = (u8)res;
         else CPURegisters[s >> 4][(s >> 2) & 3] = res;
         return true;
     }
 
-    bool Computer::FetchBinaryOpFormat(u64 &s1, u64 &s2, u64 &m, u64 &a, u64 &b,
-        bool get_a, int _a_sizecode, int _b_sizecode, bool allow_b_mem)
+    bool Computer::FetchBinaryOpFormat(u8 &s1, u8 &s2, u64 &m, u64 &a, u64 &b, bool get_a, int _a_sizecode, int _b_sizecode, bool allow_b_mem)
     {
         // read settings
         if (!GetMemAdv<u8>(s1) || !GetMemAdv<u8>(s2)) return false;
 
         // if they requested an explicit size for a, change it in the settings byte
-        if (_a_sizecode != -1) s1 = (s1 & 0xf3) | ((u64)_a_sizecode << 2);
+        if (_a_sizecode != -1) s1 = (u8)((s1 & 0xf3) | (_a_sizecode << 2));
 
         // get size codes
         u64 a_sizecode = (s1 >> 2) & 3;
@@ -105,7 +105,7 @@ namespace CSX64
                 if constexpr (StrictUND)
                 {
                     // make sure we're in registers 0-3 and 8-bit mode
-                    if ((s1 & 0xc0) != 0 || a_sizecode != 0) { Terminate(ErrorCode::UndefinedBehavior); return false; }
+                    if ((s1 & 0xc0) != 0 || a_sizecode != 0) { terminate_err(ErrorCode::UndefinedBehavior); return false; }
                 }
 
                 if (get_a) a = CPURegisters[s1 >> 4].x8h();
@@ -117,7 +117,7 @@ namespace CSX64
                 if constexpr (StrictUND)
                 {
                     // make sure we're in registers 0-3 and 8-bit mode
-                    if ((s2 & 0x0c) != 0 || b_sizecode != 0) { Terminate(ErrorCode::UndefinedBehavior); return false; }
+                    if ((s2 & 0x0c) != 0 || b_sizecode != 0) { terminate_err(ErrorCode::UndefinedBehavior); return false; }
                 }
 
                 b = CPURegisters[s2 & 15].x8h();
@@ -132,7 +132,7 @@ namespace CSX64
                 if constexpr (StrictUND)
                 {
                     // make sure we're in registers 0-3 and 8-bit mode
-                    if ((s1 & 0xc0) != 0 || a_sizecode != 0) { Terminate(ErrorCode::UndefinedBehavior); return false; }
+                    if ((s1 & 0xc0) != 0 || a_sizecode != 0) { terminate_err(ErrorCode::UndefinedBehavior); return false; }
                 }
 
                 if (get_a) a = CPURegisters[s1 >> 4].x8h();
@@ -145,7 +145,7 @@ namespace CSX64
             if constexpr (StrictUND)
             {
                 // handle allow_b_mem case
-                if (!allow_b_mem) { Terminate(ErrorCode::UndefinedBehavior); return false; }
+                if (!allow_b_mem) { terminate_err(ErrorCode::UndefinedBehavior); return false; }
             }
 
             // if dh is flagged
@@ -154,7 +154,7 @@ namespace CSX64
                 if constexpr (StrictUND)
                 {
                     // make sure we're in registers 0-3 and 8-bit mode
-                    if ((s1 & 0xc0) != 0 || a_sizecode != 0) { Terminate(ErrorCode::UndefinedBehavior); return false; }
+                    if ((s1 & 0xc0) != 0 || a_sizecode != 0) { terminate_err(ErrorCode::UndefinedBehavior); return false; }
                 }
 
                 if (get_a) a = CPURegisters[s1 >> 4].x8h();
@@ -172,7 +172,7 @@ namespace CSX64
                 if constexpr (StrictUND)
                 {
                     // make sure we're in registers 0-3 and 8-bit mode
-                    if ((s2 & 0x0c) != 0 || b_sizecode != 0) { Terminate(ErrorCode::UndefinedBehavior); return false; }
+                    if ((s2 & 0x0c) != 0 || b_sizecode != 0) { terminate_err(ErrorCode::UndefinedBehavior); return false; }
                 }
 
                 b = CPURegisters[s2 & 15].x8h();
@@ -186,10 +186,10 @@ namespace CSX64
             // get imm
             return GetMemAdv_szc(b_sizecode, b);
 
-        default: Terminate(ErrorCode::UndefinedBehavior); return false;
+        default: terminate_err(ErrorCode::UndefinedBehavior); return false;
         }
     }
-    bool Computer::StoreBinaryOpFormat(u64 s1, u64 s2, u64 m, u64 res)
+    bool Computer::StoreBinaryOpFormat(u8 s1, u8 s2, u64 m, u64 res)
     {
         u64 sizecode = (s1 >> 2) & 3;
 
@@ -204,13 +204,13 @@ namespace CSX64
         else return SetMemRaw_szc(m, sizecode, res);
     }
 
-    bool Computer::FetchUnaryOpFormat(u64 &s, u64 &m, u64 &a, bool get_a, int _a_sizecode)
+    bool Computer::FetchUnaryOpFormat(u8 &s, u64 &m, u64 &a, bool get_a, int _a_sizecode)
     {
         // read settings
         if (!GetMemAdv<u8>(s)) return false;
 
         // if they requested an explicit size for a, change it in the settings byte
-        if (_a_sizecode != -1) s = (s & 0xf3) | ((u64)_a_sizecode << 2);
+        if (_a_sizecode != -1) s = (u8)((s & 0xf3) | (_a_sizecode << 2));
 
         u64 a_sizecode = (s >> 2) & 3;
 
@@ -224,7 +224,7 @@ namespace CSX64
                 if constexpr (StrictUND)
                 {
                     // make sure we're in registers 0-3 and 8-bit mode
-                    if ((s & 0xc0) != 0 || a_sizecode != 0) { Terminate(ErrorCode::UndefinedBehavior); return false; }
+                    if ((s & 0xc0) != 0 || a_sizecode != 0) { terminate_err(ErrorCode::UndefinedBehavior); return false; }
                 }
 
                 if (get_a) a = CPURegisters[s >> 4].x8h();
@@ -238,7 +238,7 @@ namespace CSX64
         default: return true; // this should never happen but compiler is complainy
         }
     }
-    bool Computer::StoreUnaryOpFormat(u64 s, u64 m, u64 res)
+    bool Computer::StoreUnaryOpFormat(u8 s, u64 m, u64 res)
     {
         u64 sizecode = (s >> 2) & 3;
 
@@ -257,14 +257,14 @@ namespace CSX64
         }
     }
 
-    bool Computer::FetchShiftOpFormat(u64 &s, u64 &m, u64 &val, u64 &count)
+    bool Computer::FetchShiftOpFormat(u8 &s, u64 &m, u64 &val, u8 &count)
     {
         // read settings byte
         if (!GetMemAdv<u8>(s) || !GetMemAdv<u8>(count)) return false;
         u64 sizecode = (s >> 2) & 3;
 
         // if count set CL flag, replace it with that
-        if ((count & 0x80) != 0) count = CL();
+        if ((count & 0x80) != 0) count = (u8)CL();
         // mask count
         count = count & (sizecode == 3 ? 0x3f : 0x1f);
 
@@ -277,7 +277,7 @@ namespace CSX64
                 if constexpr (StrictUND)
                 {
                     // need to be in (ABCD)H
-                    if ((s & 0xc0) != 0 || sizecode != 0) { Terminate(ErrorCode::UndefinedBehavior); return false; }
+                    if ((s & 0xc0) != 0 || sizecode != 0) { terminate_err(ErrorCode::UndefinedBehavior); return false; }
                 }
 
                 val = CPURegisters[s >> 4].x8h();
@@ -289,7 +289,7 @@ namespace CSX64
         // otherwise is memory value
         else return GetAddressAdv(m) && GetMemRaw(m, Size(sizecode), val);
     }
-    bool Computer::StoreShiftOpFormat(u64 s, u64 m, u64 res)
+    bool Computer::StoreShiftOpFormat(u8 s, u64 m, u64 res)
     {
         u64 sizecode = (s >> 2) & 3;
 
@@ -306,7 +306,7 @@ namespace CSX64
         else return SetMemRaw(m, Size(sizecode), res);
     }
 
-    bool Computer::FetchIMMRMFormat(u64 &s, u64 &a, int _a_sizecode)
+    bool Computer::FetchIMMRMFormat(u8 &s, u64 &a, int _a_sizecode)
     {
         if (!GetMemAdv<u8>(s)) return false;
 
@@ -323,7 +323,7 @@ namespace CSX64
             if constexpr (StrictUND)
             {
                 // make sure we're in (ABCD)H
-                if ((s & 0xc0) != 0) { Terminate(ErrorCode::UndefinedBehavior); return false; }
+                if ((s & 0xc0) != 0) { terminate_err(ErrorCode::UndefinedBehavior); return false; }
             }
 
             a = CPURegisters[s >> 4].x8h();
@@ -337,7 +337,7 @@ namespace CSX64
         return true;
     }
 
-    bool Computer::FetchRR_RMFormat(u64 &s1, u64 &s2, u64 &dest, u64 &a, u64 &b)
+    bool Computer::FetchRR_RMFormat(u8 &s1, u8 &s2, u64 &dest, u64 &a, u64 &b)
     {
         if (!GetMemAdv<u8>(s1) || !GetMemAdv<u8>(s2)) return false;
         u64 sizecode = (s1 >> 2) & 3;
@@ -348,7 +348,7 @@ namespace CSX64
             if constexpr (StrictUND)
             {
                 // make sure we're in (ABCD)H
-                if (sizecode != 0 || (s1 & 0xc0) != 0) { Terminate(ErrorCode::UndefinedBehavior); return false; }
+                if (sizecode != 0 || (s1 & 0xc0) != 0) { terminate_err(ErrorCode::UndefinedBehavior); return false; }
             }
 
             dest = CPURegisters[s1 >> 4].x8h();
@@ -361,7 +361,7 @@ namespace CSX64
             if constexpr (StrictUND)
             {
                 // make sure we're in (ABCD)H
-                if (sizecode != 0 || (s2 & 0x0c) != 0) { Terminate(ErrorCode::UndefinedBehavior); return false; }
+                if (sizecode != 0 || (s2 & 0x0c) != 0) { terminate_err(ErrorCode::UndefinedBehavior); return false; }
             }
 
             a = CPURegisters[s2 & 15].x8h();
@@ -371,20 +371,21 @@ namespace CSX64
         // if b is register
         if ((s1 & 1) == 0)
         {
-            if (!GetMemAdv<u8>(b)) return false;
+            u8 t;
+            if (!GetMemAdv<u8>(t)) return false;
 
             // if b is high
-            if ((b & 128) != 0)
+            if ((t & 128) != 0)
             {
                 if constexpr (StrictUND)
                 {
                     // make sure we're in (ABCD)H
-                    if (sizecode != 0 || (b & 0x0c) != 0) { Terminate(ErrorCode::UndefinedBehavior); return false; }
+                    if (sizecode != 0 || (t & 0x0c) != 0) { terminate_err(ErrorCode::UndefinedBehavior); return false; }
                 }
 
-                b = CPURegisters[b & 15].x8h();
+                b = CPURegisters[t & 15].x8h();
             }
-            else b = CPURegisters[b & 15][sizecode];
+            else b = CPURegisters[t & 15][sizecode];
         }
         // otherwise b is memory
         else
@@ -394,7 +395,7 @@ namespace CSX64
 
         return true;
     }
-    bool Computer::StoreRR_RMFormat(u64 s1, u64 res)
+    bool Computer::StoreRR_RMFormat(u8 s1, u64 res)
     {
         // if dest is high
         if ((s1 & 2) != 0) CPURegisters[s1 >> 4].x8h() = (u8)res;
@@ -433,7 +434,7 @@ namespace CSX64
     */
     bool Computer::ProcessSTLDF()
     {
-        u64 ext;
+        u8 ext;
         if (!GetMemAdv<u8>(ext)) return false;
 
         switch (ext)
@@ -448,16 +449,19 @@ namespace CSX64
         case 3:
         case 4: // can't modify reserved flags
         case 5:
-            if (!PopRaw(Size(ext - 2), ext)) return false;
-            RFLAGS() = (RFLAGS() & ~ModifiableFlags) | (ext & ModifiableFlags);
+        {
+            u64 t;
+            if (!PopRaw(Size(ext - 2), t)) return false;
+            RFLAGS() = (RFLAGS() & ~ModifiableFlags) | (t & ModifiableFlags);
             return true;
+        }
 
             // sahf
         case 6: RFLAGS() = (RFLAGS() & ~ModifiableFlags) | (AH() & ModifiableFlags); return true;
             // lahf
         case 7: AH() = (u8)RFLAGS(); return true;
 
-        default: Terminate(ErrorCode::UndefinedBehavior); return false;
+        default: terminate_err(ErrorCode::UndefinedBehavior); return false;
         }
     }
 
@@ -476,7 +480,7 @@ namespace CSX64
     */
     bool Computer::ProcessFlagManip()
     {
-        u64 ext;
+        u8 ext;
         if (!GetMemAdv<u8>(ext)) return false;
 
         switch (ext)
@@ -491,7 +495,7 @@ namespace CSX64
         case 7: AC() = false; return true;
         case 8: CF() = !CF(); return true;
 
-        default: Terminate(ErrorCode::UndefinedBehavior); return false;
+        default: terminate_err(ErrorCode::UndefinedBehavior); return false;
         }
     }
 
@@ -518,9 +522,10 @@ namespace CSX64
     */
     bool Computer::ProcessSETcc()
     {
-        u64 ext, s, m, _dest;
+        u8 ext, s;
+        u64 m, _a;
         if (!GetMemAdv<u8>(ext)) return false;
-        if (!FetchUnaryOpFormat(s, m, _dest, false)) return false;
+        if (!FetchUnaryOpFormat(s, m, _a, false)) return false;
 
         // get the flag
         bool flag;
@@ -545,7 +550,7 @@ namespace CSX64
         case 16: flag = cc_g(); break;
         case 17: flag = cc_ge(); break;
 
-        default: Terminate(ErrorCode::UndefinedBehavior); return false;
+        default: terminate_err(ErrorCode::UndefinedBehavior); return false;
         }
 
         return StoreUnaryOpFormat(s, m, flag);
@@ -553,7 +558,8 @@ namespace CSX64
 
     bool Computer::ProcessMOV()
     {
-        u64 s1, s2, m, a, b;
+        u8 s1, s2;
+        u64 m, a, b;
         return FetchBinaryOpFormat(s1, s2, m, a, b, false) && StoreBinaryOpFormat(s1, s2, m, b);
     }
     /*
@@ -579,7 +585,8 @@ namespace CSX64
     */
     bool Computer::ProcessMOVcc()
     {
-        u64 ext, s1, s2, m, _dest, src;
+        u8 ext, s1, s2;
+        u64 m, _dest, src;
         if (!GetMemAdv<u8>(ext)) return false;
         if (!FetchBinaryOpFormat(s1, s2, m, _dest, src, false)) return false;
 
@@ -606,7 +613,7 @@ namespace CSX64
         case 16: flag = cc_g(); break;
         case 17: flag = cc_ge(); break;
 
-        default: Terminate(ErrorCode::UndefinedBehavior); return false;
+        default: terminate_err(ErrorCode::UndefinedBehavior); return false;
         }
 
         // if flag is true, store result
@@ -637,7 +644,8 @@ namespace CSX64
     */
     bool Computer::ProcessXCHG()
     {
-        u64 a, b, temp_1, temp_2;
+        u8 a, b;
+        u64 temp_1, temp_2;
 
         if (!GetMemAdv<u8>(a)) return false;
         u64 sizecode = (a >> 2) & 3;
@@ -648,7 +656,7 @@ namespace CSX64
             if constexpr (StrictUND)
             {
                 // make sure we're in (ABCD)H
-                if ((a & 0xc0) != 0 || sizecode != 0) { Terminate(ErrorCode::UndefinedBehavior); return false; }
+                if ((a & 0xc0) != 0 || sizecode != 0) { terminate_err(ErrorCode::UndefinedBehavior); return false; }
             }
 
             temp_1 = CPURegisters[a >> 4].x8h();
@@ -666,7 +674,7 @@ namespace CSX64
                 if constexpr (StrictUND)
                 {
                     // make sure we're in (ABCD)H
-                    if ((b & 0x0c) != 0 || sizecode != 0) { Terminate(ErrorCode::UndefinedBehavior); return false; }
+                    if ((b & 0x0c) != 0 || sizecode != 0) { terminate_err(ErrorCode::UndefinedBehavior); return false; }
                 }
 
                 temp_2 = CPURegisters[b & 15].x8h();
@@ -681,10 +689,12 @@ namespace CSX64
         // otherwise b is mem
         else
         {
+            u64 t;
+
             // get mem value into temp_2 (address in b)
-            if (!GetAddressAdv(b) || !GetMemRaw(b, Size(sizecode), temp_2)) return false;
+            if (!GetAddressAdv(t) || !GetMemRaw(t, Size(sizecode), temp_2)) return false;
             // store b result
-            if (!SetMemRaw(b, Size(sizecode), temp_1)) return false;
+            if (!SetMemRaw(t, Size(sizecode), temp_1)) return false;
         }
 
         // store a's result (b's was handled internally above)
@@ -696,7 +706,8 @@ namespace CSX64
 
     bool Computer::ProcessJMP_raw(u64 &aft)
     {
-        u64 s, val;
+        u8 s;
+        u64 val;
         if (!FetchIMMRMFormat(s, val)) return false;
 
         if constexpr (StrictUND)
@@ -704,7 +715,7 @@ namespace CSX64
             u64 sizecode = (s >> 2) & 3;
 
             // 8-bit addressing not allowed
-            if (sizecode == 0) { Terminate(ErrorCode::UndefinedBehavior); return false; }
+            if (sizecode == 0) { terminate_err(ErrorCode::UndefinedBehavior); return false; }
         }
 
         aft = RIP(); // record point immediately after reading (for CALL return address)
@@ -741,7 +752,8 @@ namespace CSX64
     */
     bool Computer::ProcessJcc()
     {
-        u64 ext, s, val;
+        u8 ext, s;
+        u64 val;
         if (!GetMemAdv<u8>(ext)) return false;
         if (!FetchIMMRMFormat(s, val)) return false;
         u64 sizecode = (s >> 2) & 3;
@@ -749,7 +761,7 @@ namespace CSX64
         if constexpr (StrictUND)
         {
             // 8-bit addressing not allowed
-            if (sizecode == 0) { Terminate(ErrorCode::UndefinedBehavior); return false; }
+            if (sizecode == 0) { terminate_err(ErrorCode::UndefinedBehavior); return false; }
         }
 
         // get the flag
@@ -776,7 +788,7 @@ namespace CSX64
         case 17: flag = cc_ge(); break;
         case 18: flag = CPURegisters[2][sizecode] == 0; break;
 
-        default: Terminate(ErrorCode::UndefinedBehavior); return false;
+        default: terminate_err(ErrorCode::UndefinedBehavior); return false;
         }
 
         if (flag) RIP() = val; // jump
@@ -785,7 +797,8 @@ namespace CSX64
     }
     bool Computer::ProcessLOOPcc()
     {
-        u64 ext, s, val;
+        u8 ext, s;
+        u64 val;
 
         // get the cc continue flag
         bool continue_flag;
@@ -796,7 +809,7 @@ namespace CSX64
         case 1: continue_flag = ZF(); break;   // LOOPe
         case 2: continue_flag = !ZF(); break;  // LOOPne
 
-        default: Terminate(ErrorCode::UndefinedBehavior); return false;
+        default: terminate_err(ErrorCode::UndefinedBehavior); return false;
         }
 
         if (!FetchIMMRMFormat(s, val)) return false;
@@ -808,7 +821,7 @@ namespace CSX64
         case 3: count = --RCX(); break;
         case 2: count = --ECX(); break;
         case 1: count = --CX(); break;
-        case 0: Terminate(ErrorCode::UndefinedBehavior); return false; // 8-bit not allowed
+        case 0: terminate_err(ErrorCode::UndefinedBehavior); return false; // 8-bit not allowed
 
         default: return true; // this can't happen but compiler is stupid
         }
@@ -821,26 +834,27 @@ namespace CSX64
     bool Computer::ProcessCALL()
     {
         u64 temp;
-        return ProcessJMP_raw(temp) && PushRaw<u64>(temp);
+        return ProcessJMP_raw(temp) && push_mem<u64>(temp);
     }
     bool Computer::ProcessRET()
     {
         u64 temp;
-        if (!PopRaw<u64>(temp)) return false;
+        if (!pop_mem<u64>(temp)) return false;
         RIP() = temp;
         return true;
     }
 
     bool Computer::ProcessPUSH()
     {
-        u64 s, a;
+        u8 s;
+        u64 a;
         if (!FetchIMMRMFormat(s, a)) return false;
         u64 sizecode = (s >> 2) & 3;
 
         if constexpr (StrictUND)
         {
             // 8-bit push not allowed
-            if (sizecode == 0) { Terminate(ErrorCode::UndefinedBehavior); return false; }
+            if (sizecode == 0) { terminate_err(ErrorCode::UndefinedBehavior); return false; }
         }
 
         return PushRaw(Size(sizecode), a);
@@ -852,14 +866,15 @@ namespace CSX64
     */
     bool Computer::ProcessPOP()
     {
-        u64 s, val;
+        u8 s;
+        u64 val;
         if (!GetMemAdv<u8>(s)) return false;
         u64 sizecode = (s >> 2) & 3;
 
         if constexpr (StrictUND)
         {
             // 8-bit pop not allowed
-            if (sizecode == 0) { Terminate(ErrorCode::UndefinedBehavior); return false; }
+            if (sizecode == 0) { terminate_err(ErrorCode::UndefinedBehavior); return false; }
         }
 
         // get the value
@@ -872,7 +887,11 @@ namespace CSX64
             return true;
         }
         // otherwise is memory
-        else return GetAddressAdv(s) && SetMemRaw(s, Size(sizecode), val);
+        else
+        {
+            u64 t;
+            return GetAddressAdv(t) && SetMemRaw(t, Size(sizecode), val);
+        }
     }
 
     /*
@@ -881,14 +900,15 @@ namespace CSX64
     */
     bool Computer::ProcessLEA()
     {
-        u64 s, address;
+        u8 s;
+        u64 address;
         if (!GetMemAdv<u8>(s) || !GetAddressAdv(address)) return false;
         u64 sizecode = (s >> 2) & 3;
 
         if constexpr (StrictUND)
         {
             // LEA doesn't allow 8-bit addressing
-            if (sizecode == 0) { Terminate(ErrorCode::UndefinedBehavior); return false; }
+            if (sizecode == 0) { terminate_err(ErrorCode::UndefinedBehavior); return false; }
         }
 
         CPURegisters[s >> 4][sizecode] = address;
@@ -897,7 +917,8 @@ namespace CSX64
 
     bool Computer::ProcessADD()
     {
-        u64 s1, s2, m, a, b;
+        u8 s1, s2;
+        u64 m, a, b;
         if (!FetchBinaryOpFormat(s1, s2, m, a, b)) return false;
         u64 sizecode = (s1 >> 2) & 3;
 
@@ -917,7 +938,8 @@ namespace CSX64
 
     bool Computer::ProcessSUB_raw(bool apply)
     {
-        u64 s1, s2, m, a, b;
+        u8 s1, s2;
+        u64 m, a, b;
         if (!FetchBinaryOpFormat(s1, s2, m, a, b)) return false;
         u64 sizecode = (s1 >> 2) & 3;
 
@@ -942,7 +964,7 @@ namespace CSX64
 
     bool Computer::ProcessMUL_x()
     {
-        u64 ext;
+        u8 ext;
         if (!GetMemAdv<u8>(ext)) return false;
 
         switch (ext)
@@ -950,12 +972,13 @@ namespace CSX64
         case 0: return ProcessMUL();
         case 1: return ProcessMULX();
 
-        default: Terminate(ErrorCode::UndefinedBehavior); return false;
+        default: terminate_err(ErrorCode::UndefinedBehavior); return false;
         }
     }
     bool Computer::ProcessMUL()
     {
-        u64 s, a, res;
+        u8 s;
+        u64 a, res;
         if (!FetchIMMRMFormat(s, a)) return false;
 
         // switch through register sizes
@@ -991,7 +1014,8 @@ namespace CSX64
     }
     bool Computer::ProcessMULX()
     {
-        u64 s1, s2, dest, a, b, res;
+        u8 s1, s2;
+        u64 dest, a, b, res;
         if (!FetchRR_RMFormat(s1, s2, dest, a, b)) return false;
 
         // switch through register sizes
@@ -1008,14 +1032,14 @@ namespace CSX64
             break;
         }
 
-        default: Terminate(ErrorCode::UndefinedBehavior); return false;
+        default: terminate_err(ErrorCode::UndefinedBehavior); return false;
         }
 
         return true;
     }
     bool Computer::ProcessIMUL()
     {
-        u64 mode;
+        u8 mode;
         if (!GetMemAdv<u8>(mode)) return false;
 
         switch (mode)
@@ -1024,12 +1048,13 @@ namespace CSX64
         case 1: return ProcessBinary_IMUL();
         case 2: return ProcessTernary_IMUL();
 
-        default: Terminate(ErrorCode::UndefinedBehavior); return false;
+        default: terminate_err(ErrorCode::UndefinedBehavior); return false;
         }
     }
     bool Computer::ProcessUnary_IMUL()
     {
-        u64 s, _a;
+        u8 s;
+        u64 _a;
         if (!FetchIMMRMFormat(s, _a)) return false;
         u64 sizecode = (s >> 2) & 3;
 
@@ -1070,7 +1095,8 @@ namespace CSX64
     }
     bool Computer::ProcessBinary_IMUL()
     {
-        u64 s1, s2, m, _a, _b;
+        u8 s1, s2;
+        u64 m, _a, _b;
         if (!FetchBinaryOpFormat(s1, s2, m, _a, _b)) return false;
         u64 sizecode = (s1 >> 2) & 3;
 
@@ -1110,7 +1136,8 @@ namespace CSX64
     }
     bool Computer::ProcessTernary_IMUL()
     {
-        u64 s, _a, _b;
+        u8 s;
+        u64 _a, _b;
         if (!FetchTernaryOpFormat(s, _a, _b)) return false;
         u64 sizecode = (s >> 2) & 3;
 
@@ -1151,10 +1178,11 @@ namespace CSX64
 
     bool Computer::ProcessDIV()
     {
-        u64 s, a;
+        u8 s;
+        u64 a;
         if (!FetchIMMRMFormat(s, a)) return false;
 
-        if (a == 0) { Terminate(ErrorCode::ArithmeticError); return false; }
+        if (a == 0) { terminate_err(ErrorCode::ArithmeticError); return false; }
 
         u64 full, quo, rem;
 
@@ -1164,26 +1192,26 @@ namespace CSX64
         case 0:
             full = AX();
             quo = full / a; rem = full % a;
-            if (quo != (u8)quo) { Terminate(ErrorCode::ArithmeticError); return false; }
+            if (quo != (u8)quo) { terminate_err(ErrorCode::ArithmeticError); return false; }
             AL() = (u8)quo; AH() = (u8)rem;
             break;
         case 1:
             full = ((u64)DX() << 16) | AX();
             quo = full / a; rem = full % a;
-            if (quo != (u16)quo) { Terminate(ErrorCode::ArithmeticError); return false; }
+            if (quo != (u16)quo) { terminate_err(ErrorCode::ArithmeticError); return false; }
             AX() = (u16)quo; DX() = (u16)rem;
             break;
         case 2:
             full = ((u64)EDX() << 32) | EAX();
             quo = full / a; rem = full % a;
-            if (quo != (u32)quo) { Terminate(ErrorCode::ArithmeticError); return false; }
+            if (quo != (u32)quo) { terminate_err(ErrorCode::ArithmeticError); return false; }
             EAX() = (u32)quo; EDX() = (u32)rem;
             break;
         case 3:
         {
             BiggerInts::uint_t<128> Full; Full.blocks[1] = RDX(); Full.blocks[0] = RAX();
             auto divmod = BiggerInts::divmod(Full, (BiggerInts::uint_t<128>)a);
-            if (divmod.first != (u64)divmod.first) { Terminate(ErrorCode::ArithmeticError); return false; }
+            if (divmod.first != (u64)divmod.first) { terminate_err(ErrorCode::ArithmeticError); return false; }
             RAX() = (u64)divmod.first; RDX() = (u64)divmod.second;
             break;
         }
@@ -1195,11 +1223,12 @@ namespace CSX64
     }
     bool Computer::ProcessIDIV()
     {
-        u64 s, _a;
+        u8 s;
+        u64 _a;
         if (!FetchIMMRMFormat(s, _a)) return false;
         u64 sizecode = (s >> 2) & 3;
 
-        if (_a == 0) { Terminate(ErrorCode::ArithmeticError); return false; }
+        if (_a == 0) { terminate_err(ErrorCode::ArithmeticError); return false; }
 
         // get val as signed
         i64 a = (i64)SignExtend(_a, sizecode);
@@ -1212,26 +1241,26 @@ namespace CSX64
         case 0:
             full = (i16)AX();
             quo = full / a; rem = full % a;
-            if (quo != (i8)quo) { Terminate(ErrorCode::ArithmeticError); return false; }
+            if (quo != (i8)quo) { terminate_err(ErrorCode::ArithmeticError); return false; }
             AL() = (u8)quo; AH() = (u8)rem;
             break;
         case 1:
             full = ((i32)DX() << 16) | AX();
             quo = full / a; rem = full % a;
-            if (quo != (i16)quo) { Terminate(ErrorCode::ArithmeticError); return false; }
+            if (quo != (i16)quo) { terminate_err(ErrorCode::ArithmeticError); return false; }
             AX() = (u16)quo; DX() = (u16)rem;
             break;
         case 2:
             full = ((i64)EDX() << 32) | EAX();
             quo = full / a; rem = full % a;
-            if (quo != (i32)quo) { Terminate(ErrorCode::ArithmeticError); return false; }
+            if (quo != (i32)quo) { terminate_err(ErrorCode::ArithmeticError); return false; }
             EAX() = (u32)quo; EDX() = (u32)rem;
             break;
         case 3:
         {
             BiggerInts::int_t<128> Full; Full.blocks[1] = RDX(); Full.blocks[0] = RAX();
             auto divmod = BiggerInts::divmod(Full, (BiggerInts::int_t<128>)a);
-            if (divmod.first != (i64)divmod.first) { Terminate(ErrorCode::ArithmeticError); return false; }
+            if (divmod.first != (i64)divmod.first) { terminate_err(ErrorCode::ArithmeticError); return false; }
             RAX() = (u64)divmod.first; RDX() = (u64)divmod.second;
             break;
         }
@@ -1244,7 +1273,8 @@ namespace CSX64
 
     bool Computer::ProcessSHL()
     {
-        u64 s, m, val, count;
+        u8 s, count;
+        u64 m, val;
         if (!FetchShiftOpFormat(s, m, val, count)) return false;
         u64 sizecode = (s >> 2) & 3;
 
@@ -1264,7 +1294,8 @@ namespace CSX64
     }
     bool Computer::ProcessSHR()
     {
-        u64 s, m, val, count;
+        u8 s, count;
+        u64 m, val;
         if (!FetchShiftOpFormat(s, m, val, count)) return false;
         u64 sizecode = (s >> 2) & 3;
 
@@ -1285,7 +1316,8 @@ namespace CSX64
 
     bool Computer::ProcessSAL()
     {
-        u64 s, m, val, count;
+        u8 s, count;
+        u64 m, val;
         if (!FetchShiftOpFormat(s, m, val, count)) return false;
         u64 sizecode = (s >> 2) & 3;
 
@@ -1305,7 +1337,8 @@ namespace CSX64
     }
     bool Computer::ProcessSAR()
     {
-        u64 s, m, val, count;
+        u8 s, count;
+        u64 m, val;
         if (!FetchShiftOpFormat(s, m, val, count)) return false;
         u64 sizecode = (s >> 2) & 3;
 
@@ -1326,7 +1359,8 @@ namespace CSX64
 
     bool Computer::ProcessROL()
     {
-        u64 s, m, val, count;
+        u8 s, count;
+        u64 m, val;
         if (!FetchShiftOpFormat(s, m, val, count)) return false;
         u64 sizecode = (s >> 2) & 3;
 
@@ -1346,7 +1380,8 @@ namespace CSX64
     }
     bool Computer::ProcessROR()
     {
-        u64 s, m, val, count;
+        u8 s, count;
+        u64 m, val;
         if (!FetchShiftOpFormat(s, m, val, count)) return false;
         u64 sizecode = (s >> 2) & 3;
 
@@ -1367,7 +1402,8 @@ namespace CSX64
 
     bool Computer::ProcessRCL()
     {
-        u64 s, m, val, count;
+        u8 s, count;
+        u64 m, val;
         if (!FetchShiftOpFormat(s, m, val, count)) return false;
         u64 sizecode = (s >> 2) & 3;
 
@@ -1394,7 +1430,8 @@ namespace CSX64
     }
     bool Computer::ProcessRCR()
     {
-        u64 s, m, val, count;
+        u8 s, count;
+        u64 m, val;
         if (!FetchShiftOpFormat(s, m, val, count)) return false;
         u64 sizecode = (s >> 2) & 3;
 
@@ -1422,7 +1459,8 @@ namespace CSX64
 
     bool Computer::ProcessAND_raw(bool apply)
     {
-        u64 s1, s2, m, a, b;
+        u8 s1, s2;
+        u64 m, a, b;
         if (!FetchBinaryOpFormat(s1, s2, m, a, b)) return false;
         u64 sizecode = (s1 >> 2) & 3;
 
@@ -1442,7 +1480,8 @@ namespace CSX64
     }
     bool Computer::ProcessOR()
     {
-        u64 s1, s2, m, a, b;
+        u8 s1, s2;
+        u64 m, a, b;
         if (!FetchBinaryOpFormat(s1, s2, m, a, b)) return false;
         u64 sizecode = (s1 >> 2) & 3;
 
@@ -1457,7 +1496,8 @@ namespace CSX64
     }
     bool Computer::ProcessXOR()
     {
-        u64 s1, s2, m, a, b;
+        u8 s1, s2;
+        u64 m, a, b;
         if (!FetchBinaryOpFormat(s1, s2, m, a, b)) return false;
         u64 sizecode = (s1 >> 2) & 3;
 
@@ -1473,7 +1513,8 @@ namespace CSX64
 
     bool Computer::ProcessINC()
     {
-        u64 s, m, a;
+        u8 s;
+        u64 m, a;
         if (!FetchUnaryOpFormat(s, m, a)) return false;
         u64 sizecode = (s >> 2) & 3;
 
@@ -1496,7 +1537,8 @@ namespace CSX64
     }
     bool Computer::ProcessDEC()
     {
-        u64 s, m, a;
+        u8 s;
+        u64 m, a;
         if (!FetchUnaryOpFormat(s, m, a)) return false;
         u64 sizecode = (s >> 2) & 3;
 
@@ -1520,7 +1562,8 @@ namespace CSX64
 
     bool Computer::ProcessNEG()
     {
-        u64 s, m, a;
+        u8 s;
+        u64 m, a;
         if (!FetchUnaryOpFormat(s, m, a)) return false;
         u64 sizecode = (s >> 2) & 3;
 
@@ -1535,7 +1578,8 @@ namespace CSX64
     }
     bool Computer::ProcessNOT()
     {
-        u64 s, m, a;
+        u8 s;
+        u64 m, a;
         if (!FetchUnaryOpFormat(s, m, a)) return false;
         u64 sizecode = (s >> 2) & 3;
 
@@ -1555,7 +1599,8 @@ namespace CSX64
 
     bool Computer::ProcessCMPZ()
     {
-        u64 s, m, a;
+        u8 s;
+        u64 m, a;
         if (!FetchUnaryOpFormat(s, m, a)) return false;
         u64 sizecode = (s >> 2) & 3;
 
@@ -1567,7 +1612,8 @@ namespace CSX64
 
     bool Computer::ProcessBSWAP()
     {
-        u64 s, m, a;
+        u8 s;
+        u64 m, a;
         if (!FetchUnaryOpFormat(s, m, a)) return false;
         u64 sizecode = (s >> 2) & 3;
 
@@ -1575,7 +1621,8 @@ namespace CSX64
     }
     bool Computer::ProcessBEXTR()
     {
-        u64 s1, s2, m, a, b;
+        u8 s1, s2;
+        u64 m, a, b;
         if (!FetchBinaryOpFormat(s1, s2, m, a, b, true, -1, 1)) return false;
         u64 sizecode = (s1 >> 2) & 3;
 
@@ -1593,7 +1640,8 @@ namespace CSX64
 
     bool Computer::ProcessBLSI()
     {
-        u64 s, m, a;
+        u8 s;
+        u64 m, a;
         if (!FetchUnaryOpFormat(s, m, a)) return false;
         u64 sizecode = (s >> 2) & 3;
 
@@ -1609,7 +1657,8 @@ namespace CSX64
     }
     bool Computer::ProcessBLSMSK()
     {
-        u64 s, m, a;
+        u8 s;
+        u64 m, a;
         if (!FetchUnaryOpFormat(s, m, a)) return false;
         u64 sizecode = (s >> 2) & 3;
 
@@ -1624,7 +1673,8 @@ namespace CSX64
     }
     bool Computer::ProcessBLSR()
     {
-        u64 s, m, a;
+        u8 s;
+        u64 m, a;
         if (!FetchUnaryOpFormat(s, m, a)) return false;
         u64 sizecode = (s >> 2) & 3;
 
@@ -1640,14 +1690,15 @@ namespace CSX64
     }
     bool Computer::ProcessANDN()
     {
-        u64 s1, s2, dest, a, b;
+        u8 s1, s2;
+        u64 dest, a, b;
         if (!FetchRR_RMFormat(s1, s2, dest, a, b)) return false;
         u64 sizecode = (s1 >> 2) & 3;
 
         if constexpr (StrictUND)
         {
             // only supports 32 and 64-bit operands
-            if (sizecode != 2 && sizecode != 3) { Terminate(ErrorCode::UndefinedBehavior); return false; }
+            if (sizecode != 2 && sizecode != 3) { terminate_err(ErrorCode::UndefinedBehavior); return false; }
         }
 
         u64 res = ~a & b;
@@ -1671,7 +1722,8 @@ namespace CSX64
     */
     bool Computer::ProcessBTx()
     {
-        u64 ext, s1, s2, m, a, b;
+        u8 ext, s1, s2;
+        u64 m, a, b;
         if (!GetMemAdv<u8>(ext)) return false;
 
         if (!FetchBinaryOpFormat(s1, s2, m, a, b, true, -1, 0, false)) return false;
@@ -1689,7 +1741,7 @@ namespace CSX64
         case 2: return StoreBinaryOpFormat(s1, s2, m, a & ~mask);
         case 3: return StoreBinaryOpFormat(s1, s2, m, a ^ mask);
 
-        default: Terminate(ErrorCode::UndefinedBehavior); return false;
+        default: terminate_err(ErrorCode::UndefinedBehavior); return false;
         }
     }
 
@@ -1704,7 +1756,7 @@ namespace CSX64
     */
     bool Computer::ProcessCxy()
     {
-        u64 ext;
+        u8 ext;
         if (!GetMemAdv<u8>(ext)) return false;
 
         switch (ext)
@@ -1717,7 +1769,7 @@ namespace CSX64
         case 4: EAX() = (u32)(i16)AX(); return true;
         case 5: RAX() = (u64)(i32)EAX(); return true;
 
-        default: Terminate(ErrorCode::UndefinedBehavior); return false;
+        default: terminate_err(ErrorCode::UndefinedBehavior); return false;
         }
     }
     /*
@@ -1738,7 +1790,8 @@ namespace CSX64
     */
     bool Computer::ProcessMOVxX()
     {
-        u64 s1, s2, src;
+        u8 s1, s2;
+        u64 src;
         if (!GetMemAdv<u8>(s1) || !GetMemAdv<u8>(s2)) return false;
 
         // if source is register
@@ -1757,7 +1810,7 @@ namespace CSX64
                     if constexpr (StrictUND)
                     {
                         // make sure we're in registers A-D
-                        if ((s2 & 0x0c) != 0) { Terminate(ErrorCode::UndefinedBehavior); return false; }
+                        if ((s2 & 0x0c) != 0) { terminate_err(ErrorCode::UndefinedBehavior); return false; }
                     }
 
                     src = CPURegisters[s2 & 15].x8h();
@@ -1769,7 +1822,7 @@ namespace CSX64
 
             case 10: src = CPURegisters[s2 & 15].x32(); break;
 
-            default: Terminate(ErrorCode::UndefinedBehavior); return false;
+            default: terminate_err(ErrorCode::UndefinedBehavior); return false;
             }
         }
         // otherwise is memory value
@@ -1782,7 +1835,7 @@ namespace CSX64
             case 3: case 5: case 7: case 9: if (!GetMemRaw(src, 2, src)) return false; break;
             case 10: if (!GetMemRaw(src, 4, src)) return false; break;
 
-            default: Terminate(ErrorCode::UndefinedBehavior); return false;
+            default: terminate_err(ErrorCode::UndefinedBehavior); return false;
             }
         }
 
@@ -1814,7 +1867,8 @@ namespace CSX64
     */
     bool Computer::ProcessADXX()
     {
-        u64 ext, s1, s2, m, a, b;
+        u8 ext, s1, s2;
+        u64 m, a, b;
         if (!GetMemAdv<u8>(ext)) return false;
 
         if (!FetchBinaryOpFormat(s1, s2, m, a, b)) return false;
@@ -1827,7 +1881,7 @@ namespace CSX64
         case 0: case 1: if (CF()) ++res; break;
         case 2: if (OF()) ++res; break;
 
-        default: Terminate(ErrorCode::UndefinedBehavior); return false;
+        default: terminate_err(ErrorCode::UndefinedBehavior); return false;
         }
 
         res = Truncate(res, sizecode);
@@ -1861,7 +1915,7 @@ namespace CSX64
     */
     bool Computer::ProcessAAX()
     {
-        u64 ext;
+        u8 ext;
         u8 temp_u8;
         bool temp_b;
         if (!GetMemAdv<u8>(ext)) return false;
@@ -1960,7 +2014,7 @@ namespace CSX64
 
             return true;
 
-        default: Terminate(ErrorCode::UndefinedBehavior); return false;
+        default: terminate_err(ErrorCode::UndefinedBehavior); return false;
         }
 
         return true;
@@ -2064,7 +2118,7 @@ namespace CSX64
     */
     bool Computer::ProcessSTRING()
     {
-        u64 s;
+        u8 s;
         if (!GetMemAdv<u8>(s)) return false;
         u64 sizecode = s & 3;
         
@@ -2232,7 +2286,7 @@ namespace CSX64
             break;
 
         // otherwise unknown mode
-        default: Terminate(ErrorCode::UndefinedBehavior); return false;
+        default: terminate_err(ErrorCode::UndefinedBehavior); return false;
         }
 
         return true;
@@ -2243,7 +2297,7 @@ namespace CSX64
         mem = 0: [4:][4: src]
         mem = 1: [address]
     */
-    bool Computer::_Process_BSx_common(u64 &s, u64 &src, u64 &sizecode)
+    bool Computer::_Process_BSx_common(u8 &s, u64 &src, u64 &sizecode)
     {
         if (!GetMemAdv<u8>(s)) return false;
         sizecode = (s >> 4) & 3;
@@ -2256,15 +2310,17 @@ namespace CSX64
         // otherwise src is reg
         else
         {
-            if (!GetMemAdv<u8>(src)) return false;
-            src = CPURegisters[src & 15][sizecode];
+            u8 t;
+            if (!GetMemAdv<u8>(t)) return false;
+            src = CPURegisters[t & 15][sizecode];
         }
 
         return true;
     }
     bool Computer::ProcessBSx()
     {
-        u64 s, src, sizecode, res;
+        u8 s;
+        u64 src, sizecode, res;
         if (!_Process_BSx_common(s, src, sizecode)) return false;
 
         // if src is zero
@@ -2289,7 +2345,8 @@ namespace CSX64
 
     bool Computer::ProcessTZCNT()
     {
-        u64 s, src, sizecode, res;
+        u8 s;
+        u64 src, sizecode, res;
         if (!_Process_BSx_common(s, src, sizecode)) return false;
 
         // if src is zero
@@ -2317,7 +2374,7 @@ namespace CSX64
     bool Computer::ProcessUD()
     {
         // ud explicitly triggers an unknown opcode error
-        Terminate(ErrorCode::UnknownOp);
+        terminate_err(ErrorCode::UnknownOp);
         return false;
     }
 
@@ -2328,32 +2385,33 @@ namespace CSX64
     */
     bool Computer::ProcessIO()
     {
-        u64 s, port;
+        u8 s;
+        u16 port;
         if (!GetMemAdv<u8>(s)) return false;
 
-        if (s & 1) port = DX();
-        else if (!GetMemAdv<u8>(port)) return false;
+        if (s & 1) port = (u16)DX();
+        else
+        {
+            u8 t;
+            if (!GetMemAdv<u8>(t)) return false;
+            port = t;
+        }
 
         if (s & 2)
         {
-            if (!Input(port, port, s >> 6)) return false;
-            CPURegisters[0][s >> 6] = port;
+            u64 v;
+            if (!input(port, v, s >> 6)) return false;
+            CPURegisters[0][s >> 6] = v;
             return true;
         }
-        else
-        {
-            return Output(port, CPURegisters[0][s >> 6], s >> 6);
-        }
+        else return output(port, CPURegisters[0][s >> 6], s >> 6);
     }
 
     // -----------------------------------------------------------
 
-    bool Computer::FINIT()
+    bool Computer::ProcessFINIT()
     {
-        FPU_control = 0x3bf;
-        FPU_status = 0;
-        FPU_tag = 0xffff;
-
+        FINIT();
         return true;
     }
 
@@ -2387,7 +2445,7 @@ namespace CSX64
     mode = 6: st(0) <- f(st(0), int32M)
     else UND
     */
-    bool Computer::FetchFPUBinaryFormat(u64 &s, long double &a, long double &b)
+    bool Computer::FetchFPUBinaryFormat(u8 &s, long double &a, long double &b)
     {
         u64 m;
         if (!GetMemAdv<u8>(s)) return false;
@@ -2396,29 +2454,29 @@ namespace CSX64
         switch (s & 7)
         {
         case 0:
-            if (ST(0).Empty() || ST(s >> 4).Empty()) { Terminate(ErrorCode::FPUAccessViolation); return false; }
+            if (ST(0).Empty() || ST(s >> 4).Empty()) { terminate_err(ErrorCode::FPUAccessViolation); return false; }
             a = ST(0); b = ST(s >> 4); return true;
         case 1:
         case 2:
-            if (ST(0).Empty() || ST(s >> 4).Empty()) { Terminate(ErrorCode::FPUAccessViolation); return false; }
+            if (ST(0).Empty() || ST(s >> 4).Empty()) { terminate_err(ErrorCode::FPUAccessViolation); return false; }
             b = ST(0); a = ST(s >> 4); return true;
 
         default:
-            if (ST(0).Empty()) { Terminate(ErrorCode::FPUAccessViolation); return false; }
+            if (ST(0).Empty()) { terminate_err(ErrorCode::FPUAccessViolation); return false; }
             a = ST(0); b = 0;
             if (!GetAddressAdv(m)) return false;
             switch (s & 7)
             {
-            case 3: if (!GetMemRaw<u32>(m, m)) return false; b = (long double)AsFloat((u32)m); return true;
-            case 4: if (!GetMemRaw<u64>(m, m)) return false; b = (long double)AsDouble(m); return true;
-            case 5: if (!GetMemRaw<u16>(m, m)) return false; b = (long double)(i64)SignExtend(m, 1); return true;
-            case 6: if (!GetMemRaw<u32>(m, m)) return false; b = (long double)(i64)SignExtend(m, 2); return true;
+            case 3: if (u32 t; read_mem<u32>(m, t)) b = (long double)AsFloat(t); else return false; return true;
+            case 4: if (u64 t; read_mem<u64>(m, t)) b = (long double)AsDouble(t); else return false; return true;
+            case 5: if (u16 t; read_mem<u16>(m, t)) b = (long double)(i64)(i16)t; else return false; return true;
+            case 6: if (u32 t; read_mem<u32>(m, t)) b = (long double)(i64)(i32)t; else return false; return true;
 
-            default: Terminate(ErrorCode::UndefinedBehavior); return false;
+            default: terminate_err(ErrorCode::UndefinedBehavior); return false;
             }
         }
     }
-    bool Computer::StoreFPUBinaryFormat(u64 s, long double res)
+    bool Computer::StoreFPUBinaryFormat(u8 s, long double res)
     {
         switch (s & 7)
         {
@@ -2435,7 +2493,7 @@ namespace CSX64
         --FPU_TOP();
 
         // if this fpu reg is in use, it's an error
-        if (!ST(0).Empty()) { Terminate(ErrorCode::FPUStackOverflow); return false; }
+        if (!ST(0).Empty()) { terminate_err(ErrorCode::FPUStackOverflow); return false; }
 
         // store the value
         ST(0) = val;
@@ -2445,7 +2503,7 @@ namespace CSX64
     bool Computer::PopFPU(long double &val)
     {
         // if this register is not in use, it's an error
-        if (ST(0).Empty()) { Terminate(ErrorCode::FPUStackUnderflow); return false; }
+        if (ST(0).Empty()) { terminate_err(ErrorCode::FPUStackUnderflow); return false; }
 
         // extract the value
         val = ST(0);
@@ -2478,7 +2536,8 @@ namespace CSX64
     */
     bool Computer::ProcessFSTLD_WORD()
     {
-        u64 m, s, temp;
+        u8 s;
+        u64 m;
         if (!GetMemAdv<u8>(s)) return false;
 
         // handle FSTSW AX case specially (doesn't have an address)
@@ -2492,84 +2551,88 @@ namespace CSX64
         // switch through mode
         switch (s)
         {
-        case 1: return SetMemRaw<u16>(m, FPU_status);
-        case 2: return SetMemRaw<u16>(m, FPU_control);
-        case 3:
-            if (!GetMemRaw<u16>(m, m)) return false;
-            FPU_control = (u16)m;
-            return true;
+        case 1: return write_mem<u16>(m, FPU_status);
+        case 2: return write_mem<u16>(m, FPU_control);
+        case 3: return read_mem<u16>(m, FPU_control);
 
-        case 4: return SetMemRaw<u32>(m, _MXCSR);
+        case 4: return write_mem<u32>(m, _MXCSR);
         case 5:
-            if (!GetMemRaw<u32>(m, m)) return false;
-            _MXCSR = (_MXCSR & 0xffff0000) | (u16)m; // make sure user can't modify the upper 16 reserved bits
+        {
+            u32 t;
+            if (!read_mem<u32>(m, t)) return false;
+            _MXCSR = (_MXCSR & 0xffff0000) | (u16)t; // make sure user can't modify the upper 16 reserved bits
             return true;
+        }
 
         case 6:
-            if (!SetMemRaw<u16>(m + 0, FPU_control)) return false;
-            if (!SetMemRaw<u16>(m + 4, FPU_status)) return false;
-            if (!SetMemRaw<u16>(m + 8, FPU_tag)) return false;
+            if (!write_mem<u16>(m + 0, FPU_control)) return false;
+            if (!write_mem<u16>(m + 4, FPU_status)) return false;
+            if (!write_mem<u16>(m + 8, FPU_tag)) return false;
 
-            if (!SetMemRaw<u32>(m + 12, EIP())) return false;
-            if (!SetMemRaw<u16>(m + 16, 0)) return false;
+            if (!write_mem<u32>(m + 12, (u32)EIP())) return false;
+            if (!write_mem<u16>(m + 16, (u16)0)) return false;
 
-            if (!SetMemRaw<u32>(m + 20, (u32)m)) return false;
-            if (!SetMemRaw<u16>(m + 24, 0)) return false;
+            if (!write_mem<u32>(m + 20, (u32)m)) return false;
+            if (!write_mem<u16>(m + 24, (u16)0)) return false;
 
             // for cross-platformability/speed, writes native double instead of some tword hacks
-            if (!SetMemRaw<u64>(m + 28, DoubleAsUInt64((double)ST(0)))) return false;
-            if (!SetMemRaw<u64>(m + 38, DoubleAsUInt64((double)ST(1)))) return false;
-            if (!SetMemRaw<u64>(m + 48, DoubleAsUInt64((double)ST(2)))) return false;
-            if (!SetMemRaw<u64>(m + 58, DoubleAsUInt64((double)ST(3)))) return false;
-            if (!SetMemRaw<u64>(m + 68, DoubleAsUInt64((double)ST(4)))) return false;
-            if (!SetMemRaw<u64>(m + 78, DoubleAsUInt64((double)ST(5)))) return false;
-            if (!SetMemRaw<u64>(m + 88, DoubleAsUInt64((double)ST(6)))) return false;
-            if (!SetMemRaw<u64>(m + 98, DoubleAsUInt64((double)ST(7)))) return false;
+            if (!write_mem<u64>(m + 28, DoubleAsUInt64((double)ST(0)))) return false;
+            if (!write_mem<u64>(m + 38, DoubleAsUInt64((double)ST(1)))) return false;
+            if (!write_mem<u64>(m + 48, DoubleAsUInt64((double)ST(2)))) return false;
+            if (!write_mem<u64>(m + 58, DoubleAsUInt64((double)ST(3)))) return false;
+            if (!write_mem<u64>(m + 68, DoubleAsUInt64((double)ST(4)))) return false;
+            if (!write_mem<u64>(m + 78, DoubleAsUInt64((double)ST(5)))) return false;
+            if (!write_mem<u64>(m + 88, DoubleAsUInt64((double)ST(6)))) return false;
+            if (!write_mem<u64>(m + 98, DoubleAsUInt64((double)ST(7)))) return false;
 
             // after storing fpu state, re-initializes
-            return FINIT();
+            FINIT();
+            return true;
         case 7:
-            if (!GetMemRaw<u16>(m + 0, temp)) { return false; } FPU_control = (u16)temp;
-            if (!GetMemRaw<u16>(m + 4, temp)) { return false; } FPU_status = (u16)temp;
-            if (!GetMemRaw<u16>(m + 8, temp)) { return false; } FPU_tag = (u16)temp;
+            if (!read_mem<u16>(m + 0, FPU_control)) return false;
+            if (!read_mem<u16>(m + 4, FPU_status)) return false;
+            if (!read_mem<u16>(m + 8, FPU_tag)) return false;
 
-            // for cross-platformability/speed, writes native double instead of some tword hacks
-            if (!GetMemRaw<u64>(m + 28, temp)) { return false; } ST(0) = AsDouble(temp);
-            if (!GetMemRaw<u64>(m + 38, temp)) { return false; } ST(1) = AsDouble(temp);
-            if (!GetMemRaw<u64>(m + 48, temp)) { return false; } ST(2) = AsDouble(temp);
-            if (!GetMemRaw<u64>(m + 58, temp)) { return false; } ST(3) = AsDouble(temp);
-            if (!GetMemRaw<u64>(m + 68, temp)) { return false; } ST(4) = AsDouble(temp);
-            if (!GetMemRaw<u64>(m + 78, temp)) { return false; } ST(5) = AsDouble(temp);
-            if (!GetMemRaw<u64>(m + 88, temp)) { return false; } ST(6) = AsDouble(temp);
-            if (!GetMemRaw<u64>(m + 98, temp)) { return false; } ST(7) = AsDouble(temp);
+            // for cross-platformability/speed, reads native double instead of some tword hacks
+            {
+                u64 t;
+                if (!read_mem<u64>(m + 28, t)) { return false; } ST(0) = AsDouble(t);
+                if (!read_mem<u64>(m + 38, t)) { return false; } ST(1) = AsDouble(t);
+                if (!read_mem<u64>(m + 48, t)) { return false; } ST(2) = AsDouble(t);
+                if (!read_mem<u64>(m + 58, t)) { return false; } ST(3) = AsDouble(t);
+                if (!read_mem<u64>(m + 68, t)) { return false; } ST(4) = AsDouble(t);
+                if (!read_mem<u64>(m + 78, t)) { return false; } ST(5) = AsDouble(t);
+                if (!read_mem<u64>(m + 88, t)) { return false; } ST(6) = AsDouble(t);
+                if (!read_mem<u64>(m + 98, t)) { return false; } ST(7) = AsDouble(t);
+            }
 
             return true;
 
         case 8:
-            if (!SetMemRaw<u16>(m + 0, FPU_control)) return false;
-            if (!SetMemRaw<u16>(m + 4, FPU_status)) return false;
-            if (!SetMemRaw<u16>(m + 8, FPU_tag)) return false;
+            if (!write_mem<u16>(m + 0, FPU_control)) return false;
+            if (!write_mem<u16>(m + 4, FPU_status)) return false;
+            if (!write_mem<u16>(m + 8, FPU_tag)) return false;
 
-            if (!SetMemRaw<u32>(m + 12, EIP())) return false;
-            if (!SetMemRaw<u16>(m + 16, 0)) return false;
+            if (!write_mem<u32>(m + 12, (u32)EIP())) return false;
+            if (!write_mem<u16>(m + 16, (u16)0)) return false;
 
-            if (!SetMemRaw<u32>(m + 20, (u32)m)) return false;
-            if (!SetMemRaw<u16>(m + 24, 0)) return false;
+            if (!write_mem<u32>(m + 20, (u32)m)) return false;
+            if (!write_mem<u16>(m + 24, (u16)0)) return false;
 
             return true;
         case 9:
-            if (!GetMemRaw<u16>(m + 0, temp)) { return false; } FPU_control = (u16)temp;
-            if (!GetMemRaw<u16>(m + 4, temp)) { return false; } FPU_status = (u16)temp;
-            if (!GetMemRaw<u16>(m + 8, temp)) { return false; } FPU_tag = (u16)temp;
+            if (!read_mem<u16>(m + 0, FPU_control)) return false;
+            if (!read_mem<u16>(m + 4, FPU_status)) return false;
+            if (!read_mem<u16>(m + 8, FPU_tag)) return false;
 
             return true;
 
-        default: Terminate(ErrorCode::UndefinedBehavior); return false;
+        default: terminate_err(ErrorCode::UndefinedBehavior); return false;
         }
     }
     bool Computer::ProcessFLD_const()
     {
-        u64 ext;
+        u8 ext;
         if (!GetMemAdv<u8>(ext)) return false;
 
         FPU_status ^= Rand() & MASK_UNION_4(FPU_C0, FPU_C1, FPU_C2, FPU_C3);
@@ -2584,7 +2647,7 @@ namespace CSX64
         case 5: return PushFPU(0.693147180559945309417232121458176568075500134360255254120L); // ln 2
         case 6: return PushFPU(0L); // 0
 
-        default: Terminate(ErrorCode::UndefinedBehavior); return false;
+        default: terminate_err(ErrorCode::UndefinedBehavior); return false;
         }
     }
     /*
@@ -2599,7 +2662,8 @@ namespace CSX64
     */
     bool Computer::ProcessFLD()
     {
-        u64 s, m;
+        u8 s;
+        u64 m;
         if (!GetMemAdv<u8>(s)) return false;
 
         FPU_status ^= Rand() & MASK_UNION_4(FPU_C0, FPU_C1, FPU_C2, FPU_C3);
@@ -2608,21 +2672,21 @@ namespace CSX64
         switch (s & 7)
         {
         case 0:
-            if (ST(s >> 4).Empty()) { Terminate(ErrorCode::FPUAccessViolation); return false; }
+            if (ST(s >> 4).Empty()) { terminate_err(ErrorCode::FPUAccessViolation); return false; }
             return PushFPU(ST(s >> 4));
 
         default:
             if (!GetAddressAdv(m)) return false;
             switch (s & 7)
             {
-            case 1: if (!GetMemRaw<u32>(m, m)) return false; return PushFPU((long double)AsFloat((u32)m));
-            case 2: if (!GetMemRaw<u64>(m, m)) return false; return PushFPU((long double)AsDouble(m));
+            case 1: { u32 t; return read_mem<u32>(m, t) && PushFPU((long double)AsFloat(t)); }
+            case 2: { u64 t; return read_mem<u64>(m, t) && PushFPU((long double)AsDouble(t)); }
 
-            case 3: if (!GetMemRaw<u16>(m, m)) return false; return PushFPU((long double)(i64)SignExtend(m, 1));
-            case 4: if (!GetMemRaw<u32>(m, m)) return false; return PushFPU((long double)(i64)SignExtend(m, 2));
-            case 5: if (!GetMemRaw<u64>(m, m)) return false; return PushFPU((long double)(i64)m);
+            case 3: { u16 t; return read_mem<u16>(m, t) && PushFPU((long double)(i64)(i16)t); }
+            case 4: { u32 t; return read_mem<u32>(m, t) && PushFPU((long double)(i64)(i32)t); }
+            case 5: { u64 t; return read_mem<u64>(m, t) && PushFPU((long double)(i64)t); }
 
-            default: Terminate(ErrorCode::UndefinedBehavior); return false;
+            default: terminate_err(ErrorCode::UndefinedBehavior); return false;
             }
         }
     }
@@ -2647,7 +2711,8 @@ namespace CSX64
     */
     bool Computer::ProcessFST()
     {
-        u64 s, m;
+        u8 s;
+        u64 m;
         if (!GetMemAdv<u8>(s)) return false;
 
         FPU_status ^= Rand() & MASK_UNION_4(FPU_C0, FPU_C1, FPU_C2, FPU_C3);
@@ -2657,26 +2722,26 @@ namespace CSX64
         case 0:
         case 1:
             // make sure we can read the value
-            if (ST(0).Empty()) { Terminate(ErrorCode::FPUAccessViolation); return false; }
+            if (ST(0).Empty()) { terminate_err(ErrorCode::FPUAccessViolation); return false; }
             // record the value (is allowed to be not in use)
             ST(s >> 4) = ST(0);
             break;
 
         default:
-            if (ST(0).Empty()) { Terminate(ErrorCode::FPUAccessViolation); return false; }
+            if (ST(0).Empty()) { terminate_err(ErrorCode::FPUAccessViolation); return false; }
             if (!GetAddressAdv(m)) return false;
             switch (s & 15)
             {
-            case 2: case 3: if (!SetMemRaw<u32>(m, FloatAsUInt64((float)ST(0)))) return false; break;
-            case 4: case 5: if (!SetMemRaw<u64>(m, DoubleAsUInt64((double)ST(0)))) return false; break;
-            case 6: case 7: if (!SetMemRaw<u16>(m, (u64)(i64)PerformRoundTrip(ST(0), FPU_RC()))) return false; break;
-            case 8: case 9: if (!SetMemRaw<u32>(m, (u64)(i64)PerformRoundTrip(ST(0), FPU_RC()))) return false; break;
-            case 10: if (!SetMemRaw<u64>(m, (u64)(i64)PerformRoundTrip(ST(0), FPU_RC()))) return false; break;
-            case 11: if (!SetMemRaw<u16>(m, (u64)(i64)ST(0))) return false; break;
-            case 12: if (!SetMemRaw<u32>(m, (u64)(i64)ST(0))) return false; break;
-            case 13: if (!SetMemRaw<u64>(m, (u64)(i64)ST(0))) return false; break;
+            case 2: case 3: if (!write_mem<u32>(m, FloatAsUInt32((float)ST(0)))) return false; break;
+            case 4: case 5: if (!write_mem<u64>(m, DoubleAsUInt64((double)ST(0)))) return false; break;
+            case 6: case 7: if (!write_mem<u16>(m, (u16)(u64)(i64)PerformRoundTrip(ST(0), FPU_RC()))) return false; break;
+            case 8: case 9: if (!write_mem<u32>(m, (u32)(u64)(i64)PerformRoundTrip(ST(0), FPU_RC()))) return false; break;
+            case 10: if (!write_mem<u64>(m, (u64)(i64)PerformRoundTrip(ST(0), FPU_RC()))) return false; break;
+            case 11: if (!write_mem<u16>(m, (u16)(u64)(i64)ST(0))) return false; break;
+            case 12: if (!write_mem<u32>(m, (u32)(u64)(i64)ST(0))) return false; break;
+            case 13: if (!write_mem<u64>(m, (u64)(i64)ST(0))) return false; break;
 
-            default: Terminate(ErrorCode::UndefinedBehavior); return false;
+            default: terminate_err(ErrorCode::UndefinedBehavior); return false;
             }
             break;
         }
@@ -2689,11 +2754,12 @@ namespace CSX64
     }
     bool Computer::ProcessFXCH()
     {
-        u64 i;
+        u8 i;
         if (!GetMemAdv<u8>(i)) return false;
+        i &= 7;
 
         // make sure they're both in use
-        if (ST(0).Empty() || ST(i).Empty()) { Terminate(ErrorCode::FPUAccessViolation); return false; }
+        if (ST(0).Empty() || ST(i).Empty()) { terminate_err(ErrorCode::FPUAccessViolation); return false; }
 
         long double temp = ST(0);
         ST(0) = ST(i);
@@ -2717,7 +2783,7 @@ namespace CSX64
     */
     bool Computer::ProcessFMOVcc()
     {
-        u64 s;
+        u8 s;
         if (!GetMemAdv<u8>(s)) return false;
 
         // get the flag
@@ -2733,14 +2799,14 @@ namespace CSX64
         case 6: flag = PF(); break;
         case 7: flag = !PF(); break;
 
-        default: Terminate(ErrorCode::UndefinedBehavior); return false;
+        default: terminate_err(ErrorCode::UndefinedBehavior); return false;
         }
 
         // if flag is set, do the move
         if (flag)
         {
             int i = (s >> 4) & 7;
-            if (ST(0).Empty() || ST(i).Empty()) { Terminate(ErrorCode::FPUAccessViolation); return false; }
+            if (ST(0).Empty() || ST(i).Empty()) { terminate_err(ErrorCode::FPUAccessViolation); return false; }
             ST(0) = ST(s >> 4);
         }
 
@@ -2751,7 +2817,7 @@ namespace CSX64
 
     bool Computer::ProcessFADD()
     {
-        u64 s;
+        u8 s;
         long double a, b;
         if (!FetchFPUBinaryFormat(s, a, b)) return false;
 
@@ -2763,7 +2829,7 @@ namespace CSX64
     }
     bool Computer::ProcessFSUB()
     {
-        u64 s;
+        u8 s;
         long double a, b;
         if (!FetchFPUBinaryFormat(s, a, b)) return false;
 
@@ -2775,7 +2841,7 @@ namespace CSX64
     }
     bool Computer::ProcessFSUBR()
     {
-        u64 s;
+        u8 s;
         long double a, b;
         if (!FetchFPUBinaryFormat(s, a, b)) return false;
 
@@ -2788,7 +2854,7 @@ namespace CSX64
 
     bool Computer::ProcessFMUL()
     {
-        u64 s;
+        u8 s;
         long double a, b;
         if (!FetchFPUBinaryFormat(s, a, b)) return false;
 
@@ -2800,7 +2866,7 @@ namespace CSX64
     }
     bool Computer::ProcessFDIV()
     {
-        u64 s;
+        u8 s;
         long double a, b;
         if (!FetchFPUBinaryFormat(s, a, b)) return false;
 
@@ -2812,7 +2878,7 @@ namespace CSX64
     }
     bool Computer::ProcessFDIVR()
     {
-        u64 s;
+        u8 s;
         long double a, b;
         if (!FetchFPUBinaryFormat(s, a, b)) return false;
 
@@ -2825,12 +2891,12 @@ namespace CSX64
 
     bool Computer::ProcessF2XM1()
     {
-        if (ST(0).Empty()) { Terminate(ErrorCode::FPUAccessViolation); return false; }
+        if (ST(0).Empty()) { terminate_err(ErrorCode::FPUAccessViolation); return false; }
 
         // get the value
         double val = ST(0);
         // val must be in range [-1, 1]
-        if (val < -1 || val > 1) { Terminate(ErrorCode::FPUError); return false; }
+        if (val < -1 || val > 1) { terminate_err(ErrorCode::FPUError); return false; }
 
         ST(0) = std::pow(2, val) - 1;
 
@@ -2840,7 +2906,7 @@ namespace CSX64
     }
     bool Computer::ProcessFABS()
     {
-        if (ST(0).Empty()) { Terminate(ErrorCode::FPUAccessViolation); return false; }
+        if (ST(0).Empty()) { terminate_err(ErrorCode::FPUAccessViolation); return false; }
 
         ST(0) = std::fabs(ST(0));
 
@@ -2851,7 +2917,7 @@ namespace CSX64
     }
     bool Computer::ProcessFCHS()
     {
-        if (ST(0).Empty()) { Terminate(ErrorCode::FPUAccessViolation); return false; }
+        if (ST(0).Empty()) { terminate_err(ErrorCode::FPUAccessViolation); return false; }
 
         ST(0) = -ST(0);
 
@@ -2862,7 +2928,7 @@ namespace CSX64
     }
     bool Computer::ProcessFPREM()
     {
-        if (ST(0).Empty() || ST(1).Empty()) { Terminate(ErrorCode::FPUAccessViolation); return false; }
+        if (ST(0).Empty() || ST(1).Empty()) { terminate_err(ErrorCode::FPUAccessViolation); return false; }
 
         long double a = ST(0);
         long double b = ST(1);
@@ -2885,7 +2951,7 @@ namespace CSX64
     }
     bool Computer::ProcessFPREM1()
     {
-        if (ST(0).Empty() || ST(1).Empty()) { Terminate(ErrorCode::FPUAccessViolation); return false; }
+        if (ST(0).Empty() || ST(1).Empty()) { terminate_err(ErrorCode::FPUAccessViolation); return false; }
 
         long double a = ST(0);
         long double b = ST(1);
@@ -2908,7 +2974,7 @@ namespace CSX64
     }
     bool Computer::ProcessFRNDINT()
     {
-        if (ST(0).Empty()) { Terminate(ErrorCode::FPUAccessViolation); return false; }
+        if (ST(0).Empty()) { terminate_err(ErrorCode::FPUAccessViolation); return false; }
 
         long double val = ST(0);
         long double res = PerformRoundTrip(val, FPU_RC());
@@ -2922,7 +2988,7 @@ namespace CSX64
     }
     bool Computer::ProcessFSQRT()
     {
-        if (ST(0).Empty()) { Terminate(ErrorCode::FPUAccessViolation); return false; }
+        if (ST(0).Empty()) { terminate_err(ErrorCode::FPUAccessViolation); return false; }
 
         ST(0) = std::sqrt(ST(0));
 
@@ -2932,12 +2998,12 @@ namespace CSX64
     }
     bool Computer::ProcessFYL2X()
     {
-        if (ST(0).Empty() || ST(1).Empty()) { Terminate(ErrorCode::FPUAccessViolation); return false; }
+        if (ST(0).Empty() || ST(1).Empty()) { terminate_err(ErrorCode::FPUAccessViolation); return false; }
 
         long double a = ST(0);
         long double b = ST(1);
 
-        PopFPU(); // pop stack and place in the new st(0)
+        (void)PopFPU(); // pop stack and place in the new st(0) - discarding result because check above ensures this will succeed
         ST(0) = b * std::log2(a);
 
         FPU_status ^= Rand() & MASK_UNION_4(FPU_C0, FPU_C1, FPU_C2, FPU_C3);
@@ -2946,12 +3012,12 @@ namespace CSX64
     }
     bool Computer::ProcessFYL2XP1()
     {
-        if (ST(0).Empty() || ST(1).Empty()) { Terminate(ErrorCode::FPUAccessViolation); return false; }
+        if (ST(0).Empty() || ST(1).Empty()) { terminate_err(ErrorCode::FPUAccessViolation); return false; }
 
         long double a = ST(0);
         long double b = ST(1);
 
-        PopFPU(); // pop stack and place in the new st(0)
+        (void)PopFPU(); // pop stack and place in the new st(0) - discarding result because check above ensures this will succeed
         ST(0) = b * std::log2(a + 1);
 
         FPU_status ^= Rand() & MASK_UNION_4(FPU_C0, FPU_C1, FPU_C2, FPU_C3);
@@ -2960,7 +3026,7 @@ namespace CSX64
     }
     bool Computer::ProcessFXTRACT()
     {
-        if (ST(0).Empty()) { Terminate(ErrorCode::FPUAccessViolation); return false; }
+        if (ST(0).Empty()) { terminate_err(ErrorCode::FPUAccessViolation); return false; }
 
         FPU_status ^= Rand() & MASK_UNION_4(FPU_C0, FPU_C1, FPU_C2, FPU_C3);
 
@@ -2974,7 +3040,7 @@ namespace CSX64
     }
     bool Computer::ProcessFSCALE()
     {
-        if (ST(0).Empty() || ST(1).Empty()) { Terminate(ErrorCode::FPUAccessViolation); return false; }
+        if (ST(0).Empty() || ST(1).Empty()) { terminate_err(ErrorCode::FPUAccessViolation); return false; }
 
         double a = ST(0);
         double b = ST(1);
@@ -3016,12 +3082,12 @@ namespace CSX64
     }
     bool Computer::ProcessFTST()
     {
-        if (ST(0).Empty()) { Terminate(ErrorCode::FPUAccessViolation); return false; }
+        if (ST(0).Empty()) { terminate_err(ErrorCode::FPUAccessViolation); return false; }
 
         long double a = ST(0);
 
         // for FTST, nan is an arithmetic error
-        if (std::isnan(a)) { Terminate(ErrorCode::ArithmeticError); return false; }
+        if (std::isnan(a)) { terminate_err(ErrorCode::ArithmeticError); return false; }
 
         // do the comparison
         if (a > 0) { FPU_C3() = false; FPU_C2() = false; FPU_C0() = false; }
@@ -3053,7 +3119,8 @@ namespace CSX64
     */
     bool Computer::ProcessFCOM()
     {
-        u64 s, m;
+        u8 s;
+        u64 m;
         if (!GetMemAdv<u8>(s)) return false;
 
         long double a, b;
@@ -3066,23 +3133,23 @@ namespace CSX64
         case 2:
         case 11:
         case 12:
-            if (ST(0).Empty() || ST(s >> 4).Empty()) { Terminate(ErrorCode::FPUAccessViolation); return false; }
+            if (ST(0).Empty() || ST(s >> 4).Empty()) { terminate_err(ErrorCode::FPUAccessViolation); return false; }
             a = ST(0); b = ST(s >> 4);
             break;
 
         default:
-            if (ST(0).Empty()) { Terminate(ErrorCode::FPUAccessViolation); return false; }
+            if (ST(0).Empty()) { terminate_err(ErrorCode::FPUAccessViolation); return false; }
             a = ST(0);
             if (!GetAddressAdv(m)) return false;
             switch (s & 15)
             {
-            case 3: case 4: if (!GetMemRaw<u32>(m, m)) return false; b = (long double)AsFloat((u32)m); break;
-            case 5: case 6: if (!GetMemRaw<u64>(m, m)) return false; b = (long double)AsDouble(m); break;
+            case 3: case 4: if (u32 t; read_mem<u32>(m, t)) b = (long double)AsFloat(t); else return false; break;
+            case 5: case 6: if (u64 t; read_mem<u64>(m, t)) b = (long double)AsDouble(t); else return false; break;
 
-            case 7: case 8: if (!GetMemRaw<u16>(m, m)) return false; b = (long double)(i64)SignExtend(m, 1); break;
-            case 9: case 10: if (!GetMemRaw<u32>(m, m)) return false; b = (long double)(i64)SignExtend(m, 2); break;
+            case 7: case 8: if (u16 t; read_mem<u16>(m, t)) b = (long double)(i64)(i16)t; else return false; break;
+            case 9: case 10: if (u32 t; read_mem<u32>(m, t)) b = (long double)(i64)(i32)t; else return false; break;
 
-            default: Terminate(ErrorCode::UndefinedBehavior); return false;
+            default: terminate_err(ErrorCode::UndefinedBehavior); return false;
             }
             break;
         }
@@ -3096,7 +3163,7 @@ namespace CSX64
         // otherwise is unordered
         else
         {
-            if ((s & 128) == 0) { Terminate(ErrorCode::ArithmeticError); return false; }
+            if ((s & 128) == 0) { terminate_err(ErrorCode::ArithmeticError); return false; }
             x = y = z = true;
         }
 		
@@ -3117,7 +3184,7 @@ namespace CSX64
         FPU_C1() = false; // C1 is cleared in either case
 
         // handle popping cases
-        switch (s & 7)
+        switch (s & 15)
         {
         case 2: return PopFPU() && PopFPU();
         case 1: case 4: case 6: case 8: case 10: case 12: return PopFPU();
@@ -3127,7 +3194,7 @@ namespace CSX64
 
     bool Computer::ProcessFSIN()
     {
-        if (ST(0).Empty()) { Terminate(ErrorCode::FPUAccessViolation); return false; }
+        if (ST(0).Empty()) { terminate_err(ErrorCode::FPUAccessViolation); return false; }
 
         ST(0) = std::sin(ST(0));
 
@@ -3138,7 +3205,7 @@ namespace CSX64
     }
     bool Computer::ProcessFCOS()
     {
-        if (ST(0).Empty()) { Terminate(ErrorCode::FPUAccessViolation); return false; }
+        if (ST(0).Empty()) { terminate_err(ErrorCode::FPUAccessViolation); return false; }
 
         ST(0) = std::cos(ST(0));
 
@@ -3149,7 +3216,7 @@ namespace CSX64
     }
     bool Computer::ProcessFSINCOS()
     {
-        if (ST(0).Empty()) { Terminate(ErrorCode::FPUAccessViolation); return false; }
+        if (ST(0).Empty()) { terminate_err(ErrorCode::FPUAccessViolation); return false; }
 
         FPU_status ^= Rand() & MASK_UNION_3(FPU_C0, FPU_C1, FPU_C3);
         FPU_C2() = false;
@@ -3163,7 +3230,7 @@ namespace CSX64
     }
     bool Computer::ProcessFPTAN()
     {
-        if (ST(0).Empty()) { Terminate(ErrorCode::FPUAccessViolation); return false; }
+        if (ST(0).Empty()) { terminate_err(ErrorCode::FPUAccessViolation); return false; }
 
         ST(0) = std::tan(ST(0));
 
@@ -3175,12 +3242,12 @@ namespace CSX64
     }
     bool Computer::ProcessFPATAN()
     {
-        if (ST(0).Empty() || ST(1).Empty()) { Terminate(ErrorCode::FPUAccessViolation); return false; }
+        if (ST(0).Empty() || ST(1).Empty()) { terminate_err(ErrorCode::FPUAccessViolation); return false; }
 
         long double a = ST(0);
         long double b = ST(1);
 
-        PopFPU(); // pop stack and place in new st(0)
+        (void)PopFPU(); // pop stack and place in new st(0) - discarding result because check above ensures this will succeed
         ST(0) = std::atan2(b, a);
 
         FPU_status ^= Rand() & MASK_UNION_3(FPU_C0, FPU_C1, FPU_C3);
@@ -3196,7 +3263,7 @@ namespace CSX64
     */
     bool Computer::ProcessFINCDECSTP()
     {
-        u64 ext;
+        u8 ext;
         if (!GetMemAdv<u8>(ext)) return false;
 
         // does not modify tag word
@@ -3215,8 +3282,9 @@ namespace CSX64
     }
     bool Computer::ProcessFFREE()
     {
-        u64 i;
+        u8 i;
         if (!GetMemAdv<u8>(i)) return false;
+        i &= 7;
 
         // mark as not in use
         ST(i).Free();
@@ -3238,7 +3306,8 @@ namespace CSX64
     bool Computer::ProcessVPUMove()
     {
         // read settings bytes
-        u64 s1, s2, _src, m, temp;
+        u8 s1, s2;
+        u64 m, temp;
         if (!GetMemAdv<u8>(s1) || !GetMemAdv<u8>(s2)) return false;
         u64 reg_sizecode = s1 & 3;
         u64 elem_sizecode = (s2 >> 2) & 3;
@@ -3246,25 +3315,24 @@ namespace CSX64
         // -- get the register to work with -- //
 
         // this check isn't optional - if it's 3 it can go out of bounds of the ZMMRegister object
-        if (reg_sizecode == 3) { Terminate(ErrorCode::UndefinedBehavior); return false; }
+        if (reg_sizecode == 3) { terminate_err(ErrorCode::UndefinedBehavior); return false; }
 
         if constexpr (StrictUND)
         {
             // this check is optional - just prevents XMM / YMM ops from accessing vpu registers 16-31 (standard intel stuff)
-            if (reg_sizecode != 2 && (s1 & 0x80) != 0) { Terminate(ErrorCode::UndefinedBehavior); return false; }
+            if (reg_sizecode != 2 && (s1 & 0x80) != 0) { terminate_err(ErrorCode::UndefinedBehavior); return false; }
         }
 
-        u64 reg = s1 >> 3;
+        ZMMRegister &reg = ZMMRegisters[s1 >> 3];
 
         // -- prepare for execution -- //
 
         // get number of elements to process (accounting for scalar flag)
-        u64 elem_count = s2 & 0x20 ? 1 : Size(reg_sizecode + 4) >> elem_sizecode;
-        u64 src;
+        const u64 elem_count = s2 & 0x20 ? 1 : Size(reg_sizecode + 4) >> elem_sizecode;
 
         // get the mask (default of all 1's)
         u64 mask = ~(u64)0;
-        if ((s2 & 0x80) != 0 && !GetMemAdv(BitsToBytes((u64)elem_count), mask)) return false;
+        if ((s2 & 0x80) != 0 && !GetMemAdv(BitsToBytes(elem_count), mask)) return false;
         // get the zmask flag
         bool zmask = (s2 & 0x40) != 0;
 
@@ -3272,56 +3340,59 @@ namespace CSX64
         switch (s2 & 3)
         {
         case 0:
+        {
+            u8 _src;
             if (!GetMemAdv<u8>(_src)) return false;
 
             if constexpr (StrictUND)
             {
                 // this check is optional - just prevents XMM / YMM ops from accessing vpu registers 16-31 (standard intel stuff)
-                if (reg_sizecode != 2 && (_src & 0x10) != 0) { Terminate(ErrorCode::UndefinedBehavior); return false; }
+                if (reg_sizecode != 2 && (_src & 0x10) != 0) { terminate_err(ErrorCode::UndefinedBehavior); return false; }
             }
 
-            src = (int)_src & 0x1f;
+            const ZMMRegister &src = ZMMRegisters[_src & 0x1f];
 
             for (u64 i = 0; i < elem_count; ++i, mask >>= 1)
             {
-                if ((mask & 1) != 0) ZMMRegisters[reg].uint((int)elem_sizecode, i) = ZMMRegisters[src].uint((int)elem_sizecode, i);
-                else if (zmask) ZMMRegisters[reg].uint(elem_sizecode, i) = 0;
+                if (mask & 1) reg.uint((int)elem_sizecode, i) = src.uint((int)elem_sizecode, i);
+                else if (zmask) reg.uint(elem_sizecode, i) = 0;
             }
 
             break;
+        } 
         case 1:
             if (!GetAddressAdv(m)) return false;
             // if we're in vector mode and aligned flag is set, make sure address is aligned
-            if (elem_count > 1 && (s1 & 4) != 0 && m % Size(reg_sizecode + 4) != 0) { Terminate(ErrorCode::AlignmentViolation); return false; }
+            if (elem_count > 1 && (s1 & 4) != 0 && m % Size(reg_sizecode + 4) != 0) { terminate_err(ErrorCode::AlignmentViolation); return false; }
 
             for (u64 i = 0; i < elem_count; ++i, mask >>= 1, m += Size(elem_sizecode))
             {
-                if ((mask & 1) != 0)
+                if (mask & 1)
                 {
                     if (!GetMemRaw(m, Size(elem_sizecode), temp)) return false;
-                    ZMMRegisters[reg].uint((int)elem_sizecode, i) = temp;
+                    reg.uint((int)elem_sizecode, i) = temp;
                 }
-                else if (zmask) ZMMRegisters[reg].uint(elem_sizecode, i) = 0;
+                else if (zmask) reg.uint(elem_sizecode, i) = 0;
             }
 
             break;
         case 2:
             if (!GetAddressAdv(m)) return false;
             // if we're in vector mode and aligned flag is set, make sure address is aligned
-            if (elem_count > 1 && (s1 & 4) != 0 && m % Size(reg_sizecode + 4) != 0) { Terminate(ErrorCode::AlignmentViolation); return false; }
+            if (elem_count > 1 && (s1 & 4) != 0 && m % Size(reg_sizecode + 4) != 0) { terminate_err(ErrorCode::AlignmentViolation); return false; }
 
             for (u64 i = 0; i < elem_count; ++i, mask >>= 1, m += Size(elem_sizecode))
             {
-                if ((mask & 1) != 0)
+                if (mask & 1)
                 {
-                    if (!SetMemRaw(m, Size(elem_sizecode), ZMMRegisters[reg].uint(elem_sizecode, i))) return false;
+                    if (!SetMemRaw(m, Size(elem_sizecode), reg.uint(elem_sizecode, i))) return false;
                 }
                 else if (zmask && !SetMemRaw(m, Size(elem_sizecode), 0)) return false;
             }
 
             break;
 
-        default: Terminate(ErrorCode::UndefinedBehavior); return false;
+        default: terminate_err(ErrorCode::UndefinedBehavior); return false;
         }
 
         return true;
@@ -3334,26 +3405,27 @@ namespace CSX64
     bool Computer::ProcessVPUBinary(u64 elem_size_mask, VPUBinaryDelegate func)
     {
         // read settings bytes
-        u64 s1, s2, _src1, _src2, res, m;
+        u8 s1, s2, _src1, _src2;
+        u64 res, m;
         if (!GetMemAdv<u8>(s1) || !GetMemAdv<u8>(s2)) return false;
         u64 dest_sizecode = s1 & 3;
         u64 elem_sizecode = (s2 >> 2) & 3;
 
         // make sure this element size is allowed
-        if ((Size(elem_sizecode) & elem_size_mask) == 0) { Terminate(ErrorCode::UndefinedBehavior); return false; }
+        if ((Size(elem_sizecode) & elem_size_mask) == 0) { terminate_err(ErrorCode::UndefinedBehavior); return false; }
 
         // -- get the register to work with -- //
 
         // this check isn't optional - if it's 3 it can go out of bounds of the ZMMRegister object
-        if (dest_sizecode == 3) { Terminate(ErrorCode::UndefinedBehavior); return false; }
+        if (dest_sizecode == 3) { terminate_err(ErrorCode::UndefinedBehavior); return false; }
 
         if constexpr (StrictUND)
         {
             // this check is optional - just prevents XMM / YMM ops from accessing vpu registers 16-31 (standard intel stuff)
-            if (dest_sizecode != 2 && s1 & 0x80) { Terminate(ErrorCode::UndefinedBehavior); return false; }
+            if (dest_sizecode != 2 && s1 & 0x80) { terminate_err(ErrorCode::UndefinedBehavior); return false; }
         }
 
-        u64 dest = s1 >> 3;
+        ZMMRegister &dest = ZMMRegisters[s1 >> 3];
 
         // -- prepare for execution -- //
 
@@ -3372,10 +3444,10 @@ namespace CSX64
         if constexpr (StrictUND)
         {
             // this check is optional - just prevents XMM / YMM ops from accessing vpu registers 16-31 (standard intel stuff)
-            if (dest_sizecode != 2 && (_src1 & 0x10) != 0) { Terminate(ErrorCode::UndefinedBehavior); return false; }
+            if (dest_sizecode != 2 && (_src1 & 0x10) != 0) { terminate_err(ErrorCode::UndefinedBehavior); return false; }
         }
 
-        u64 src1 = _src1 & 0x1f;
+        const ZMMRegister &src1 = ZMMRegisters[_src1 & 0x1f];
 
         // if src2 is a register
         if ((s2 & 1) == 0)
@@ -3385,26 +3457,28 @@ namespace CSX64
             if constexpr (StrictUND)
             {
                 // this check is optional - just prevents XMM / YMM ops from accessing vpu registers 16-31 (standard intel stuff)
-                if (dest_sizecode != 2 && _src2 & 0x10) { Terminate(ErrorCode::UndefinedBehavior); return false; }
+                if (dest_sizecode != 2 && _src2 & 0x10) { terminate_err(ErrorCode::UndefinedBehavior); return false; }
             }
 
-            u64 src2 = _src2 & 0x1f;
+            const ZMMRegister &src2 = ZMMRegisters[_src2 & 0x1f];
 
             for (u64 i = 0; i < elem_count; ++i, mask >>= 1)
+            {
                 if (mask & 1)
                 {
                     // hand over to the delegate for processing
-                    if (!(this->*func)(elem_sizecode, res, ZMMRegisters[src1].uint(elem_sizecode, i), ZMMRegisters[src2].uint(elem_sizecode, i), i)) return false;
-                    ZMMRegisters[dest].uint(elem_sizecode, i) = res;
+                    if (!(this->*func)(elem_sizecode, res, src1.uint(elem_sizecode, i), src2.uint(elem_sizecode, i), i)) return false;
+                    dest.uint(elem_sizecode, i) = res;
                 }
-                else if (zmask) ZMMRegisters[dest].uint(elem_sizecode, i) = 0;
+                else if (zmask) dest.uint(elem_sizecode, i) = 0;
+            }
         }
         // otherwise src is memory
         else
         {
             if (!GetAddressAdv(m)) return false;
             // if we're in vector mode and aligned flag is set, make sure address is aligned
-            if (elem_count > 1 && (s1 & 4) != 0 && m % Size(dest_sizecode + 4) != 0) { Terminate(ErrorCode::AlignmentViolation); return false; }
+            if (elem_count > 1 && (s1 & 4) != 0 && m % Size(dest_sizecode + 4) != 0) { terminate_err(ErrorCode::AlignmentViolation); return false; }
 
             for (u64 i = 0; i < elem_count; ++i, mask >>= 1, m += Size(elem_sizecode))
                 if (mask & 1)
@@ -3412,10 +3486,10 @@ namespace CSX64
                     if (!GetMemRaw(m, Size(elem_sizecode), res)) return false;
 
                     // hand over to the delegate for processing
-                    if (!(this->*func)(elem_sizecode, res, ZMMRegisters[src1].uint(elem_sizecode, i), res, i)) return false;
-                    ZMMRegisters[dest].uint(elem_sizecode, i) = res;
+                    if (!(this->*func)(elem_sizecode, res, src1.uint(elem_sizecode, i), res, i)) return false;
+                    dest.uint(elem_sizecode, i) = res;
                 }
-                else if (zmask) ZMMRegisters[dest].uint(elem_sizecode, i) = 0;
+                else if (zmask) dest.uint(elem_sizecode, i) = 0;
         }
 
         return true;
@@ -3428,26 +3502,27 @@ namespace CSX64
     bool Computer::ProcessVPUUnary(u64 elem_size_mask, VPUUnaryDelegate func)
     {
         // read settings bytes
-        u64 s1, s2, _src, res, m;
+        u8 s1, s2;
+        u64 res, m;
         if (!GetMemAdv<u8>(s1) || !GetMemAdv<u8>(s2)) return false;
         u64 dest_sizecode = s1 & 3;
         u64 elem_sizecode = (s2 >> 2) & 3;
 
         // make sure this element size is allowed
-        if ((Size(elem_sizecode) & elem_size_mask) == 0) { Terminate(ErrorCode::UndefinedBehavior); return false; }
+        if ((Size(elem_sizecode) & elem_size_mask) == 0) { terminate_err(ErrorCode::UndefinedBehavior); return false; }
 
         // -- get the register to work with -- //
 
         // this check isn't optional - if it's 3 it can go out of bounds of the ZMMRegister object
-        if (dest_sizecode == 3) { Terminate(ErrorCode::UndefinedBehavior); return false; }
+        if (dest_sizecode == 3) { terminate_err(ErrorCode::UndefinedBehavior); return false; }
 
         if constexpr (StrictUND)
         {
             // this check is optional - just prevents XMM / YMM ops from accessing vpu registers 16-31 (standard intel stuff)
-            if (dest_sizecode != 2 && s1 & 0x80) { Terminate(ErrorCode::UndefinedBehavior); return false; }
+            if (dest_sizecode != 2 && s1 & 0x80) { terminate_err(ErrorCode::UndefinedBehavior); return false; }
         }
 
-        u64 dest = s1 >> 3;
+        ZMMRegister &dest = ZMMRegisters[s1 >> 3];
 
         // -- prepare for execution -- //
 
@@ -3463,31 +3538,32 @@ namespace CSX64
         // if src is a register
         if ((s2 & 1) == 0)
         {
+            u8 _src;
             if (!GetMemAdv<u8>(_src)) return false;
 
             if constexpr (StrictUND)
             {
                 // this check is optional - just prevents XMM / YMM ops from accessing vpu registers 16-31 (standard intel stuff)
-                if (dest_sizecode != 2 && _src & 0x10) { Terminate(ErrorCode::UndefinedBehavior); return false; }
+                if (dest_sizecode != 2 && _src & 0x10) { terminate_err(ErrorCode::UndefinedBehavior); return false; }
             }
 
-            u64 src = _src & 0x1f;
+            ZMMRegister &src = ZMMRegisters[_src & 0x1f];
 
             for (u64 i = 0; i < elem_count; ++i, mask >>= 1)
                 if (mask & 1)
                 {
                     // hand over to the delegate for processing
-                    if (!(this->*func)(elem_sizecode, res, ZMMRegisters[src].uint(elem_sizecode, i), i)) return false;
-                    ZMMRegisters[dest].uint(elem_sizecode, i) = res;
+                    if (!(this->*func)(elem_sizecode, res, src.uint(elem_sizecode, i), i)) return false;
+                    dest.uint(elem_sizecode, i) = res;
                 }
-                else if (zmask) ZMMRegisters[dest].uint(elem_sizecode, i) = 0;
+                else if (zmask) dest.uint(elem_sizecode, i) = 0;
         }
         // otherwise src is memory
         else
         {
             if (!GetAddressAdv(m)) return false;
             // if we're in vector mode and aligned flag is set, make sure address is aligned
-            if (elem_count > 1 && (s1 & 4) != 0 && m % Size(dest_sizecode + 4) != 0) { Terminate(ErrorCode::AlignmentViolation); return false; }
+            if (elem_count > 1 && (s1 & 4) != 0 && m % Size(dest_sizecode + 4) != 0) { terminate_err(ErrorCode::AlignmentViolation); return false; }
 
             for (u64 i = 0; i < elem_count; ++i, mask >>= 1, m += Size(elem_sizecode))
                 if (mask & 1)
@@ -3496,9 +3572,9 @@ namespace CSX64
                     
                     // hand over to the delegate for processing
                     if (!(this->*func)(elem_sizecode, res, res, i)) return false;
-                    ZMMRegisters[dest].uint(elem_sizecode, i) = res;
+                    dest.uint(elem_sizecode, i) = res;
                 }
-                else if (zmask) ZMMRegisters[dest].uint(elem_sizecode, i) = 0;
+                else if (zmask) dest.uint(elem_sizecode, i) = 0;
         }
 
         return true;
@@ -3512,7 +3588,7 @@ namespace CSX64
     bool Computer::ProcessVPUCVT_packed(u64 elem_count, u64 to_elem_sizecode, u64 from_elem_sizecode, VPUCVTDelegate func)
     {
         // read settings byte
-        u64 s;
+        u8 s;
         if (!GetMemAdv<u8>(s)) return false;
         u64 dest = s >> 3;
 
@@ -3530,16 +3606,18 @@ namespace CSX64
         // if src is a register
         if ((s & 4) == 0)
         {
-            u64 src, res;
-            if (!GetMemAdv<u8>(src)) return false;
-            src &= 0x1f;
+            u8 _src;
+            u64 res;
+            if (!GetMemAdv<u8>(_src)) return false;
+
+            ZMMRegister &src = ZMMRegisters[_src & 0x1f];
 
             for (u64 i = 0; i < elem_count; ++i, mask >>= 1)
             {
                 if (mask & 1)
                 {
                     // hand over to the delegate for processing
-                    if (!(this->*func)(res, ZMMRegisters[src].uint(from_elem_sizecode, i))) return false;
+                    if (!(this->*func)(res, src.uint(from_elem_sizecode, i))) return false;
                     temp_dest.uint(to_elem_sizecode, i) = res;
                 }
                 else if (zmask) temp_dest.uint(to_elem_sizecode, i) = 0;
@@ -3551,7 +3629,7 @@ namespace CSX64
             u64 m, res;
             if (!GetAddressAdv(m)) return false;
             // make sure source address is aligned
-            if (m % (elem_count << from_elem_sizecode) != 0) { Terminate(ErrorCode::AlignmentViolation); return false; }
+            if (m % (elem_count << from_elem_sizecode) != 0) { terminate_err(ErrorCode::AlignmentViolation); return false; }
 
             for (u64 i = 0; i < elem_count; ++i, mask >>= 1, m += Size(from_elem_sizecode))
             {
@@ -3579,7 +3657,8 @@ namespace CSX64
     bool Computer::ProcessVPUCVT_scalar_xmm_xmm(u64 to_elem_sizecode, u64 from_elem_sizecode, VPUCVTDelegate func)
     {
         // read the settings byte
-        u64 s, temp;
+        u8 s;
+        u64 temp;
         if (!GetMemAdv<u8>(s)) return false;
 
         // perform the conversion
@@ -3596,7 +3675,8 @@ namespace CSX64
     bool Computer::ProcessVPUCVT_scalar_xmm_reg(u64 to_elem_sizecode, u64 from_elem_sizecode, VPUCVTDelegate func)
     {
         // read the settings byte
-        u64 s, temp;
+        u8 s;
+        u64 temp;
         if (!GetMemAdv<u8>(s)) return false;
 
         // perform the conversion
@@ -3613,7 +3693,8 @@ namespace CSX64
     bool Computer::ProcessVPUCVT_scalar_xmm_mem(u64 to_elem_sizecode, u64 from_elem_sizecode, VPUCVTDelegate func)
     {
         // read the settings byte
-        u64 s, temp;
+        u8 s;
+        u64 temp;
         if (!GetMemAdv<u8>(s)) return false;
 
         // get value to convert in temp
@@ -3633,7 +3714,8 @@ namespace CSX64
     bool Computer::ProcessVPUCVT_scalar_reg_xmm(u64 to_elem_sizecode, u64 from_elem_sizecode, VPUCVTDelegate func)
     {
         // read the settings byte
-        u64 s, temp;
+        u8 s;
+        u64 temp;
         if (!GetMemAdv<u8>(s)) return false;
 
         // perform the conversion
@@ -3650,7 +3732,8 @@ namespace CSX64
     bool Computer::ProcessVPUCVT_scalar_reg_mem(u64 to_elem_sizecode, u64 from_elem_sizecode, VPUCVTDelegate func)
     {
         // read the settings byte
-        u64 s, temp;
+        u8 s;
+        u64 temp;
         if (!GetMemAdv<u8>(s)) return false;
 
         // get value to convert in temp
@@ -3670,7 +3753,7 @@ namespace CSX64
         // 64-bit fp
         if (elem_sizecode == 3) res = DoubleAsUInt64(AsDouble(a) + AsDouble(b));
         // 32-bit fp
-        else res = FloatAsUInt64(AsFloat((u32)a) + AsFloat((u32)b));
+        else res = FloatAsUInt32(AsFloat((u32)a) + AsFloat((u32)b));
 
         return true;
     }
@@ -3679,7 +3762,7 @@ namespace CSX64
         // 64-bit fp
         if (elem_sizecode == 3) res = DoubleAsUInt64(AsDouble(a) - AsDouble(b));
         // 32-bit fp
-        else res = FloatAsUInt64(AsFloat((u32)a) - AsFloat((u32)b));
+        else res = FloatAsUInt32(AsFloat((u32)a) - AsFloat((u32)b));
 
         return true;
     }
@@ -3688,7 +3771,7 @@ namespace CSX64
         // 64-bit fp
         if (elem_sizecode == 3) res = DoubleAsUInt64(AsDouble(a) * AsDouble(b));
         // 32-bit fp
-        else res = FloatAsUInt64(AsFloat((u32)a) * AsFloat((u32)b));
+        else res = FloatAsUInt32(AsFloat((u32)a) * AsFloat((u32)b));
 
         return true;
     }
@@ -3697,7 +3780,7 @@ namespace CSX64
         // 64-bit fp
         if (elem_sizecode == 3) res = DoubleAsUInt64(AsDouble(a) / AsDouble(b));
         // 32-bit fp
-        else res = FloatAsUInt64(AsFloat((u32)a) / AsFloat((u32)b));
+        else res = FloatAsUInt32(AsFloat((u32)a) / AsFloat((u32)b));
 
         return true;
     }
@@ -3854,7 +3937,7 @@ namespace CSX64
         // 64-bit fp
         if (elem_sizecode == 3) res = DoubleAsUInt64(index % 2 == 0 ? AsDouble(a) - AsDouble(b) : AsDouble(a) + AsDouble(b));
         // 32-bit fp
-        else res = FloatAsUInt64(index % 2 == 0 ? AsFloat((u32)a) - AsFloat((u32)b) : AsFloat((u32)a) + AsFloat((u32)b));
+        else res = FloatAsUInt32(index % 2 == 0 ? AsFloat((u32)a) - AsFloat((u32)b) : AsFloat((u32)a) + AsFloat((u32)b));
 
         return true;
     }
@@ -3883,7 +3966,7 @@ namespace CSX64
             if (std::isnan(fa) || std::isnan(fb))
             {
                 cmp = unord;
-                if (signal) { Terminate(ErrorCode::ArithmeticError); return false; }
+                if (signal) { terminate_err(ErrorCode::ArithmeticError); return false; }
             }
             else if (fa >  fb) cmp = great;
             else if (fa <  fb) cmp = less;
@@ -3898,7 +3981,7 @@ namespace CSX64
             if (std::isnan(fa) || std::isnan(fb))
             {
                 cmp = unord;
-                if (signal) { Terminate(ErrorCode::ArithmeticError); return false; }
+                if (signal) { terminate_err(ErrorCode::ArithmeticError); return false; }
             }
             else if (fa >  fb) cmp = great;
             else if (fa <  fb) cmp = less;
@@ -3945,11 +4028,11 @@ namespace CSX64
     bool Computer::TryProcessVEC_FCMP()
     {
         // read condition byte
-        u64 cond;
+        u8 cond;
         if (!GetMemAdv<u8>(cond)) return false;
 
         // ensure condition is in range - not optional
-        if (cond >= 32) { Terminate(ErrorCode::UndefinedBehavior); return false; }
+        if (cond >= 32) { terminate_err(ErrorCode::UndefinedBehavior); return false; }
 
         // perform the comparison
         return ProcessVPUBinary(12, _TryProcessVEC_FCMP_lookup[cond]);
@@ -4007,14 +4090,14 @@ namespace CSX64
         if (elem_sizecode == 3)
         {
             double f = AsDouble(a);
-            if (f < 0) { Terminate(ErrorCode::ArithmeticError); return false; }
+            if (f < 0) { terminate_err(ErrorCode::ArithmeticError); return false; }
             res = DoubleAsUInt64(std::sqrt(f));
         }
         else
         {
             float f = AsFloat((u32)a);
-            if (f < 0) { Terminate(ErrorCode::ArithmeticError); return false; }
-            res = FloatAsUInt64(std::sqrt(f));
+            if (f < 0) { terminate_err(ErrorCode::ArithmeticError); return false; }
+            res = FloatAsUInt32(std::sqrt(f));
         }
         return true;
     }
@@ -4023,14 +4106,14 @@ namespace CSX64
         if (elem_sizecode == 3)
         {
             double f = AsDouble(a);
-            if (f < 0) { Terminate(ErrorCode::ArithmeticError); return false; }
+            if (f < 0) { terminate_err(ErrorCode::ArithmeticError); return false; }
             res = DoubleAsUInt64(1.0 / std::sqrt(f));
         }
         else
         {
             float f = AsFloat((u32)a);
-            if (f < 0) { Terminate(ErrorCode::ArithmeticError); return false; }
-            res = FloatAsUInt64(1.0f / std::sqrt(f));
+            if (f < 0) { terminate_err(ErrorCode::ArithmeticError); return false; }
+            res = FloatAsUInt32(1.0f / std::sqrt(f));
         }
         return true;
     }
@@ -4090,7 +4173,7 @@ namespace CSX64
     }
     bool Computer::_i32_to_single(u64 &res, u64 val)
     {
-        res = FloatAsUInt64((float)(i32)val);
+        res = FloatAsUInt32((float)(i32)val);
         return true;
     }
 
@@ -4101,13 +4184,13 @@ namespace CSX64
     }
     bool Computer::_i64_to_single(u64 &res, u64 val)
     {
-        res = FloatAsUInt64((float)(i64)val);
+        res = FloatAsUInt32((float)(i64)val);
         return true;
     }
 
     bool Computer::_double_to_single(u64 &res, u64 val)
     {
-        res = FloatAsUInt64((float)AsDouble(val));
+        res = FloatAsUInt32((float)AsDouble(val));
         return true;
     }
     bool Computer::_single_to_double(u64 &res, u64 val)
@@ -4194,7 +4277,7 @@ namespace CSX64
     bool Computer::TryProcessVEC_CVT()
     {
         // read mode byte
-        u64 mode;
+        u8 mode;
         if (!GetMemAdv<u8>(mode)) return false;
 
         // route to handlers
@@ -4270,7 +4353,7 @@ namespace CSX64
         case 50: return ProcessVPUCVT_packed(4, 3, 2, &Computer::_single_to_double);
         case 51: return ProcessVPUCVT_packed(8, 3, 2, &Computer::_single_to_double);
 
-        default: Terminate(ErrorCode::UndefinedBehavior); return false;
+        default: terminate_err(ErrorCode::UndefinedBehavior); return false;
         }
     }
 	
@@ -4289,7 +4372,7 @@ namespace CSX64
 	*/
 	bool Computer::TryProcessTRANS()
 	{
-		u64 temp;
+		u8 temp;
 		if (!GetMemAdv<u8>(temp)) return false;
 
 		switch (temp)
@@ -4318,7 +4401,8 @@ namespace CSX64
 
 		case 4:
 		{
-			u64 s1, s2, m, a, b;
+            u8 s1, s2;
+			u64 m, a, b;
 			if (!FetchBinaryOpFormat(s1, s2, m, a, b, false)) return false;
 			u64 sizecode = (s1 >> 2) & 3;
 
@@ -4328,14 +4412,14 @@ namespace CSX64
 		// -----------------------------------
 
 		default:
-			Terminate(ErrorCode::UndefinedBehavior);
+			terminate_err(ErrorCode::UndefinedBehavior);
 			return false;
 		}
 	}
 
     bool Computer::ProcessDEBUG()
     {
-        u64 op, temp;
+        u8 op;
         if (!GetMemAdv<u8>(op)) return false;
 
         switch (op)
@@ -4344,25 +4428,28 @@ namespace CSX64
         case 1: WriteVPUDebugString(std::cout); break;
         case 2: WriteFullDebugString(std::cout); break;
 		case 3:
-			if (!GetAddressAdv(op) || !GetMemAdv<u64>(temp)) { Terminate(ErrorCode::UndefinedBehavior); return false; }
+        {
+            u64 m, t;
+            if (!GetAddressAdv(m) || !GetMemAdv<u64>(t)) { terminate_err(ErrorCode::UndefinedBehavior); return false; }
 
-			// if starting position is out of bounds, print 0 characters (don't no-op cause then user might think it's not working)
-			if (op >= mem.size()) temp = 0;
-			// otherwise if printing more than exists, print as many as possible instead
-			else if (temp > mem.size() || op + temp > mem.size()) temp = mem.size() - op;
+            // if starting position is out of bounds, print 0 characters (don't no-op cause then user might think it's not working)
+            if (m >= mem.size()) t = 0;
+            // otherwise if printing more than exists, print as many as possible instead
+            else if (t > mem.size() || m + t > mem.size()) t = mem.size() - m;
 
-			std::cout << '\n';
-			Dump(std::cout, mem.data(), op, temp);
-			break;
+            std::cout << '\n';
+            Dump(std::cout, mem.data(), m, t);
+            break;
+        }
 
-        default: Terminate(ErrorCode::UndefinedBehavior); return false;
+        default: terminate_err(ErrorCode::UndefinedBehavior); return false;
         }
 
         return true;
     }
     bool Computer::ProcessUNKNOWN()
     {
-        Terminate(ErrorCode::UnknownOp);
+        terminate_err(ErrorCode::UnknownOp);
         return false;
     }
 }

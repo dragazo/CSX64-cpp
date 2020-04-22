@@ -22,9 +22,12 @@ namespace CSX64
 
 	const u64 Version = 0x501;
 
-	// -- helpers -- //
+	// -- sfinae helpers -- //
 
 	template<typename T> inline constexpr bool is_uint = std::is_same_v<T, u8> || std::is_same_v<T, u16> || std::is_same_v<T, u32> || std::is_same_v<T, u64>;
+	template<typename T> inline constexpr bool is_sint = std::is_same_v<T, i8> || std::is_same_v<T, i16> || std::is_same_v<T, i32> || std::is_same_v<T, i64>;
+
+	template<typename T> inline constexpr bool is_int = is_uint<T> || is_sint<T>;
 
 	// -- serialization -- //
 
@@ -43,6 +46,11 @@ namespace CSX64
 		res = ((v & 0x00ff00ff00ff00ff) << 8) | ((v & 0xff00ff00ff00ff00) >> 8);
 		return res;
 	}
+
+	inline constexpr i8 bswap(i8 v) { return v; }
+	inline constexpr i16 bswap(i16 v) { return (i16)bswap((u16)v); }
+	inline constexpr i32 bswap(i32 v) { return (i32)bswap((u32)v); }
+	inline constexpr i64 bswap(i64 v) { return (i64)bswap((u64)v); }
 
 	inline constexpr u64 bswap(u64 val, u64 sizecode)
 	{
@@ -63,7 +71,7 @@ namespace CSX64
 	std::istream &BinRead(std::istream &istr, void *p, std::size_t count);
 
 	// writes a little-endian value to the stream
-	template<typename T, typename U, std::enable_if_t<is_uint<T> && std::is_same_v<T, U>, int> = 0>
+	template<typename T, typename U, std::enable_if_t<is_int<T> && std::is_same_v<T, U>, int> = 0>
 	std::ostream &write(std::ostream &ostr, U val)
 	{
 		if constexpr (std::endian::native == std::endian::big) val = bswap(val);
@@ -71,7 +79,7 @@ namespace CSX64
 	}
 
 	// reads a little-endian value from the stream
-	template<typename T, typename U, std::enable_if_t<is_uint<T> && std::is_same_v<T, U>, int> = 0>
+	template<typename T, typename U, std::enable_if_t<is_int<T> && std::is_same_v<T, U>, int> = 0>
 	std::istream &read(std::istream &istr, U &val)
 	{
 		if constexpr (std::endian::native == std::endian::little) return BinRead(istr, &val, sizeof(val));
@@ -90,7 +98,7 @@ namespace CSX64
 	// -- binary access -- //
 
 	// writes a little-endian value to the given memory location
-	template<typename T, typename U, std::enable_if_t<is_uint<T> && std::is_same_v<T, U>, int> = 0>
+	template<typename T, typename U, std::enable_if_t<is_int<T> && std::is_same_v<T, U>, int> = 0>
 	void write(void *dest, U val)
 	{
 		if constexpr (std::endian::native == std::endian::big) val = bswap(val);
@@ -98,7 +106,7 @@ namespace CSX64
 	}
 
 	// reads a little-endian value from the given memory location
-	template<typename T, std::enable_if_t<is_uint<T>, int> = 0>
+	template<typename T, std::enable_if_t<is_int<T>, int> = 0>
 	T read(const void *src)
 	{
 		T val;
@@ -416,8 +424,8 @@ namespace CSX64
 		return pun<double>(val);
 	}
 
-	// Interprets a float as its raw bits (placed in low 32 bits)
-	inline u64 FloatAsUInt64(float val)
+	// Interprets a float as its raw bits
+	inline u32 FloatAsUInt32(float val)
 	{
 		return pun<u32>(val);
 	}

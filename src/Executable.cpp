@@ -17,10 +17,8 @@ namespace CSX64
 {
 	Executable::Executable() { clear(); }
 
-	Executable::Executable(Executable &&other) noexcept : _content(std::move(other._content))
+	Executable::Executable(Executable &&other) noexcept : _seglens(std::move(other._seglens)), _content(std::move(other._content))
 	{
-		std::memcpy(_seglens, other._seglens, sizeof(_seglens));
-
 		other.clear(); // make sure other is left in the empty state
 	}
 	Executable &Executable::operator=(Executable &&other) noexcept
@@ -95,16 +93,16 @@ namespace CSX64
 		if (!file) throw FileOpenError("Failed to open file for saving Executable");
 
 		// write exe header and CSX64 version number
-		file.write(reinterpret_cast<const char*>(header), sizeof(header));
+		BinWrite(file, header, sizeof(header));
 		write<u64>(file, Version);
 
 		// write the segment lengths
-		file.write(reinterpret_cast<const char*>(_seglens), sizeof(_seglens));
+		for (std::size_t v : _seglens) write<u64>(file, (u64)v);
 
 		// write the content of the executable
-		file.write(reinterpret_cast<const char*>(_content.data()), _content.size());
+		BinWrite(file, _content.data(), _content.size());
 
-		// make sure the writes succeeded
+		// make sure all the writes succeeded
 		if (!file) throw IOError("Failed to write Executable to file");
 	}
 	void Executable::load(const std::string &path)
@@ -120,13 +118,15 @@ namespace CSX64
 		const u64 file_size = file.tellg();
 		file.seekg(0);
 
+		const std::size_t sum3 = _seglens[0] + _seglens[1] + _seglens[2]; // we overflow check this later
+
 		u8 header_temp[sizeof(header)];
 		u64 Version_temp;
 
 		// -- file validation -- //
 
 		// read the header from the file and make sure it matches - match failure is a type error, not a format error.
-		if (!file.read(reinterpret_cast<char*>(header_temp), sizeof(header)) || file.gcount() != sizeof(header)) goto err;
+		if (!BinRead(file, header_temp, sizeof(header))) goto err;
 		if (std::memcmp(header_temp, header, sizeof(header)))
 		{
 			clear(); // if we throw an exception we must set to the empty state first
@@ -144,32 +144,33 @@ namespace CSX64
 		// -- read executable info -- //
 
 		// read the segment lengths - make sure we got everything
-		if (!file.read(reinterpret_cast<char*>(_seglens), sizeof(_seglens)) || file.gcount() != sizeof(_seglens)) goto err;
+		for (std::size_t &v : _seglens)
+		{
+			u64 t;
+			if (!read<u64>(file, t)) goto err;
+			if constexpr (sizeof(std::size_t) < sizeof(u64)) { if (t != (std::size_t)t) throw MemoryAllocException("Executable is too large"); }
+			v = (std::size_t)t;
+		}
 
 		// make sure seg lengths don't overflow u64
 		{
-			u64 sum = 0;
-			for (u64 val : _seglens) if ((sum += val) < val) goto err;
+			std::size_t sum = 0;
+			for (std::size_t val : _seglens) if ((sum += val) < val) throw std::overflow_error("Sum of segments overflows max size");
 		}
 
 		// make sure the file is the correct size
-		if (file_size != 48 + _seglens[0] + _seglens[1] + _seglens[2]) goto err;
+		if (48 + sum3 < sum3) throw std::overflow_error("File size overflows max size"); // presumably this will never happen, but just in case
+		if (file_size != 48 + sum3) goto err;
 
 		// -- read executable content -- //
 
 		// allocate space to hold the executable content - if that fails set the exe to empty state and rethrow
 		_content.clear();
-		try
-		{
-			const u64 v = _seglens[0] + _seglens[1] + _seglens[2];
-			if constexpr (std::numeric_limits<std::size_t>::max() < std::numeric_limits<u64>::max()) { if (v != (std::size_t)v) throw MemoryAllocException("Executable content too large"); }
-			_content.resize((std::size_t)v);
-
-		}
+		try { _content.resize(sum3); }
 		catch (...) { clear(); throw; }
 
 		// read the content - make sure we got everything
-		if (!file.read(reinterpret_cast<char*>(_content.data()), _content.size()) || (std::size_t)file.gcount() != _content.size()) goto err;
+		if (!BinRead(file, _content.data(), _content.size())) goto err;
 
 		return;
 

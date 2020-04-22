@@ -545,7 +545,7 @@ namespace CSX64
 				switch (data.Size)
 				{
 				case 8: if (!Write(res, data.Address, 8, val)) { err = "line " + tostr(data.Line) + ": Error writing value"; return PatchError::Error; } break;
-				case 4: if (!Write(res, data.Address, 4, FloatAsUInt64((float)AsDouble(val)))) { err = "line " + tostr(data.Line) + ": Error writing value"; return PatchError::Error; } break;
+				case 4: if (!Write(res, data.Address, 4, FloatAsUInt32((float)AsDouble(val)))) { err = "line " + tostr(data.Line) + ": Error writing value"; return PatchError::Error; } break;
 
 				default: err = "line " + tostr(data.Line) + ": Attempt to use unsupported floating-point format"; return PatchError::Error;
 				}

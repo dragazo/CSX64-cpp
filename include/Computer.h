@@ -22,21 +22,21 @@ namespace CSX64
 	public: // -- info -- //
 
 		// the number of file descriptors available to this computer
-		inline static constexpr int FDCount = 16;
-
-		// the alignment of the internal memory array
-		inline static constexpr std::size_t MemAlignment = 64;
+		static inline constexpr int FDCount = 16;
 		
 		// default value for max memory used by any given Computer
-		inline static constexpr std::size_t DefaultMaxMemSize = (std::size_t)(sizeof(std::size_t) > sizeof(u32) ? (u64)8 * 1024 * 1024 * 1024 : (u64)2 * 1024 * 1024 * 1024);
+		static inline constexpr std::size_t DefaultMaxMemSize = (std::size_t)(sizeof(std::size_t) > sizeof(u32) ? (u64)8 * 1024 * 1024 * 1024 : (u64)2 * 1024 * 1024 * 1024);
 
 		// CSX64 considers many valid, but non-intel things to be undefined behavior at runtime (e.g. 8-bit addressing).
 		// however, these types of things are already blocked by the assembler.
 		// if this is set to true, emits ErrorCode::UndefinedBehavior in these cases - otherwise permits them (more efficient).
-		inline static constexpr bool StrictUND = false;
+		static inline constexpr bool StrictUND = false;
 
 		// if set to true, uses mask unions to perform the UpdateFlagsZSP() function - otherwise uses flag accessors (slower)
-		inline static constexpr bool FlagAccessMasking = true;
+		static inline constexpr bool FlagAccessMasking = true;
+
+		// the bitmask representing flags from RFLAGS that are allowed to be modified manually by instructions such as POPF
+		static inline constexpr u64 ModifiableFlags = 0x003f0fd5ul;
 
 	public: // -- special types -- //
 
@@ -162,10 +162,9 @@ namespace CSX64
 		std::size_t readonly_barrier = 0; // The barrier before which memory is read-only
 		std::size_t stack_barrier = 0;    // Gets the barrier before which the stack can't enter
 		
-		bool running = false;
-		bool suspended_read = false;
-		ErrorCode error = ErrorCode::None;
-		int return_value = 0;
+		bool _running = false;
+		ErrorCode _error = ErrorCode::None;
+		int _return_value = 0;
 
 		CPURegister CPURegisters[16];
 		u64 _RFLAGS, _RIP;
@@ -182,26 +181,25 @@ namespace CSX64
 
 	public: // -- data access -- //
 
-		// Gets the maximum amount of memory the client can request
-		std::size_t MaxMemory() const noexcept { return max_mem_size; }
-		// Sets the maximum amount of memory the client can request in the future. Does not impact the current memory array.
-		void MaxMemory(std::size_t max) noexcept { max_mem_size = max; }
+		// gets the maximum amount of memory the client can request (bytes).
+		[[nodiscard]] std::size_t max_memory() const noexcept { return max_mem_size; }
+		// sets the maximum amount of memory the client can request in the future (bytes).
+		// this does NOT impact the current memory array - intended to be set prior to initialize().
+		void max_memory(std::size_t max) noexcept { max_mem_size = max; }
 
-		// Gets the amount of memory (in bytes) the computer currently has access to
-		std::size_t MemorySize() const noexcept { return mem.size(); }
+		// gets the amount of memory the computer is currently using (bytes).
+		[[nodiscard]] std::size_t memory_size() const noexcept { return mem.size(); }
 
-		// Flag marking if the program is still executing (still true even in halted state)
-		bool Running() const noexcept { return running; }
-		// Gets if the processor is awaiting data from an interactive stream
-		bool SuspendedRead() const noexcept { return suspended_read; }
-		// Gets the current error code
-		ErrorCode Error() const noexcept { return error; }
-		// The return value from the program after errorless termination
-		int ReturnValue() const noexcept { return return_value; }
+		// checks if the client program has not yet terminated due to exit or error.
+		[[nodiscard]] bool running() const noexcept { return _running; }
+		// checks the current error status: for running clients or clients that terminated errorlessly this is ErrorCode::None.
+		[[nodiscard]] ErrorCode error() const noexcept { return _error; }
+		// if the client has terminated errorlessly, this gets the return value - otherwise meaningless.
+		[[nodiscard]] int return_value() const noexcept { return _return_value; }
 
 	public: // -- ctor/dtor -- //
 
-		// Validates the machine for operation, but does not prepare it for execute (see Initialize)
+		// Validates the machine for operation, but does not prepare it for execute (see initialize())
 		Computer() : Rand((unsigned int)std::time(nullptr)) {}
 		virtual ~Computer() = default;
 		
@@ -215,34 +213,27 @@ namespace CSX64
 		
 		// reallocates the current array to be the specified size. returns true on success.
 		// if preserve_contents is true, the contents of the result is identical up to the lesser of the current and requested sizes. otherwise the contents are undefined.
-		// this will attempt to resize the array in-place; however, if force_realloc is true it will guarantee a full reallocation operation (e.g. for releasing extraneous memory).
 		// on success, the memory size is updated to the specified size.
 		// on failure, nothing is changed (as if the request was not made) - strong guarantee.
-		bool realloc(u64 size, bool preserve_contents);
+		bool realloc(std::size_t size, bool preserve_contents);
 
-		// Initializes the computer for execution
+		// initializes the computer for execution
 		// exe       - the memory to load before starting execution (memory beyond this range is undefined)</param>
 		// args      - the command line arguments to provide to the computer. pass null or empty array for none</param>
 		// stacksize - the amount of additional space to allocate for the program's stack</param>
 		// throws std::overflow_error if the memory size calculation results in an overflow.
 		// throws MemoryAllocException if attempting to exceed max memory settings or if allocation fails.
-		void Initialize(const Executable &exe, const std::vector<std::string> &args, u64 stacksize = 2 * 1024 * 1024);
+		void initialize(const Executable &exe, const std::vector<std::string> &args, std::size_t stacksize = 2 * 1024 * 1024);
 
-		/// <summary>
-		/// Performs a single operation. Returns the number of successful operations.
-		/// Returning a lower number than requested (even zero) does not necessarily indicate termination or error.
-		/// To check for termination/error, use <see cref="Running"/>.
-		/// </summary>
-		/// <param name="count">The maximum number of operations to perform</param>
-		u64 Tick(u64 count);
+		// performs up to the specified number of operations. returns the number of successful operations.
+		// returning a lower number than requested (even zero) does not necessarily indicate termination or error.
+		// to check for termination/error, use running() and error().
+		u64 tick(u64 count);
 
 		// Causes the machine to end execution with an error code and release various system resources (e.g. file handles).
-		void Terminate(ErrorCode err = ErrorCode::None);
+		void terminate_err(ErrorCode err);
 		// Causes the machine to end execution with a return value and release various system resources (e.g. file handles).
-		void Exit(int ret = 0);
-
-		// Unsets the suspended read state
-		void ResumeSuspendedRead();
+		void terminate_ok(int ret);
 
 		// links the provided file to the first available file descriptor.
 		// returns the file descriptor that was used. if none were available, does not link the file and returns -1.
@@ -274,153 +265,105 @@ namespace CSX64
 
 		// this is what handles syscalls from client code.
 		// you can overload this to add your own, but for the sake of users should preserve pre-existing syscall behavior.
-		virtual bool ProcessSYSCALL();
+		[[nodiscard]] virtual bool syscall();
 
 		// these handle raw IO port data transfers
 		// port is the IO port to use
 		// dest/value hold the values to read/write from/to.
 		// sizecode specifies transaction size (0=8 bit, 1=16 bit, 2=32 bit, 3=64 bit).
-		virtual bool Input(u64 port, u64 &dest, u64 sizecode) { dest = 0; return true; }
-		virtual bool Output(u64 port, u64 value, u64 sizecode) { return true; }
+		[[nodiscard]] virtual bool input(u16 port, u64 &dest, u64 sizecode) { dest = 0; return true; }
+		[[nodiscard]] virtual bool output(u16 port, u64 value, u64 sizecode) { return true; }
 
-	private: // -- syscall functions -- //
+	private: // -- builtin syscall functions -- //
 
-		bool Process_sys_read();
-		bool Process_sys_write();
-		bool Process_sys_open();
-		bool Process_sys_close();
-		bool Process_sys_lseek();
+		[[nodiscard]] bool Process_sys_read();
+		[[nodiscard]] bool Process_sys_write();
+		[[nodiscard]] bool Process_sys_open();
+		[[nodiscard]] bool Process_sys_close();
+		[[nodiscard]] bool Process_sys_lseek();
 
-		bool Process_sys_brk();
+		[[nodiscard]] bool Process_sys_brk();
 
-		bool Process_sys_rename();
-		bool Process_sys_unlink();
-		bool Process_sys_mkdir();
-		bool Process_sys_rmdir();
+		[[nodiscard]] bool Process_sys_rename();
+		[[nodiscard]] bool Process_sys_unlink();
+		[[nodiscard]] bool Process_sys_mkdir();
+		[[nodiscard]] bool Process_sys_rmdir();
 
 	public: // -- public memory access -- //
 
-		// Reads a C-style string from memory. Returns true if successful, otherwise fails with OutOfBounds and returns false
-		bool GetCString(u64 pos, std::string &str);
-		// Writes a C-style string to memory. Returns true if successful, otherwise fails with OutOfBounds and returns false
-		bool SetCString(u64 pos, const std::string &str);
-
-		// reads a POD type T from memory. returns true on success
-		template<typename T, std::enable_if_t<is_uint<T>, int> = 0>
-		bool GetMem(u64 pos, T &val)
+		// reads a value from memory. returns true on success. on failure, val is not modified.
+		template<typename T, typename U, std::enable_if_t<is_int<T> && std::is_same_v<T, U>, int> = 0>
+		[[nodiscard]] bool read_mem(u64 pos, U &val)
 		{
-			if (pos >= mem.size() || pos + sizeof(T) > mem.size()) { Terminate(ErrorCode::OutOfBounds); return false; }
-
-			val = bin_read<T>(mem.data() + pos); // aliasing ok because casting to char type
-
+			if (pos >= mem.size() || pos + sizeof(T) > mem.size()) { terminate_err(ErrorCode::OutOfBounds); return false; }
+			val = read<T>(mem.data() + pos);
 			return true;
 		}
-		// writes a POD type T to memory. returns true on success
-		template<typename T, std::enable_if_t<is_uint<T>, int> = 0>
-		bool SetMem(u64 pos, T val)
+		// writes a value to memory. returns true on success. on failure, memory is not modified.
+		template<typename T, typename U, std::enable_if_t<is_int<T> && std::is_same_v<T, U>, int> = 0>
+		[[nodiscard]] bool write_mem(u64 pos, U val)
 		{
-			if (pos >= mem.size() || pos + sizeof(T) > mem.size()) { Terminate(ErrorCode::OutOfBounds); return false; }
-			if (pos < readonly_barrier) { Terminate(ErrorCode::AccessViolation);  return false; }
-
-			write<T>(mem.data() + pos, val); // aliasing ok because casting to char type
-
+			if (pos >= mem.size() || pos + sizeof(T) > mem.size()) { terminate_err(ErrorCode::OutOfBounds); return false; }
+			if (pos < readonly_barrier) { terminate_err(ErrorCode::AccessViolation);  return false; }
+			write<T>(mem.data() + pos, val);
 			return true;
 		}
 
-		// pushes a POD type T onto the stack. returns true on success
-		template<typename T, std::enable_if_t<std::is_trivial<T>::value, int> = 0>
-		bool Push(const T &val)
+		// pushes a value onto the stack. returns true on success. on failure, rsp and memory are not modified.
+		template<typename T, typename U, std::enable_if_t<is_int<T> && std::is_same_v<T, U>, int> = 0>
+		[[nodiscard]] bool push_mem(U val)
 		{
+			if (RSP() < stack_barrier) { terminate_err(ErrorCode::StackOverflow); return false; }
+			if (!write_mem<T>(RSP() - sizeof(T), val)) return false;
 			RSP() -= sizeof(T);
-			if (RSP() < stack_barrier) { Terminate(ErrorCode::StackOverflow); return false; }
-			if (!SetMem(RSP(), val)) return false;
 			return true;
 		}
-		// pops a POD type T off the stack. returns true on success
-		template<typename T, std::enable_if_t<std::is_trivial<T>::value, int> = 0>
-		bool Pop(T &val)
+		// pops a value off the stack. returns true on success. on failure rsp and val are not modified.
+		template<typename T, typename U, std::enable_if_t<is_int<T> && std::is_same_v<T, U>, int> = 0>
+		[[nodiscard]] bool pop_mem(U &val)
 		{
-			if (RSP() < stack_barrier) { Terminate(ErrorCode::StackOverflow); return false; }
-			if (!GetMem(RSP(), val)) return false;
+			if (RSP() < stack_barrier) { terminate_err(ErrorCode::StackOverflow); return false; }
+			if (!read_mem<T>(RSP(), val)) return false;
 			RSP() += sizeof(T);
 			return true;
 		}
+
+		// reads a C-style string from memory. returns true if successful, otherwise fails with OutOfBounds and returns false.
+		[[nodiscard]] bool read_str(u64 pos, std::string &str);
+		// writes a C-style string to memory. returns true if successful, otherwise fails with OutOfBounds and returns false.
+		[[nodiscard]] bool write_str(u64 pos, const std::string &str);
 
 	private: // -- exe memory utilities -- //
 
-		// Pushes a raw value onto the stack
-		bool PushRaw(u64 size, u64 val);
-		template<typename T, std::enable_if_t<std::is_trivial<T>::value, int> = 0>
-		bool PushRaw(u64 val)
-		{
-			RSP() -= sizeof(T);
-			if (RSP() < stack_barrier) { Terminate(ErrorCode::StackOverflow); return false; }
-			return SetMemRaw<T>(RSP(), val);
-		}
+		[[nodiscard]] bool PushRaw(u64 size, u64 val);
+		[[nodiscard]] bool PopRaw(u64 size, u64 &val);
 
-		// Pops a value from the stack
-		bool PopRaw(u64 size, u64 &val);
-		template<typename T, std::enable_if_t<std::is_trivial<T>::value, int> = 0>
-		bool PopRaw(u64 &val)
-		{
-			if (RSP() < stack_barrier) { Terminate(ErrorCode::StackOverflow); return false; }
-			if (!GetMemRaw<T>(RSP(), val)) return false;
-			RSP() += sizeof(T);
-			return true;
-		}
+		[[nodiscard]] bool GetMemRaw(u64 pos, u64 size, u64 &res);
+		[[nodiscard]] bool SetMemRaw(u64 pos, u64 size, u64 val);
 
-		// reads a raw value from memory. returns true on success
-		bool GetMemRaw(u64 pos, u64 size, u64 &res);
-		template<typename T, std::enable_if_t<std::is_trivial<T>::value, int> = 0>
-		bool GetMemRaw(u64 pos, u64 &res)
-		{
-			if (pos >= mem.size() || pos + sizeof(T) > mem.size()) { Terminate(ErrorCode::OutOfBounds); return false; }
-			
-			res = read<T>(mem.data() + pos);
+		[[nodiscard]] bool GetMemRaw_szc(u64 pos, u64 sizecode, u64 &res);
+		[[nodiscard]] bool SetMemRaw_szc(u64 pos, u64 sizecode, u64 val);
 
-			return true;
-		}
 
-		// as GetMemRaw() but takes a sizecode instead of a size
-		bool GetMemRaw_szc(u64 pos, u64 sizecode, u64 &res);
-
-		// writes a raw value to memory. returns true on success
-		bool SetMemRaw(u64 pos, u64 size, u64 val);
-		template<typename T, std::enable_if_t<is_uint<T>, int> = 0>
-		bool SetMemRaw(u64 pos, u64 val)
-		{
-			if (pos >= mem.size() || pos + sizeof(T) > mem.size()) { Terminate(ErrorCode::OutOfBounds); return false; }
-			if (pos < readonly_barrier) { Terminate(ErrorCode::AccessViolation); return false; }
-
-			write<T>(mem.data() + pos, (T)val); // aliasing ok because casting to char type
-
-			return true;
-		}
 
 		// as SetMemRaw() but takes a sizecode instead of a size
-		bool SetMemRaw_szc(u64 pos, u64 sizecode, u64 val);
 
 		// gets a value and advances the execution pointer. returns true on success
-		bool GetMemAdv(u64 size, u64 &res);
-		template<typename T, std::enable_if_t<std::is_trivial<T>::value, int> = 0>
-		bool GetMemAdv(u64 &res)
+		[[nodiscard]] bool GetMemAdv(u64 size, u64 &res);
+
+		template<typename T, typename U, std::enable_if_t<is_int<T> && std::is_same_v<T, U>, int> = 0>
+		[[nodiscard]] bool GetMemAdv(U &res)
 		{
-			if (!GetMemRaw<T>(RIP(), res)) return false;
+			if (!read_mem<T>(RIP(), res)) return false;
 			RIP() += sizeof(T);
 			return true;
 		}
 
 		// as GetMemAdv() but takes a sizecode instead of a size
-		bool GetMemAdv_szc(u64 sizecode, u64 &res);
-
-		// reads a byte at RIP and advances the execution pointer
-		bool GetByteAdv(u8 &res);
-
-		// get a compact imm and advances the execution pointer. returns true on success.
-		bool GetCompactImmAdv(u64 &res);
+		[[nodiscard]] bool GetMemAdv_szc(u64 sizecode, u64 &res);
 
 		// gets an address and advances the execution pointer. returns true on success
-		bool GetAddressAdv(u64 &res);
+		[[nodiscard]] bool GetAddressAdv(u64 &res);
 
 	public: // -- register access -- //
 
@@ -699,6 +642,9 @@ namespace CSX64
 		bool FPU_C3() const { return FPU_status & FlagWrapper<u16, 14>::mask; }
 		bool FPU_B() const { return FPU_status & FlagWrapper<u16, 15>::mask; }
 
+		// initializes the FPU as if by the FINIT instruction.
+		void FINIT() { FPU_control = 0x3bf; FPU_status = 0; FPU_tag = 0xffff; }
+
 		ST_Wrapper       ST(u64 num) { return {*this, (u32)((FPU_TOP() + num) & 7)}; }
 		const_ST_Wrapper ST(u64 num) const { return {*this, (u32)((FPU_TOP() + num) & 7)}; }
 		
@@ -764,8 +710,8 @@ namespace CSX64
 		mem = 1: [address]              dest <- f(M[address], imm)
 		(dh and sh mark AH, BH, CH, or DH for dest or src)
 		*/
-		bool FetchTernaryOpFormat(u64 &s, u64 &a, u64 &b);
-		bool StoreTernaryOPFormat(u64 s, u64 res);
+		[[nodiscard]] bool FetchTernaryOpFormat(u8 &s, u64 &a, u64 &b);
+		[[nodiscard]] bool StoreTernaryOPFormat(u8 s, u64 res);
 
 		/*
 		[4: dest][2: size][1:dh][1: sh]   [4: mode][4: src]
@@ -777,9 +723,8 @@ namespace CSX64
 		Else UND
 		(dh and sh mark AH, BH, CH, or DH for dest or src)
 		*/
-		bool FetchBinaryOpFormat(u64 &s1, u64 &s2, u64 &m, u64 &a, u64 &b,
-			bool get_a = true, int _a_sizecode = -1, int _b_sizecode = -1, bool allow_b_mem = true);
-		bool StoreBinaryOpFormat(u64 s1, u64 s2, u64 m, u64 res);
+		[[nodiscard]] bool FetchBinaryOpFormat(u8 &s1, u8 &s2, u64 &m, u64 &a, u64 &b, bool get_a = true, int _a_sizecode = -1, int _b_sizecode = -1, bool allow_b_mem = true);
+		[[nodiscard]] bool StoreBinaryOpFormat(u8 s1, u8 s2, u64 m, u64 res);
 
 		/*
 		[4: dest][2: size][1: dh][1: mem]
@@ -787,14 +732,14 @@ namespace CSX64
 		mem = 1: [address]   M[address] <- f(M[address])
 		(dh marks AH, BH, CH, or DH for dest)
 		*/
-		bool FetchUnaryOpFormat(u64 &s, u64 &m, u64 &a, bool get_a = true, int _a_sizecode = -1);
-		bool StoreUnaryOpFormat(u64 s, u64 m, u64 res);
+		[[nodiscard]] bool FetchUnaryOpFormat(u8 &s, u64 &m, u64 &a, bool get_a = true, int _a_sizecode = -1);
+		[[nodiscard]] bool StoreUnaryOpFormat(u8 s, u64 m, u64 res);
 
 		/*
 		[4: dest][2: size][1: dh][1: mem]   [1: CL][1:][6: count]   ([address])
 		*/
-		bool FetchShiftOpFormat(u64 &s, u64 &m, u64 &val, u64 &count);
-		bool StoreShiftOpFormat(u64 s, u64 m, u64 res);
+		[[nodiscard]] bool FetchShiftOpFormat(u8 &s, u64 &m, u64 &val, u8 &count);
+		[[nodiscard]] bool StoreShiftOpFormat(u8 s, u64 m, u64 res);
 
 		/*
 		[4: reg][2: size][2: mode]
@@ -803,344 +748,342 @@ namespace CSX64
 		mode = 2: [size: imm]   imm
 		mode = 3: [address]     M[address]
 		*/
-		bool FetchIMMRMFormat(u64 &s, u64 &a, int _a_sizecode = -1);
+		[[nodiscard]] bool FetchIMMRMFormat(u8 &s, u64 &a, int _a_sizecode = -1);
 
 		/*
 		[4: dest][2: size][1: dh][1: mem]   [1: src_1_h][3:][4: src_1]
 		mem = 0: [1: src_2_h][3:][4: src_2]
 		mem = 1: [address_src_2]
 		*/
-		bool FetchRR_RMFormat(u64 &s1, u64 &s2, u64 &dest, u64 &a, u64 &b);
-		bool StoreRR_RMFormat(u64 s1, u64 res);
+		[[nodiscard]] bool FetchRR_RMFormat(u8 &s1, u8 &s2, u64 &dest, u64 &a, u64 &b);
+		[[nodiscard]] bool StoreRR_RMFormat(u8 s1, u64 res);
 
 		// updates the flags for integral ops (identical for most integral ops)
 		void UpdateFlagsZSP(u64 value, u64 sizecode);
 
 		// -- impl -- //
 
-		bool ProcessNOP() { return true; }
-		bool ProcessHLT() { Terminate(ErrorCode::Abort); return true; }
+		[[nodiscard]] bool ProcessSYSCALL() { return syscall(); }
 
-		static inline constexpr u64 ModifiableFlags = 0x003f0fd5ul;
+		[[nodiscard]] bool ProcessNOP() { return true; }
+		[[nodiscard]] bool ProcessHLT() { return false; }
 
-		bool ProcessSTLDF();
+		[[nodiscard]] bool ProcessSTLDF();
 
-		bool ProcessFlagManip();
+		[[nodiscard]] bool ProcessFlagManip();
 
-		bool ProcessSETcc();
+		[[nodiscard]] bool ProcessSETcc();
 
-		bool ProcessMOV();
-		bool ProcessMOVcc();
+		[[nodiscard]] bool ProcessMOV();
+		[[nodiscard]] bool ProcessMOVcc();
 
-		bool ProcessXCHG();
+		[[nodiscard]] bool ProcessXCHG();
 
-		bool ProcessJMP_raw(u64 &aft);
-		bool ProcessJMP();
-		bool ProcessJcc();
-		bool ProcessLOOPcc();
+		[[nodiscard]] bool ProcessJMP_raw(u64 &aft);
+		[[nodiscard]] bool ProcessJMP();
+		[[nodiscard]] bool ProcessJcc();
+		[[nodiscard]] bool ProcessLOOPcc();
 
-		bool ProcessCALL();
-		bool ProcessRET();
+		[[nodiscard]] bool ProcessCALL();
+		[[nodiscard]] bool ProcessRET();
 
-		bool ProcessPUSH();
-		bool ProcessPOP();
+		[[nodiscard]] bool ProcessPUSH();
+		[[nodiscard]] bool ProcessPOP();
 
-		bool ProcessLEA();
+		[[nodiscard]] bool ProcessLEA();
 
-		bool ProcessADD();
-		bool ProcessSUB();
+		[[nodiscard]] bool ProcessADD();
+		[[nodiscard]] bool ProcessSUB();
 
-		bool ProcessSUB_raw(bool apply);
+		[[nodiscard]] bool ProcessSUB_raw(bool apply);
 
-		bool ProcessMUL_x();
-		bool ProcessMUL();
-		bool ProcessMULX();
-		bool ProcessIMUL();
-		bool ProcessUnary_IMUL();
-		bool ProcessBinary_IMUL();
-		bool ProcessTernary_IMUL();
+		[[nodiscard]] bool ProcessMUL_x();
+		[[nodiscard]] bool ProcessMUL();
+		[[nodiscard]] bool ProcessMULX();
+		[[nodiscard]] bool ProcessIMUL();
+		[[nodiscard]] bool ProcessUnary_IMUL();
+		[[nodiscard]] bool ProcessBinary_IMUL();
+		[[nodiscard]] bool ProcessTernary_IMUL();
 
-		bool ProcessDIV();
-		bool ProcessIDIV();
+		[[nodiscard]] bool ProcessDIV();
+		[[nodiscard]] bool ProcessIDIV();
 
-		bool ProcessSHL();
-		bool ProcessSHR();
+		[[nodiscard]] bool ProcessSHL();
+		[[nodiscard]] bool ProcessSHR();
 
-		bool ProcessSAL();
-		bool ProcessSAR();
+		[[nodiscard]] bool ProcessSAL();
+		[[nodiscard]] bool ProcessSAR();
 
-		bool ProcessROL();
-		bool ProcessROR();
+		[[nodiscard]] bool ProcessROL();
+		[[nodiscard]] bool ProcessROR();
 
-		bool ProcessRCL();
-		bool ProcessRCR();
+		[[nodiscard]] bool ProcessRCL();
+		[[nodiscard]] bool ProcessRCR();
 
-		bool ProcessAND_raw(bool apply);
+		[[nodiscard]] bool ProcessAND_raw(bool apply);
 
-		bool ProcessAND();
-		bool ProcessOR();
-		bool ProcessXOR();
+		[[nodiscard]] bool ProcessAND();
+		[[nodiscard]] bool ProcessOR();
+		[[nodiscard]] bool ProcessXOR();
 
-		bool ProcessINC();
-		bool ProcessDEC();
+		[[nodiscard]] bool ProcessINC();
+		[[nodiscard]] bool ProcessDEC();
 
-		bool ProcessNEG();
-		bool ProcessNOT();
+		[[nodiscard]] bool ProcessNEG();
+		[[nodiscard]] bool ProcessNOT();
 
-		bool ProcessCMP();
-		bool ProcessTEST();
+		[[nodiscard]] bool ProcessCMP();
+		[[nodiscard]] bool ProcessTEST();
 
-		bool ProcessCMPZ();
+		[[nodiscard]] bool ProcessCMPZ();
 
-		bool ProcessBSWAP();
-		bool ProcessBEXTR();
-		bool ProcessBLSI();
-		bool ProcessBLSMSK();
-		bool ProcessBLSR();
-		bool ProcessANDN();
+		[[nodiscard]] bool ProcessBSWAP();
+		[[nodiscard]] bool ProcessBEXTR();
+		[[nodiscard]] bool ProcessBLSI();
+		[[nodiscard]] bool ProcessBLSMSK();
+		[[nodiscard]] bool ProcessBLSR();
+		[[nodiscard]] bool ProcessANDN();
 
-		bool ProcessBTx();
+		[[nodiscard]] bool ProcessBTx();
 
-		bool ProcessCxy();
-		bool ProcessMOVxX();
+		[[nodiscard]] bool ProcessCxy();
+		[[nodiscard]] bool ProcessMOVxX();
 
-		bool ProcessADXX();
-		bool ProcessAAX();
+		[[nodiscard]] bool ProcessADXX();
+		[[nodiscard]] bool ProcessAAX();
 
-		bool _ProcessSTRING_MOVS(u64 sizecode);
-		bool _ProcessSTRING_CMPS(u64 sizecode);
-		bool _ProcessSTRING_LODS(u64 sizecode);
-		bool _ProcessSTRING_STOS(u64 sizecode);
-		bool _ProcessSTRING_SCAS(u64 sizecode);
+		[[nodiscard]] bool _ProcessSTRING_MOVS(u64 sizecode);
+		[[nodiscard]] bool _ProcessSTRING_CMPS(u64 sizecode);
+		[[nodiscard]] bool _ProcessSTRING_LODS(u64 sizecode);
+		[[nodiscard]] bool _ProcessSTRING_STOS(u64 sizecode);
+		[[nodiscard]] bool _ProcessSTRING_SCAS(u64 sizecode);
 
-		bool ProcessSTRING();
+		[[nodiscard]] bool ProcessSTRING();
 
-		bool _Process_BSx_common(u64 &s, u64 &src, u64 &sizecode);
-		bool ProcessBSx();
+		[[nodiscard]] bool _Process_BSx_common(u8 &s, u64 &src, u64 &sizecode);
+		[[nodiscard]] bool ProcessBSx();
 
-		bool ProcessTZCNT();
+		[[nodiscard]] bool ProcessTZCNT();
 
-		bool ProcessUD();
+		[[nodiscard]] bool ProcessUD();
 
-		bool ProcessIO();
+		[[nodiscard]] bool ProcessIO();
 
 		// -- floating point stuff -- //
 
-		// Initializes the FPU as if by FINIT. always returns true
-		bool FINIT();
+		[[nodiscard]] bool ProcessFINIT();
 
-		bool ProcessFCLEX();
+		[[nodiscard]] bool ProcessFCLEX();
 
 		// Performs a round trip on the value based on the specified rounding mode (as per Intel x87)
 		// val - the value to round
 		// rc  - the rounding control field
-		static long double PerformRoundTrip(long double val, u32 rc);
+		[[nodiscard]] static long double PerformRoundTrip(long double val, u32 rc);
 
-		bool FetchFPUBinaryFormat(u64 &s, long double &a, long double &b);
-		bool StoreFPUBinaryFormat(u64 s, long double res);
+		[[nodiscard]] bool FetchFPUBinaryFormat(u8 &s, long double &a, long double &b);
+		[[nodiscard]] bool StoreFPUBinaryFormat(u8 s, long double res);
 
-		bool PushFPU(long double val);
-		bool PopFPU(long double &val);
-		bool PopFPU();
+		[[nodiscard]] bool PushFPU(long double val);
+		[[nodiscard]] bool PopFPU(long double &val);
+		[[nodiscard]] bool PopFPU();
 
-		bool ProcessFSTLD_WORD();
+		[[nodiscard]] bool ProcessFSTLD_WORD();
 
-		bool ProcessFLD_const();
-		bool ProcessFLD();
+		[[nodiscard]] bool ProcessFLD_const();
+		[[nodiscard]] bool ProcessFLD();
 
-		bool ProcessFST();
-		bool ProcessFXCH();
-		bool ProcessFMOVcc();
+		[[nodiscard]] bool ProcessFST();
+		[[nodiscard]] bool ProcessFXCH();
+		[[nodiscard]] bool ProcessFMOVcc();
 
-		bool ProcessFADD();
-		bool ProcessFSUB();
-		bool ProcessFSUBR();
+		[[nodiscard]] bool ProcessFADD();
+		[[nodiscard]] bool ProcessFSUB();
+		[[nodiscard]] bool ProcessFSUBR();
 
-		bool ProcessFMUL();
-		bool ProcessFDIV();
-		bool ProcessFDIVR();
+		[[nodiscard]] bool ProcessFMUL();
+		[[nodiscard]] bool ProcessFDIV();
+		[[nodiscard]] bool ProcessFDIVR();
 
-		bool ProcessF2XM1();
-		bool ProcessFABS();
-		bool ProcessFCHS();
-		bool ProcessFPREM();
-		bool ProcessFPREM1();
-		bool ProcessFRNDINT();
-		bool ProcessFSQRT();
-		bool ProcessFYL2X();
-		bool ProcessFYL2XP1();
-		bool ProcessFXTRACT();
-		bool ProcessFSCALE();
+		[[nodiscard]] bool ProcessF2XM1();
+		[[nodiscard]] bool ProcessFABS();
+		[[nodiscard]] bool ProcessFCHS();
+		[[nodiscard]] bool ProcessFPREM();
+		[[nodiscard]] bool ProcessFPREM1();
+		[[nodiscard]] bool ProcessFRNDINT();
+		[[nodiscard]] bool ProcessFSQRT();
+		[[nodiscard]] bool ProcessFYL2X();
+		[[nodiscard]] bool ProcessFYL2XP1();
+		[[nodiscard]] bool ProcessFXTRACT();
+		[[nodiscard]] bool ProcessFSCALE();
 
-		bool ProcessFXAM();
-		bool ProcessFTST();
+		[[nodiscard]] bool ProcessFXAM();
+		[[nodiscard]] bool ProcessFTST();
 
-		bool ProcessFCOM();
+		[[nodiscard]] bool ProcessFCOM();
 
-		bool ProcessFSIN();
-		bool ProcessFCOS();
-		bool ProcessFSINCOS();
-		bool ProcessFPTAN();
-		bool ProcessFPATAN();
+		[[nodiscard]] bool ProcessFSIN();
+		[[nodiscard]] bool ProcessFCOS();
+		[[nodiscard]] bool ProcessFSINCOS();
+		[[nodiscard]] bool ProcessFPTAN();
+		[[nodiscard]] bool ProcessFPATAN();
 
-		bool ProcessFINCDECSTP();
-		bool ProcessFFREE();
+		[[nodiscard]] bool ProcessFINCDECSTP();
+		[[nodiscard]] bool ProcessFFREE();
 
 		// -- vpu stuff -- //
 
-		bool ProcessVPUMove();
-		bool ProcessVPUBinary(u64 elem_size_mask, VPUBinaryDelegate func);
-		bool ProcessVPUUnary(u64 elem_size_mask, VPUUnaryDelegate func);
+		[[nodiscard]] bool ProcessVPUMove();
+		[[nodiscard]] bool ProcessVPUBinary(u64 elem_size_mask, VPUBinaryDelegate func);
+		[[nodiscard]] bool ProcessVPUUnary(u64 elem_size_mask, VPUUnaryDelegate func);
 
-		bool ProcessVPUCVT_packed(u64 elem_count, u64 to_elem_sizecode, u64 from_elem_sizecode, VPUCVTDelegate func);
+		[[nodiscard]] bool ProcessVPUCVT_packed(u64 elem_count, u64 to_elem_sizecode, u64 from_elem_sizecode, VPUCVTDelegate func);
 
-		bool ProcessVPUCVT_scalar_xmm_xmm(u64 to_elem_sizecode, u64 from_elem_sizecode, VPUCVTDelegate func);
-		bool ProcessVPUCVT_scalar_xmm_reg(u64 to_elem_sizecode, u64 from_elem_sizecode, VPUCVTDelegate func);
-		bool ProcessVPUCVT_scalar_xmm_mem(u64 to_elem_sizecode, u64 from_elem_sizecode, VPUCVTDelegate func);
-		bool ProcessVPUCVT_scalar_reg_xmm(u64 to_elem_sizecode, u64 from_elem_sizecode, VPUCVTDelegate func);
-		bool ProcessVPUCVT_scalar_reg_mem(u64 to_elem_sizecode, u64 from_elem_sizecode, VPUCVTDelegate func);
+		[[nodiscard]] bool ProcessVPUCVT_scalar_xmm_xmm(u64 to_elem_sizecode, u64 from_elem_sizecode, VPUCVTDelegate func);
+		[[nodiscard]] bool ProcessVPUCVT_scalar_xmm_reg(u64 to_elem_sizecode, u64 from_elem_sizecode, VPUCVTDelegate func);
+		[[nodiscard]] bool ProcessVPUCVT_scalar_xmm_mem(u64 to_elem_sizecode, u64 from_elem_sizecode, VPUCVTDelegate func);
+		[[nodiscard]] bool ProcessVPUCVT_scalar_reg_xmm(u64 to_elem_sizecode, u64 from_elem_sizecode, VPUCVTDelegate func);
+		[[nodiscard]] bool ProcessVPUCVT_scalar_reg_mem(u64 to_elem_sizecode, u64 from_elem_sizecode, VPUCVTDelegate func);
 
-		bool _TryPerformVEC_FADD(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
-		bool _TryPerformVEC_FSUB(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
-		bool _TryPerformVEC_FMUL(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
-		bool _TryPerformVEC_FDIV(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
+		[[nodiscard]] bool _TryPerformVEC_FADD(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
+		[[nodiscard]] bool _TryPerformVEC_FSUB(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
+		[[nodiscard]] bool _TryPerformVEC_FMUL(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
+		[[nodiscard]] bool _TryPerformVEC_FDIV(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
 
-		bool TryProcessVEC_FADD();
-		bool TryProcessVEC_FSUB();
-		bool TryProcessVEC_FMUL();
-		bool TryProcessVEC_FDIV();
+		[[nodiscard]] bool TryProcessVEC_FADD();
+		[[nodiscard]] bool TryProcessVEC_FSUB();
+		[[nodiscard]] bool TryProcessVEC_FMUL();
+		[[nodiscard]] bool TryProcessVEC_FDIV();
 
-		bool _TryPerformVEC_AND(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
-		bool _TryPerformVEC_OR(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
-		bool _TryPerformVEC_XOR(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
-		bool _TryPerformVEC_ANDN(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
+		[[nodiscard]] bool _TryPerformVEC_AND(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
+		[[nodiscard]] bool _TryPerformVEC_OR(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
+		[[nodiscard]] bool _TryPerformVEC_XOR(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
+		[[nodiscard]] bool _TryPerformVEC_ANDN(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
 
-		bool TryProcessVEC_AND();
-		bool TryProcessVEC_OR();
-		bool TryProcessVEC_XOR();
-		bool TryProcessVEC_ANDN();
+		[[nodiscard]] bool TryProcessVEC_AND();
+		[[nodiscard]] bool TryProcessVEC_OR();
+		[[nodiscard]] bool TryProcessVEC_XOR();
+		[[nodiscard]] bool TryProcessVEC_ANDN();
 
-		bool _TryPerformVEC_ADD(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
-		bool _TryPerformVEC_ADDS(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
-		bool _TryPerformVEC_ADDUS(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
+		[[nodiscard]] bool _TryPerformVEC_ADD(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
+		[[nodiscard]] bool _TryPerformVEC_ADDS(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
+		[[nodiscard]] bool _TryPerformVEC_ADDUS(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
 
-		bool TryProcessVEC_ADD();
-		bool TryProcessVEC_ADDS();
-		bool TryProcessVEC_ADDUS();
+		[[nodiscard]] bool TryProcessVEC_ADD();
+		[[nodiscard]] bool TryProcessVEC_ADDS();
+		[[nodiscard]] bool TryProcessVEC_ADDUS();
 
-		bool _TryPerformVEC_SUB(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
-		bool _TryPerformVEC_SUBS(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
-		bool _TryPerformVEC_SUBUS(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
+		[[nodiscard]] bool _TryPerformVEC_SUB(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
+		[[nodiscard]] bool _TryPerformVEC_SUBS(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
+		[[nodiscard]] bool _TryPerformVEC_SUBUS(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
 
-		bool TryProcessVEC_SUB();
-		bool TryProcessVEC_SUBS();
-		bool TryProcessVEC_SUBUS();
+		[[nodiscard]] bool TryProcessVEC_SUB();
+		[[nodiscard]] bool TryProcessVEC_SUBS();
+		[[nodiscard]] bool TryProcessVEC_SUBUS();
 
-		bool _TryPerformVEC_MULL(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
+		[[nodiscard]] bool _TryPerformVEC_MULL(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
 
-		bool TryProcessVEC_MULL();
+		[[nodiscard]] bool TryProcessVEC_MULL();
 
-		bool _TryProcessVEC_FMIN(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
-		bool _TryProcessVEC_FMAX(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
+		[[nodiscard]] bool _TryProcessVEC_FMIN(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
+		[[nodiscard]] bool _TryProcessVEC_FMAX(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
 
-		bool TryProcessVEC_FMIN();
-		bool TryProcessVEC_FMAX();
+		[[nodiscard]] bool TryProcessVEC_FMIN();
+		[[nodiscard]] bool TryProcessVEC_FMAX();
 
-		bool _TryProcessVEC_UMIN(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
-		bool _TryProcessVEC_SMIN(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
-		bool _TryProcessVEC_UMAX(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
-		bool _TryProcessVEC_SMAX(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
+		[[nodiscard]] bool _TryProcessVEC_UMIN(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
+		[[nodiscard]] bool _TryProcessVEC_SMIN(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
+		[[nodiscard]] bool _TryProcessVEC_UMAX(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
+		[[nodiscard]] bool _TryProcessVEC_SMAX(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
 
-		bool TryProcessVEC_UMIN();
-		bool TryProcessVEC_SMIN();
-		bool TryProcessVEC_UMAX();
-		bool TryProcessVEC_SMAX();
+		[[nodiscard]] bool TryProcessVEC_UMIN();
+		[[nodiscard]] bool TryProcessVEC_SMIN();
+		[[nodiscard]] bool TryProcessVEC_UMAX();
+		[[nodiscard]] bool TryProcessVEC_SMAX();
 
-		bool _TryPerformVEC_FADDSUB(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
+		[[nodiscard]] bool _TryPerformVEC_FADDSUB(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
 
-		bool TryProcessVEC_FADDSUB();
+		[[nodiscard]] bool TryProcessVEC_FADDSUB();
 
-		bool _TryPerformVEC_AVG(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
+		[[nodiscard]] bool _TryPerformVEC_AVG(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
 
-		bool TryProcessVEC_AVG();
+		[[nodiscard]] bool TryProcessVEC_AVG();
 
-		bool _TryProcessVEC_FCMP_helper(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index,
-			bool great, bool less, bool equal, bool unord, bool signal);
+		[[nodiscard]] bool _TryProcessVEC_FCMP_helper(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index, bool great, bool less, bool equal, bool unord, bool signal);
 		
-		bool _TryProcessVEC_FCMP_EQ_OQ(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
-		bool _TryProcessVEC_FCMP_LT_OS(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
-		bool _TryProcessVEC_FCMP_LE_OS(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
-		bool _TryProcessVEC_FCMP_UNORD_Q(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
-		bool _TryProcessVEC_FCMP_NEQ_UQ(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
-		bool _TryProcessVEC_FCMP_NLT_US(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
-		bool _TryProcessVEC_FCMP_NLE_US(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
-		bool _TryProcessVEC_FCMP_ORD_Q(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
-		bool _TryProcessVEC_FCMP_EQ_UQ(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
-		bool _TryProcessVEC_FCMP_NGE_US(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
-		bool _TryProcessVEC_FCMP_NGT_US(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
-		bool _TryProcessVEC_FCMP_FALSE_OQ(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
-		bool _TryProcessVEC_FCMP_NEQ_OQ(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
-		bool _TryProcessVEC_FCMP_GE_OS(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
-		bool _TryProcessVEC_FCMP_GT_OS(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
-		bool _TryProcessVEC_FCMP_TRUE_UQ(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
-		bool _TryProcessVEC_FCMP_EQ_OS(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
-		bool _TryProcessVEC_FCMP_LT_OQ(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
-		bool _TryProcessVEC_FCMP_LE_OQ(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
-		bool _TryProcessVEC_FCMP_UNORD_S(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
-		bool _TryProcessVEC_FCMP_NEQ_US(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
-		bool _TryProcessVEC_FCMP_NLT_UQ(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
-		bool _TryProcessVEC_FCMP_NLE_UQ(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
-		bool _TryProcessVEC_FCMP_ORD_S(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
-		bool _TryProcessVEC_FCMP_EQ_US(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
-		bool _TryProcessVEC_FCMP_NGE_UQ(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
-		bool _TryProcessVEC_FCMP_NGT_UQ(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
-		bool _TryProcessVEC_FCMP_FALSE_OS(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
-		bool _TryProcessVEC_FCMP_NEQ_OS(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
-		bool _TryProcessVEC_FCMP_GE_OQ(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
-		bool _TryProcessVEC_FCMP_GT_OQ(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
-		bool _TryProcessVEC_FCMP_TRUE_US(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
+		[[nodiscard]] bool _TryProcessVEC_FCMP_EQ_OQ(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
+		[[nodiscard]] bool _TryProcessVEC_FCMP_LT_OS(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
+		[[nodiscard]] bool _TryProcessVEC_FCMP_LE_OS(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
+		[[nodiscard]] bool _TryProcessVEC_FCMP_UNORD_Q(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
+		[[nodiscard]] bool _TryProcessVEC_FCMP_NEQ_UQ(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
+		[[nodiscard]] bool _TryProcessVEC_FCMP_NLT_US(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
+		[[nodiscard]] bool _TryProcessVEC_FCMP_NLE_US(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
+		[[nodiscard]] bool _TryProcessVEC_FCMP_ORD_Q(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
+		[[nodiscard]] bool _TryProcessVEC_FCMP_EQ_UQ(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
+		[[nodiscard]] bool _TryProcessVEC_FCMP_NGE_US(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
+		[[nodiscard]] bool _TryProcessVEC_FCMP_NGT_US(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
+		[[nodiscard]] bool _TryProcessVEC_FCMP_FALSE_OQ(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
+		[[nodiscard]] bool _TryProcessVEC_FCMP_NEQ_OQ(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
+		[[nodiscard]] bool _TryProcessVEC_FCMP_GE_OS(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
+		[[nodiscard]] bool _TryProcessVEC_FCMP_GT_OS(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
+		[[nodiscard]] bool _TryProcessVEC_FCMP_TRUE_UQ(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
+		[[nodiscard]] bool _TryProcessVEC_FCMP_EQ_OS(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
+		[[nodiscard]] bool _TryProcessVEC_FCMP_LT_OQ(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
+		[[nodiscard]] bool _TryProcessVEC_FCMP_LE_OQ(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
+		[[nodiscard]] bool _TryProcessVEC_FCMP_UNORD_S(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
+		[[nodiscard]] bool _TryProcessVEC_FCMP_NEQ_US(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
+		[[nodiscard]] bool _TryProcessVEC_FCMP_NLT_UQ(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
+		[[nodiscard]] bool _TryProcessVEC_FCMP_NLE_UQ(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
+		[[nodiscard]] bool _TryProcessVEC_FCMP_ORD_S(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
+		[[nodiscard]] bool _TryProcessVEC_FCMP_EQ_US(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
+		[[nodiscard]] bool _TryProcessVEC_FCMP_NGE_UQ(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
+		[[nodiscard]] bool _TryProcessVEC_FCMP_NGT_UQ(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
+		[[nodiscard]] bool _TryProcessVEC_FCMP_FALSE_OS(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
+		[[nodiscard]] bool _TryProcessVEC_FCMP_NEQ_OS(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
+		[[nodiscard]] bool _TryProcessVEC_FCMP_GE_OQ(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
+		[[nodiscard]] bool _TryProcessVEC_FCMP_GT_OQ(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
+		[[nodiscard]] bool _TryProcessVEC_FCMP_TRUE_US(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index);
 
-		bool TryProcessVEC_FCMP();
+		[[nodiscard]] bool TryProcessVEC_FCMP();
 
-		bool _TryProcessVEC_FCOMI(u64 elem_sizecode, u64 &res, u64 _a, u64 _b, u64 index);
+		[[nodiscard]] bool _TryProcessVEC_FCOMI(u64 elem_sizecode, u64 &res, u64 _a, u64 _b, u64 index);
 
-		bool TryProcessVEC_FCOMI();
+		[[nodiscard]] bool TryProcessVEC_FCOMI();
 
-		bool _TryProcessVEC_FSQRT(u64 elem_sizecode, u64 &res, u64 a, u64 index);
-		bool _TryProcessVEC_FRSQRT(u64 elem_sizecode, u64 &res, u64 a, u64 index);
+		[[nodiscard]] bool _TryProcessVEC_FSQRT(u64 elem_sizecode, u64 &res, u64 a, u64 index);
+		[[nodiscard]] bool _TryProcessVEC_FRSQRT(u64 elem_sizecode, u64 &res, u64 a, u64 index);
 
-		bool TryProcessVEC_FSQRT();
-		bool TryProcessVEC_FRSQRT();
+		[[nodiscard]] bool TryProcessVEC_FSQRT();
+		[[nodiscard]] bool TryProcessVEC_FRSQRT();
 
-		bool _double_to_i32(u64 &res, u64 val);
-		bool _single_to_i32(u64 &res, u64 val);
+		[[nodiscard]] bool _double_to_i32(u64 &res, u64 val);
+		[[nodiscard]] bool _single_to_i32(u64 &res, u64 val);
 
-		bool _double_to_i64(u64 &res, u64 val);
-		bool _single_to_i64(u64 &res, u64 val);
+		[[nodiscard]] bool _double_to_i64(u64 &res, u64 val);
+		[[nodiscard]] bool _single_to_i64(u64 &res, u64 val);
 
-		bool _double_to_ti32(u64 &res, u64 val);
-		bool _single_to_ti32(u64 &res, u64 val);
+		[[nodiscard]] bool _double_to_ti32(u64 &res, u64 val);
+		[[nodiscard]] bool _single_to_ti32(u64 &res, u64 val);
 
-		bool _double_to_ti64(u64 &res, u64 val);
-		bool _single_to_ti64(u64 &res, u64 val);
+		[[nodiscard]] bool _double_to_ti64(u64 &res, u64 val);
+		[[nodiscard]] bool _single_to_ti64(u64 &res, u64 val);
 
-		bool _i32_to_double(u64 &res, u64 val);
-		bool _i32_to_single(u64 &res, u64 val);
+		[[nodiscard]] bool _i32_to_double(u64 &res, u64 val);
+		[[nodiscard]] bool _i32_to_single(u64 &res, u64 val);
 
-		bool _i64_to_double(u64 &res, u64 val);
-		bool _i64_to_single(u64 &res, u64 val);
+		[[nodiscard]] bool _i64_to_double(u64 &res, u64 val);
+		[[nodiscard]] bool _i64_to_single(u64 &res, u64 val);
 
-		bool _double_to_single(u64 &res, u64 val);
-		bool _single_to_double(u64 &res, u64 val);
+		[[nodiscard]] bool _double_to_single(u64 &res, u64 val);
+		[[nodiscard]] bool _single_to_double(u64 &res, u64 val);
 
-		bool TryProcessVEC_CVT();
+		[[nodiscard]] bool TryProcessVEC_CVT();
 
 		// -- misc instructions -- //
 
-		bool TryProcessTRANS();
+		[[nodiscard]] bool TryProcessTRANS();
 
-		bool ProcessDEBUG();
-		bool ProcessUNKNOWN();
+		[[nodiscard]] bool ProcessDEBUG();
+		[[nodiscard]] bool ProcessUNKNOWN();
 	};
 }
 

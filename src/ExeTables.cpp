@@ -120,7 +120,7 @@ namespace CSX64
 
 		&Computer::ProcessNOP,
 
-		&Computer::FINIT,
+		&Computer::ProcessFINIT,
 		&Computer::ProcessFCLEX,
 
 		&Computer::ProcessFSTLD_WORD,

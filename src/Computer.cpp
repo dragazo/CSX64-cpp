@@ -10,19 +10,17 @@ u64 op_exe_count[256];
 
 namespace CSX64
 {
-    bool Computer::realloc(u64 size, bool preserve_contents)
+    bool Computer::realloc(std::size_t size, bool preserve_contents)
     {
 		if (!preserve_contents) mem.clear();
 		mem.resize(size);
 		return true;
     }
 
-    void Computer::Initialize(const Executable &exe, const std::vector<std::string> &args, u64 stacksize)
+    void Computer::initialize(const Executable &exe, const std::vector<std::string> &args, std::size_t stacksize)
 	{
-		assert(max_mem_size == (std::size_t)max_mem_size);
-
 		// get size of memory we need to allocate
-		u64 size = exe.total_size() + stacksize;
+		std::size_t size = exe.total_size() + stacksize;
 
 		// make sure we catch overflow from adding stacksize
 		if (size < stacksize) throw std::overflow_error("memory size overflow");
@@ -54,14 +52,13 @@ namespace CSX64
 		// set up vpu registers
 		for (int i = 0; i < 32; ++i)
 			for (int j = 0; j < 8; ++j) ZMMRegisters[i].get<u64>(j) = Rand();
-		_MXCSR = 0x1f80;
+		MXCSR() = 0x1f80;
 
 		// set execution state
 		RIP() = 0;
 		RFLAGS() = 2; // x86 standard dictates this initial state
-		running = true;
-		suspended_read = false;
-		error = ErrorCode::None;
+		_running = true;
+		_error = ErrorCode::None;
 
 		// get the stack pointer
 		u64 stack = size;
@@ -76,7 +73,7 @@ namespace CSX64
 		{
 			// push the arg onto the stack
 			stack -= (u64)args[i].size() + 1;
-			SetCString(stack, args[i]);
+			(void)write_str(stack, args[i]);
 
 			// record pointer to this arg
 			cmdarg_pointers[i] = stack;
@@ -87,7 +84,7 @@ namespace CSX64
 		// make room for the command line pointer array
 		stack -= 8 * (u64)cmdarg_pointers.size();
 		// write pointer array to memory
-		for (std::size_t i = 0; i < cmdarg_pointers.size(); ++i) SetMem(stack + i * 8, cmdarg_pointers[i]);
+		for (std::size_t i = 0; i < cmdarg_pointers.size(); ++i) (void)write_mem<u64>(stack + i * 8, cmdarg_pointers[i]);
 
 		// load arg count and arg array pointer to RDI, RSI
 		RDI() = args.size();
@@ -97,59 +94,52 @@ namespace CSX64
 		RSP() = stack;
 
 		// also push args to stack (RTL)
-		Push(RSI());
-		Push(RDI());
+		(void)push_mem<u64>(RSI());
+		(void)push_mem<u64>(RDI());
 
 		#if OPCODE_COUNTS
-		// clear op_exe_count
 		for (u64 i = 0; i < 256; ++i) op_exe_count[i] = 0;
 		#endif
 	}
 
-	u64 Computer::Tick(u64 count)
+	u64 Computer::tick(u64 count)
 	{
-		u64 ticks, op;
+		if (!running()) return 0;
+
+		u8 op;
+		u64 ticks;
 		for (ticks = 0; ticks < count; ++ticks)
 		{
-			// fail if terminated or awaiting data
-			if (!running || suspended_read) break;
-
-			// make sure we're before the executable barrier
-			if (RIP() >= exe_barrier) { Terminate(ErrorCode::AccessViolation); break; }
-
-			// fetch the instruction
+			// make sure we're before the executable barrier before reading the opcode
+			if (RIP() >= exe_barrier) { terminate_err(ErrorCode::AccessViolation); break; }
 			if (!GetMemAdv<u8>(op)) break;
 
 			#if OPCODE_COUNTS
-			// update op exe count
 			++op_exe_count[op];
 			#endif
 
-			//std::cout << op << '\n';
-
-			// perform the instruction
-			(this->*opcode_handlers[op])();
+			// perform the instruction - if it returns false it is requesting tick loop to break early for some reason
+			if (!(this->*opcode_handlers[op])()) break;
 		}
-
 		return ticks;
 	}
 
-    void Computer::Terminate(ErrorCode err)
+    void Computer::terminate_err(ErrorCode err)
     {
         // only do this if we're currently running (so we don't override what error caused the initial termination)
-        if (running)
+        if (_running)
         {
             // set error and stop execution
-            error = err;
-            running = false;
+            _error = err;
+            _running = false;
 
             CloseFiles(); // close all the file descriptors
         }
     }
-    void Computer::Exit(int ret)
+    void Computer::terminate_ok(int ret)
     {
         // only do this if we're currently running (so we don't override the "real" return value)
-        if (running)
+        if (_running)
         {
 			#if OPCODE_COUNTS
 			std::cout << "\n\nOPCode Counts:\n" << std::dec << std::setfill(' ');
@@ -161,16 +151,11 @@ namespace CSX64
 			#endif
 
             // set return value and stop execution
-            return_value = ret;
-            running = false;
+            _return_value = ret;
+            _running = false;
 
             CloseFiles(); // close all the file descriptors
         }
-    }
-
-    void Computer::ResumeSuspendedRead()
-    {
-        if (running) suspended_read = false; 
     }
 
     int Computer::OpenFileWrapper(std::unique_ptr<IFileWrapper> f)

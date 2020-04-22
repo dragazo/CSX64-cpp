@@ -1,6 +1,7 @@
 #ifndef DRAGAZO_CSX64_EXECUTABLE_H
 #define DRAGAZO_CSX64_EXECUTABLE_H
 
+#include <array>
 #include <vector>
 #include <string>
 #include <cstdlib>
@@ -19,7 +20,7 @@ namespace CSX64
 	{
 	private: // -- data -- //
 
-		u64 _seglens[4]; // segment lengths (text, rodata, data, bss - respectively)
+		std::array<std::size_t, 4> _seglens; // segment lengths (text, rodata, data, bss - respectively)
 
 		std::vector<u8> _content; // executable contents (actually loaded into memory for execution)
 
@@ -44,9 +45,9 @@ namespace CSX64
 	public: // -- construction -- //
 
 		// assigns this executable a value constructed from component segments.
-		// throws std::overflow_error if the sum of all the segments exceeds u64 max.
+		// throws std::overflow_error if the sum of all the segments overflows std::size_t.
 		// if an exception is thrown, this executable is left in the empty state.
-		void construct(const std::vector<u8> &text, const std::vector<u8> &rodata, const std::vector<u8> &data, u64 bsslen);
+		void construct(const std::vector<u8> &text, const std::vector<u8> &rodata, const std::vector<u8> &data, std::size_t bsslen);
 
 	public: // -- state -- //
 
@@ -63,19 +64,19 @@ namespace CSX64
 	public: // -- access -- //
 
 		// gets the length of each segment
-		u64 text_seglen() const noexcept { return _seglens[0]; }
-		u64 rodata_seglen() const noexcept { return _seglens[1]; }
-		u64 data_seglen() const noexcept { return _seglens[2]; }
-		u64 bss_seglen() const noexcept { return _seglens[3]; }
+		std::size_t text_seglen() const noexcept { return _seglens[0]; }
+		std::size_t rodata_seglen() const noexcept { return _seglens[1]; }
+		std::size_t data_seglen() const noexcept { return _seglens[2]; }
+		std::size_t bss_seglen() const noexcept { return _seglens[3]; }
 
 		// gets the content of the executable in proper segment order (und if empty) (does not include bss) (i.e. holds text, rodata, and data in that order).
 		const u8 *content() const& noexcept { return _content.data(); }
 		const u8 *content() && noexcept = delete;
 		// gets the size of the content array
-		u64 content_size() const noexcept { return _content.size(); }
+		std::size_t content_size() const noexcept { return _content.size(); }
 
 		// returns the total size of all segments (including bss) (>= content_size)
-		u64 total_size() const noexcept { return _content.size() + _seglens[3]; }
+		std::size_t total_size() const noexcept { return _content.size() + _seglens[3]; }
 
 	public: // -- IO -- //
 
