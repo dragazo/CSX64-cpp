@@ -9,7 +9,7 @@
 #include "Assembly.h"
 #include "Expr.h"
 
-namespace CSX64
+namespace CSX64::detail
 {
 	// Holds all the variables used during assembly
 	class AssembleArgs
@@ -21,7 +21,7 @@ namespace CSX64
 		AsmSegment current_seg = AsmSegment::INVALID;
 		AsmSegment done_segs = AsmSegment::INVALID;
 
-		int line = 0;
+		std::size_t line = 0;
 		u64 line_pos_in_seg = 0;
 
 		std::string last_nonlocal_label;
@@ -36,7 +36,7 @@ namespace CSX64
 	public: // -- ctor/dtor -- //
 
 		AssembleArgs(ObjectFile &dest) : file(dest) {}
-		
+
 		AssembleArgs(const AssembleArgs&) = delete;
 		AssembleArgs(AssembleArgs&&) = delete;
 

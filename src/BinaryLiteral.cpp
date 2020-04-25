@@ -6,6 +6,8 @@
 #include "../include/Assembly.h"
 #include "../include/csx_exceptions.h"
 
+using namespace CSX64::detail;
+
 namespace CSX64
 {
 	static constexpr std::size_t npos = ~(std::size_t)0;
@@ -120,7 +122,7 @@ namespace CSX64
 		for (const auto &i : top_level_literals)
 		{
 			write<u64>(writer, (u64)i.size());
-			BinWrite(writer, i.data(), i.size());
+			write_bin(writer, i.data(), i.size());
 		}
 
 		// write number of literals
@@ -151,7 +153,7 @@ namespace CSX64
 			if (!read<u64>(reader, temp2)) return reader;
 			if constexpr (std::numeric_limits<std::size_t>::max() < std::numeric_limits<u64>::max()) { if (temp2 != (std::size_t)temp2) throw MemoryAllocException("Binary literal too large"); }
 			std::vector<u8> v((std::size_t)temp2);
-			if (!BinRead(reader, v.data(), (std::size_t)temp2)) return reader;
+			if (!read_bin(reader, v.data(), (std::size_t)temp2)) return reader;
 			top_level_literals.emplace_back(std::move(v));
 		}
 

@@ -20,7 +20,7 @@ namespace CSX64
 	{
 	private: // -- data -- //
 
-		std::array<std::size_t, 4> _seglens; // segment lengths (text, rodata, data, bss - respectively)
+		std::array<std::size_t, 4> _seglens = {}; // segment lengths (text, rodata, data, bss - respectively)
 
 		std::vector<u8> _content; // executable contents (actually loaded into memory for execution)
 

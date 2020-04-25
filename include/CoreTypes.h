@@ -21,28 +21,24 @@ namespace CSX64
 	typedef double f64;
 	typedef float f32;
 
-	// the standard dictates fixed-size ints operate as if they were that size, but doesn't guarantee they actually /are/ that size
-	// we do some stuff that only works if they really /are/ the proper size
+	typedef long double fext;
 
-	static_assert(sizeof(u64) * CHAR_BIT == 64, "Uhoh!! This compiler's std::uint64_t isn't really 64-bit!");
-	static_assert(sizeof(u32) * CHAR_BIT == 32, "Uhoh!! This compiler's std::uint32_t isn't really 32-bit!");
-	static_assert(sizeof(u16) * CHAR_BIT == 16, "Uhoh!! This compiler's std::uint64_t isn't really 16-bit!");
-	static_assert(sizeof(u8) * CHAR_BIT == 8, "Uhoh!! This compiler's std::uint64_t isn't really 8-bit!");
+	static_assert(CHAR_BIT == 8, "Uhoh!! This system doesn't use 8-bit bytes!");
 
-	static_assert(sizeof(i64) * CHAR_BIT == 64, "Uhoh!! This compiler's std::int64_t isn't really 64-bit!");
-	static_assert(sizeof(i32) * CHAR_BIT == 32, "Uhoh!! This compiler's std::int32_t isn't really 32-bit!");
-	static_assert(sizeof(i16) * CHAR_BIT == 16, "Uhoh!! This compiler's std::int64_t isn't really 16-bit!");
-	static_assert(sizeof(i8) * CHAR_BIT == 8, "Uhoh!! This compiler's std::int64_t isn't really 8-bit!");
+	static_assert(sizeof(u64) == 8, "Uhoh!! This compiler's std::uint64_t isn't really 64-bit!");
+	static_assert(sizeof(u32) == 4, "Uhoh!! This compiler's std::uint32_t isn't really 32-bit!");
+	static_assert(sizeof(u16) == 2, "Uhoh!! This compiler's std::uint64_t isn't really 16-bit!");
+	static_assert(sizeof(u8) == 1, "Uhoh!! This compiler's std::uint64_t isn't really 8-bit!");
 
-	// additionally, we do a lot of things involving reading floating values as integers, and we need to make sure they're the assumed size
+	static_assert(sizeof(i64) == 8, "Uhoh!! This compiler's std::int64_t isn't really 64-bit!");
+	static_assert(sizeof(i32) == 4, "Uhoh!! This compiler's std::int32_t isn't really 32-bit!");
+	static_assert(sizeof(i16) == 2, "Uhoh!! This compiler's std::int64_t isn't really 16-bit!");
+	static_assert(sizeof(i8) == 1, "Uhoh!! This compiler's std::int64_t isn't really 8-bit!");
 
-	static_assert(sizeof(f64) * CHAR_BIT == 64, "Uhoh!! This compiler's double isn't 64-bit!");
-	static_assert(sizeof(f32) * CHAR_BIT == 32, "Uhoh!! This compiler's float isn't 32-bit!");
+	static_assert(sizeof(f64) == 8, "Uhoh!! This compiler's double isn't 64-bit!");
+	static_assert(sizeof(f32) == 4, "Uhoh!! This compiler's float isn't 32-bit!");
 
-	// -- extra type info -- //
-
-	// true if long double has greater precision than double
-	inline constexpr bool ld_is_extended_fp = sizeof(long double) * CHAR_BIT > 64;
+	static_assert(sizeof(fext) >= sizeof(f64), "Uhoh!! This compiler's long double is less precise than double!");
 
 	// ---------------------------------------
 

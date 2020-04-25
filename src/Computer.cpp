@@ -23,9 +23,9 @@ namespace CSX64
 		std::size_t size = exe.total_size() + stacksize;
 
 		// make sure we catch overflow from adding stacksize
-		if (size < stacksize) throw std::overflow_error("memory size overflow");
+		if (size < stacksize) throw std::overflow_error("memory get_size overflow");
 		// make sure it's within max memory usage limits
-		if (size > max_mem_size) throw MemoryAllocException("executable size exceeded max memory");
+		if (size > max_mem_size) throw MemoryAllocException("executable get_size exceeded max memory");
 		
 		// allocate the required space (we can safely discard any previous values)
 		if (!this->realloc(size, false)) throw MemoryAllocException("memory allocation failed");

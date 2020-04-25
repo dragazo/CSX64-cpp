@@ -19,7 +19,6 @@
 
 namespace CSX64
 {
-	// error codes resulting from executing client code (these don't trigger exceptions).
 	enum class ErrorCode
 	{
 		None, OutOfBounds, UnhandledSyscall, UndefinedBehavior, ArithmeticError, Abort,
@@ -27,6 +26,10 @@ namespace CSX64
 		FPUStackOverflow, FPUStackUnderflow, FPUError, FPUAccessViolation,
 		AlignmentViolation, UnknownOp, FilePermissions,
 	};
+}
+
+namespace CSX64::detail
+{
 	extern const std::unordered_map<ErrorCode, std::string> ErrorCodeToString;
 
 	enum class SyscallCode
@@ -185,10 +188,10 @@ namespace CSX64
 	public: // -- partition access -- //
 
 		constexpr u64 &x64() noexcept { return data; }
-		constexpr ReferenceRouter<u32, u64> x32() noexcept { return {data}; }
-		constexpr BitfieldWrapper<u64, 0, 16> x16() noexcept { return {data}; }
-		constexpr BitfieldWrapper<u64, 0, 8> x8() noexcept { return {data}; }
-		constexpr BitfieldWrapper<u64, 8, 8> x8h() noexcept { return {data}; }
+		constexpr ReferenceRouter<u32, u64> x32() noexcept { return { data }; }
+		constexpr BitfieldWrapper<u64, 0, 16> x16() noexcept { return { data }; }
+		constexpr BitfieldWrapper<u64, 0, 8> x8() noexcept { return { data }; }
+		constexpr BitfieldWrapper<u64, 8, 8> x8h() noexcept { return { data }; }
 
 		constexpr u64 x64() const noexcept { return data; }
 		constexpr u32 x32() const noexcept { return (u32)data; }
@@ -207,7 +210,7 @@ namespace CSX64
 			case 2: return x32();
 			case 3: return x64();
 
-			default: throw std::invalid_argument("sizecode must be on range [0,3]");
+			default: throw std::invalid_argument("get_sizecode must be on range [0,3]");
 			}
 		}
 	};
@@ -225,7 +228,7 @@ namespace CSX64
 			case 2: return reg.x32();
 			case 3: return reg.x64();
 
-			default: throw std::invalid_argument("sizecode must be on range [0,3]");
+			default: throw std::invalid_argument("get_sizecode must be on range [0,3]");
 			}
 		}
 		constexpr CPURegister_sizecode_wrapper &operator=(u64 value)
@@ -237,19 +240,19 @@ namespace CSX64
 			case 2: reg.x32() = (u32)value; return *this;
 			case 3: reg.x64() = (u64)value; return *this;
 
-			default: throw std::invalid_argument("sizecode must be on range [0,3]");
+			default: throw std::invalid_argument("get_sizecode must be on range [0,3]");
 			}
 		}
 		constexpr CPURegister_sizecode_wrapper &operator=(CPURegister_sizecode_wrapper other) { *this = (u64)other; return *this; }
 	};
-	inline CPURegister_sizecode_wrapper CPURegister::operator[](u64 sizecode) { return {*this, (u8)sizecode}; }
+	inline CPURegister_sizecode_wrapper CPURegister::operator[](u64 sizecode) { return { *this, (u8)sizecode }; }
 
 	struct ZMMRegister_sizecode_wrapper;
 	// Represents a 512-bit register used by vpu instructions
 	struct alignas(64) ZMMRegister
 	{
 	private:
-		
+
 		alignas(64) unsigned char data[64]; // the raw data block used to represent the entire 64-byte vector register
 
 	public: // -- fill utilities -- //
@@ -260,7 +263,7 @@ namespace CSX64
 	public: // -- partition access -- //
 
 		// gets the value of type T at the specified index (index offsets based on T)
-		template<typename T> bin_cpy_wrapper<T> get(u64 index) noexcept { return {data + index * sizeof(T)}; }
+		template<typename T> bin_cpy_wrapper<T> get(u64 index) noexcept { return { data + index * sizeof(T) }; }
 		template<typename T> T get(u64 index) const noexcept { return read<T>(data + index * sizeof(T)); }
 
 	public: // -- sizecode access utilities -- //
@@ -276,7 +279,7 @@ namespace CSX64
 			case 2: return get<u32>(index);
 			case 3: return get<u64>(index);
 
-			default: throw std::invalid_argument("sizecode must be on range [0,3]");
+			default: throw std::invalid_argument("get_sizecode must be on range [0,3]");
 			}
 		}
 	};
@@ -295,7 +298,7 @@ namespace CSX64
 			case 2: return reg.get<u32>(index);
 			case 3: return reg.get<u64>(index);
 
-			default: throw std::invalid_argument("sizecode must be on range [0,3]");
+			default: throw std::invalid_argument("get_sizecode must be on range [0,3]");
 			}
 		}
 		constexpr ZMMRegister_sizecode_wrapper &operator=(u64 value)
@@ -307,13 +310,17 @@ namespace CSX64
 			case 2: reg.get<u32>(index) = (u32)value; return *this;
 			case 3: reg.get<u64>(index) = (u64)value; return *this;
 
-			default: throw std::invalid_argument("sizecode must be on range [0,3]");
+			default: throw std::invalid_argument("get_sizecode must be on range [0,3]");
 			}
 		}
 		constexpr ZMMRegister_sizecode_wrapper &operator=(ZMMRegister_sizecode_wrapper other) { *this = (u64)other; return *this; }
 	};
-	inline ZMMRegister_sizecode_wrapper ZMMRegister::uint(u64 sizecode, u64 index) { return {*this, (u8)index, (u8)sizecode}; }
+	inline ZMMRegister_sizecode_wrapper ZMMRegister::uint(u64 sizecode, u64 index) { return { *this, (u8)index, (u8)sizecode }; }
 
+}
+
+namespace CSX64
+{
 	// -------- //
 
 	// -- io -- //

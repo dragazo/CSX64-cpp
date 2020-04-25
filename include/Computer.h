@@ -58,7 +58,7 @@ namespace CSX64
 
 		public:
 
-			operator long double() const { return c.FPURegisters[index]; }
+			operator fext() const { return c.FPURegisters[index]; }
 			ST_Wrapper_common &operator=(const ST_Wrapper_common&) = delete;
 
 			// ---------------------------------------- //
@@ -68,9 +68,9 @@ namespace CSX64
 			static constexpr u16 tag_special = 2;
 			static constexpr u16 tag_empty = 3;
 
-			static u16 ComputeFPUTag(long double val)
+			static u16 ComputeFPUTag(fext val)
 			{
-				if (std::isnan(val) || std::isinf(val) || IsDenorm(val)) return tag_special;
+				if (std::isnan(val) || std::isinf(val) || detail::IsDenorm(val)) return tag_special;
 				else if (val == 0) return tag_zero;
 				else return tag_normal;
 			}
@@ -94,7 +94,7 @@ namespace CSX64
 				_frstor.fmt().width(0);
 
 				if (wrapper.Empty()) ostr << "Empty";
-				else ostr << std::defaultfloat << std::setprecision(17) << (long double)wrapper;
+				else ostr << std::defaultfloat << std::setprecision(17) << (fext)wrapper;
 
 				return ostr;
 			}
@@ -111,13 +111,13 @@ namespace CSX64
 
 		public:
 
-			ST_Wrapper &operator=(long double value)
+			ST_Wrapper &operator=(fext value)
 			{
 				// store value, accounting for precision control flag
 				switch (c.FPU_PC())
 				{
-				case 0: value = (float)value; break;
-				case 2: value = (double)value; break;
+				case 0: value = (f64)value; break;
+				case 2: value = (f64)value; break;
 				}
 
 				// const_cast does not violate const correctness - see above comment for private ctor
@@ -126,12 +126,12 @@ namespace CSX64
 
 				return *this;
 			}
-			ST_Wrapper &operator=(ST_Wrapper wrapper) { *this = (long double)wrapper; return *this; }
+			ST_Wrapper &operator=(ST_Wrapper wrapper) { *this = (fext)wrapper; return *this; }
 
-			ST_Wrapper &operator+=(long double val) { *this = *this + val; return *this; }
-			ST_Wrapper &operator-=(long double val) { *this = *this - val; return *this; }
-			ST_Wrapper &operator*=(long double val) { *this = *this * val; return *this; }
-			ST_Wrapper &operator/=(long double val) { *this = *this / val; return *this; }
+			ST_Wrapper &operator+=(fext val) { *this = *this + val; return *this; }
+			ST_Wrapper &operator-=(fext val) { *this = *this - val; return *this; }
+			ST_Wrapper &operator*=(fext val) { *this = *this * val; return *this; }
+			ST_Wrapper &operator/=(fext val) { *this = *this / val; return *this; }
 
 			// marks the ST register as empty
 			void Free() noexcept { const_cast<Computer&>(c).FPU_tag |= 3 << (index * 2); }
@@ -166,18 +166,18 @@ namespace CSX64
 		ErrorCode _error = ErrorCode::None;
 		int _return_value = 0;
 
-		CPURegister CPURegisters[16];
+		detail::CPURegister CPURegisters[16];
 		u64 _RFLAGS, _RIP;
 
-		long double FPURegisters[8];
+		fext FPURegisters[8];
 		u16 FPU_control, FPU_status, FPU_tag;
 
-		ZMMRegister ZMMRegisters[32];
+		detail::ZMMRegister ZMMRegisters[32];
 		u32 _MXCSR;
 
 		std::unique_ptr<IFileWrapper> FileDescriptors[FDCount];
 
-		FastRNG Rand;
+		detail::FastRNG Rand;
 
 	public: // -- data access -- //
 
@@ -292,25 +292,25 @@ namespace CSX64
 	public: // -- public memory access -- //
 
 		// reads a value from memory. returns true on success. on failure, val is not modified.
-		template<typename T, typename U, std::enable_if_t<is_int<T> && std::is_same_v<T, U>, int> = 0>
+		template<typename T, typename U, std::enable_if_t<detail::is_int<T> && std::is_same_v<T, U>, int> = 0>
 		[[nodiscard]] bool read_mem(u64 pos, U &val)
 		{
 			if (pos >= mem.size() || pos + sizeof(T) > mem.size()) { terminate_err(ErrorCode::OutOfBounds); return false; }
-			val = read<T>(mem.data() + pos);
+			val = detail::read<T>(mem.data() + pos);
 			return true;
 		}
 		// writes a value to memory. returns true on success. on failure, memory is not modified.
-		template<typename T, typename U, std::enable_if_t<is_int<T> && std::is_same_v<T, U>, int> = 0>
+		template<typename T, typename U, std::enable_if_t<detail::is_int<T> && std::is_same_v<T, U>, int> = 0>
 		[[nodiscard]] bool write_mem(u64 pos, U val)
 		{
 			if (pos >= mem.size() || pos + sizeof(T) > mem.size()) { terminate_err(ErrorCode::OutOfBounds); return false; }
 			if (pos < readonly_barrier) { terminate_err(ErrorCode::AccessViolation);  return false; }
-			write<T>(mem.data() + pos, val);
+			detail::write<T>(mem.data() + pos, val);
 			return true;
 		}
 
 		// pushes a value onto the stack. returns true on success. on failure, rsp and memory are not modified.
-		template<typename T, typename U, std::enable_if_t<is_int<T> && std::is_same_v<T, U>, int> = 0>
+		template<typename T, typename U, std::enable_if_t<detail::is_int<T> && std::is_same_v<T, U>, int> = 0>
 		[[nodiscard]] bool push_mem(U val)
 		{
 			if (RSP() < stack_barrier) { terminate_err(ErrorCode::StackOverflow); return false; }
@@ -319,7 +319,7 @@ namespace CSX64
 			return true;
 		}
 		// pops a value off the stack. returns true on success. on failure rsp and val are not modified.
-		template<typename T, typename U, std::enable_if_t<is_int<T> && std::is_same_v<T, U>, int> = 0>
+		template<typename T, typename U, std::enable_if_t<detail::is_int<T> && std::is_same_v<T, U>, int> = 0>
 		[[nodiscard]] bool pop_mem(U &val)
 		{
 			if (RSP() < stack_barrier) { terminate_err(ErrorCode::StackOverflow); return false; }
@@ -344,14 +344,10 @@ namespace CSX64
 		[[nodiscard]] bool GetMemRaw_szc(u64 pos, u64 sizecode, u64 &res);
 		[[nodiscard]] bool SetMemRaw_szc(u64 pos, u64 sizecode, u64 val);
 
-
-
-		// as SetMemRaw() but takes a sizecode instead of a size
-
 		// gets a value and advances the execution pointer. returns true on success
 		[[nodiscard]] bool GetMemAdv(u64 size, u64 &res);
 
-		template<typename T, typename U, std::enable_if_t<is_int<T> && std::is_same_v<T, U>, int> = 0>
+		template<typename T, typename U, std::enable_if_t<detail::is_int<T> && std::is_same_v<T, U>, int> = 0>
 		[[nodiscard]] bool GetMemAdv(U &res)
 		{
 			if (!read_mem<T>(RIP(), res)) return false;
@@ -367,17 +363,17 @@ namespace CSX64
 
 	public: // -- register access -- //
 
-		u64                        &RFLAGS() { return _RFLAGS; }
-		BitfieldWrapper<u64, 0, 32> EFLAGS() { return {_RFLAGS}; }
-		BitfieldWrapper<u64, 0, 16> FLAGS() { return {_RFLAGS}; }
+		u64                                &RFLAGS() { return _RFLAGS; }
+		detail::BitfieldWrapper<u64, 0, 32> EFLAGS() { return {_RFLAGS}; }
+		detail::BitfieldWrapper<u64, 0, 16> FLAGS() { return {_RFLAGS}; }
 		
 		u64 RFLAGS() const { return _RFLAGS; }
 		u32 EFLAGS() const { return (u32)_RFLAGS; }
 		u16 FLAGS() const { return (u16)_RFLAGS; }
 
-		u64                      &RIP() { return _RIP; }
-		ReferenceRouter<u32, u64> EIP() { return {_RIP}; }
-		ReferenceRouter<u16, u64> IP() { return {_RIP}; }
+		u64                              &RIP() { return _RIP; }
+		detail::ReferenceRouter<u32, u64> EIP() { return {_RIP}; }
+		detail::ReferenceRouter<u16, u64> IP() { return {_RIP}; }
 
 		u64 RIP() const { return _RIP; }
 		u32 EIP() const { return (u32)_RIP; }
@@ -532,51 +528,51 @@ namespace CSX64
 		// source: https://en.wikipedia.org/wiki/FLAGS_register
 		// source: http://www.eecg.toronto.edu/~amza/www.mindsec.com/files/x86regs.html
 
-		FlagWrapper<u64, 0>         CF() { return {_RFLAGS}; }
-		FlagWrapper<u64, 2>         PF() { return {_RFLAGS}; }
-		FlagWrapper<u64, 4>         AF() { return {_RFLAGS}; }
-		FlagWrapper<u64, 6>         ZF() { return {_RFLAGS}; }
-		FlagWrapper<u64, 7>         SF() { return {_RFLAGS}; }
-		FlagWrapper<u64, 8>         TF() { return {_RFLAGS}; }
-		FlagWrapper<u64, 9>         IF() { return {_RFLAGS}; }
-		FlagWrapper<u64, 10>        DF() { return {_RFLAGS}; }
-		FlagWrapper<u64, 11>        OF() { return {_RFLAGS}; }
-		BitfieldWrapper<u64, 12, 2> IOPL() { return {_RFLAGS}; }
-		FlagWrapper<u64, 14>        NT() { return {_RFLAGS}; }
+		detail::FlagWrapper<u64, 0>         CF() { return {_RFLAGS}; }
+		detail::FlagWrapper<u64, 2>         PF() { return {_RFLAGS}; }
+		detail::FlagWrapper<u64, 4>         AF() { return {_RFLAGS}; }
+		detail::FlagWrapper<u64, 6>         ZF() { return {_RFLAGS}; }
+		detail::FlagWrapper<u64, 7>         SF() { return {_RFLAGS}; }
+		detail::FlagWrapper<u64, 8>         TF() { return {_RFLAGS}; }
+		detail::FlagWrapper<u64, 9>         IF() { return {_RFLAGS}; }
+		detail::FlagWrapper<u64, 10>        DF() { return {_RFLAGS}; }
+		detail::FlagWrapper<u64, 11>        OF() { return {_RFLAGS}; }
+		detail::BitfieldWrapper<u64, 12, 2> IOPL() { return {_RFLAGS}; }
+		detail::FlagWrapper<u64, 14>        NT() { return {_RFLAGS}; }
 
-		FlagWrapper<u64, 16> RF() { return {_RFLAGS}; }
-		FlagWrapper<u64, 17> VM() { return {_RFLAGS}; }
-		FlagWrapper<u64, 18> AC() { return {_RFLAGS}; }
-		FlagWrapper<u64, 19> VIF() { return {_RFLAGS}; }
-		FlagWrapper<u64, 20> VIP() { return {_RFLAGS}; }
-		FlagWrapper<u64, 21> ID() { return {_RFLAGS}; }
+		detail::FlagWrapper<u64, 16> RF() { return {_RFLAGS}; }
+		detail::FlagWrapper<u64, 17> VM() { return {_RFLAGS}; }
+		detail::FlagWrapper<u64, 18> AC() { return {_RFLAGS}; }
+		detail::FlagWrapper<u64, 19> VIF() { return {_RFLAGS}; }
+		detail::FlagWrapper<u64, 20> VIP() { return {_RFLAGS}; }
+		detail::FlagWrapper<u64, 21> ID() { return {_RFLAGS}; }
 
-		bool CF() const { return _RFLAGS & FlagWrapper<u64, 0>::mask; }
-		bool PF() const { return _RFLAGS & FlagWrapper<u64, 2>::mask; }
-		bool AF() const { return _RFLAGS & FlagWrapper<u64, 4>::mask; }
-		bool ZF() const { return _RFLAGS & FlagWrapper<u64, 6>::mask; }
-		bool SF() const { return _RFLAGS & FlagWrapper<u64, 7>::mask; }
-		bool TF() const { return _RFLAGS & FlagWrapper<u64, 8>::mask; }
-		bool IF() const { return _RFLAGS & FlagWrapper<u64, 9>::mask; }
-		bool DF() const { return _RFLAGS & FlagWrapper<u64, 10>::mask; }
-		bool OF() const { return _RFLAGS & FlagWrapper<u64, 11>::mask; }
-		u64 IOPL() const { return (_RFLAGS & BitfieldWrapper<u64, 12, 2>::mask) >> 12; }
-		bool NT() const { return _RFLAGS & FlagWrapper<u64, 14>::mask; }
+		bool CF() const { return _RFLAGS & detail::FlagWrapper<u64, 0>::mask; }
+		bool PF() const { return _RFLAGS & detail::FlagWrapper<u64, 2>::mask; }
+		bool AF() const { return _RFLAGS & detail::FlagWrapper<u64, 4>::mask; }
+		bool ZF() const { return _RFLAGS & detail::FlagWrapper<u64, 6>::mask; }
+		bool SF() const { return _RFLAGS & detail::FlagWrapper<u64, 7>::mask; }
+		bool TF() const { return _RFLAGS & detail::FlagWrapper<u64, 8>::mask; }
+		bool IF() const { return _RFLAGS & detail::FlagWrapper<u64, 9>::mask; }
+		bool DF() const { return _RFLAGS & detail::FlagWrapper<u64, 10>::mask; }
+		bool OF() const { return _RFLAGS & detail::FlagWrapper<u64, 11>::mask; }
+		u64 IOPL() const { return (_RFLAGS & detail::BitfieldWrapper<u64, 12, 2>::mask) >> 12; }
+		bool NT() const { return _RFLAGS & detail::FlagWrapper<u64, 14>::mask; }
 
-		bool RF() const { return _RFLAGS & FlagWrapper<u64, 16>::mask; }
-		bool VM() const { return _RFLAGS & FlagWrapper<u64, 17>::mask; }
-		bool AC() const { return _RFLAGS & FlagWrapper<u64, 18>::mask; }
-		bool VIF() const { return _RFLAGS & FlagWrapper<u64, 19>::mask; }
-		bool VIP() const { return _RFLAGS & FlagWrapper<u64, 20>::mask; }
-		bool ID() const { return _RFLAGS & FlagWrapper<u64, 21>::mask; }
+		bool RF() const { return _RFLAGS & detail::FlagWrapper<u64, 16>::mask; }
+		bool VM() const { return _RFLAGS & detail::FlagWrapper<u64, 17>::mask; }
+		bool AC() const { return _RFLAGS & detail::FlagWrapper<u64, 18>::mask; }
+		bool VIF() const { return _RFLAGS & detail::FlagWrapper<u64, 19>::mask; }
+		bool VIP() const { return _RFLAGS & detail::FlagWrapper<u64, 20>::mask; }
+		bool ID() const { return _RFLAGS & detail::FlagWrapper<u64, 21>::mask; }
 
 		// File System Flag - denotes if the client is allowed to perform potentially-dangerous file system syscalls (open, delete, mkdir, etc.)
-		FlagWrapper<u64, 32> FSF() { return {_RFLAGS}; }
-		bool                 FSF() const { return _RFLAGS & FlagWrapper<u64, 32>::mask; }
+		detail::FlagWrapper<u64, 32> FSF() { return {_RFLAGS}; }
+		bool                         FSF() const { return _RFLAGS & detail::FlagWrapper<u64, 32>::mask; }
 
 		// One-Tick-REP Flag - denotes if REP instructions are performed in a single tick (more efficient, but could result in expensive ticks)
-		FlagWrapper<u64, 33> OTRF() { return {_RFLAGS}; }
-		bool                 OTRF() const { return _RFLAGS & FlagWrapper<u64, 33>::mask; }
+		detail::FlagWrapper<u64, 33> OTRF() { return {_RFLAGS}; }
+		bool                         OTRF() const { return _RFLAGS & detail::FlagWrapper<u64, 33>::mask; }
 
 		bool cc_b() const { return CF(); }
 		bool cc_be() const { return CF() || ZF(); }
@@ -590,57 +586,57 @@ namespace CSX64
 
 		// source : http://www.website.masmforum.com/tutorials/fptute/fpuchap1.htm
 
-		FlagWrapper<u16, 0> FPU_IM() { return {FPU_control}; }
-		FlagWrapper<u16, 1> FPU_DM() { return {FPU_control}; }
-		FlagWrapper<u16, 2> FPU_ZM() { return {FPU_control}; }
-		FlagWrapper<u16, 3> FPU_OM() { return {FPU_control}; }
-		FlagWrapper<u16, 4> FPU_UM() { return {FPU_control}; }
-		FlagWrapper<u16, 5> FPU_PM() { return {FPU_control}; }
-		FlagWrapper<u16, 7> FPU_IEM() { return {FPU_control}; }
-		BitfieldWrapper<u16, 8, 2> FPU_PC() { return {FPU_control}; }
-		BitfieldWrapper<u16, 10, 2> FPU_RC() { return {FPU_control}; }
-		FlagWrapper<u16, 12> FPU_IC() { return {FPU_control}; }
+		detail::FlagWrapper<u16, 0> FPU_IM() { return {FPU_control}; }
+		detail::FlagWrapper<u16, 1> FPU_DM() { return {FPU_control}; }
+		detail::FlagWrapper<u16, 2> FPU_ZM() { return {FPU_control}; }
+		detail::FlagWrapper<u16, 3> FPU_OM() { return {FPU_control}; }
+		detail::FlagWrapper<u16, 4> FPU_UM() { return {FPU_control}; }
+		detail::FlagWrapper<u16, 5> FPU_PM() { return {FPU_control}; }
+		detail::FlagWrapper<u16, 7> FPU_IEM() { return {FPU_control}; }
+		detail::BitfieldWrapper<u16, 8, 2> FPU_PC() { return {FPU_control}; }
+		detail::BitfieldWrapper<u16, 10, 2> FPU_RC() { return {FPU_control}; }
+		detail::FlagWrapper<u16, 12> FPU_IC() { return {FPU_control}; }
 
-		FlagWrapper<u16, 0> FPU_I() { return {FPU_status}; }
-		FlagWrapper<u16, 1> FPU_D() { return {FPU_status}; }
-		FlagWrapper<u16, 2> FPU_Z() { return {FPU_status}; }
-		FlagWrapper<u16, 3> FPU_O() { return {FPU_status}; }
-		FlagWrapper<u16, 4> FPU_U() { return {FPU_status}; }
-		FlagWrapper<u16, 5> FPU_P() { return {FPU_status}; }
-		FlagWrapper<u16, 6> FPU_SF() { return {FPU_status}; }
-		FlagWrapper<u16, 7> FPU_IR() { return {FPU_status}; }
-		FlagWrapper<u16, 8> FPU_C0() { return {FPU_status}; }
-		FlagWrapper<u16, 9> FPU_C1() { return {FPU_status}; }
-		FlagWrapper<u16, 10> FPU_C2() { return {FPU_status}; }
-		BitfieldWrapper<u16, 11, 3> FPU_TOP() { return {FPU_control}; }
-		FlagWrapper<u16, 14> FPU_C3() { return {FPU_status}; }
-		FlagWrapper<u16, 15> FPU_B() { return {FPU_status}; }
+		detail::FlagWrapper<u16, 0> FPU_I() { return {FPU_status}; }
+		detail::FlagWrapper<u16, 1> FPU_D() { return {FPU_status}; }
+		detail::FlagWrapper<u16, 2> FPU_Z() { return {FPU_status}; }
+		detail::FlagWrapper<u16, 3> FPU_O() { return {FPU_status}; }
+		detail::FlagWrapper<u16, 4> FPU_U() { return {FPU_status}; }
+		detail::FlagWrapper<u16, 5> FPU_P() { return {FPU_status}; }
+		detail::FlagWrapper<u16, 6> FPU_SF() { return {FPU_status}; }
+		detail::FlagWrapper<u16, 7> FPU_IR() { return {FPU_status}; }
+		detail::FlagWrapper<u16, 8> FPU_C0() { return {FPU_status}; }
+		detail::FlagWrapper<u16, 9> FPU_C1() { return {FPU_status}; }
+		detail::FlagWrapper<u16, 10> FPU_C2() { return {FPU_status}; }
+		detail::BitfieldWrapper<u16, 11, 3> FPU_TOP() { return {FPU_control}; }
+		detail::FlagWrapper<u16, 14> FPU_C3() { return {FPU_status}; }
+		detail::FlagWrapper<u16, 15> FPU_B() { return {FPU_status}; }
 
-		bool FPU_IM() const { return FPU_control & FlagWrapper<u16, 0>::mask; }
-		bool FPU_DM() const { return FPU_control & FlagWrapper<u16, 1>::mask; }
-		bool FPU_ZM() const { return FPU_control & FlagWrapper<u16, 2>::mask; }
-		bool FPU_OM() const { return FPU_control & FlagWrapper<u16, 3>::mask; }
-		bool FPU_UM() const { return FPU_control & FlagWrapper<u16, 4>::mask; }
-		bool FPU_PM() const { return FPU_control & FlagWrapper<u16, 5>::mask; }
-		bool FPU_IEM() const { return FPU_control & FlagWrapper<u16, 7>::mask; }
-		u16 FPU_PC() const { return (FPU_control & BitfieldWrapper<u16, 8, 2>::mask) >> 8; }
-		u16 FPU_RC() const { return (FPU_control & BitfieldWrapper<u16, 10, 2>::mask) >> 10; }
-		bool FPU_IC() const { return FPU_control & FlagWrapper<u16, 12>::mask; }
+		bool FPU_IM() const { return FPU_control & detail::FlagWrapper<u16, 0>::mask; }
+		bool FPU_DM() const { return FPU_control & detail::FlagWrapper<u16, 1>::mask; }
+		bool FPU_ZM() const { return FPU_control & detail::FlagWrapper<u16, 2>::mask; }
+		bool FPU_OM() const { return FPU_control & detail::FlagWrapper<u16, 3>::mask; }
+		bool FPU_UM() const { return FPU_control & detail::FlagWrapper<u16, 4>::mask; }
+		bool FPU_PM() const { return FPU_control & detail::FlagWrapper<u16, 5>::mask; }
+		bool FPU_IEM() const { return FPU_control & detail::FlagWrapper<u16, 7>::mask; }
+		u16 FPU_PC() const { return (FPU_control & detail::BitfieldWrapper<u16, 8, 2>::mask) >> 8; }
+		u16 FPU_RC() const { return (FPU_control & detail::BitfieldWrapper<u16, 10, 2>::mask) >> 10; }
+		bool FPU_IC() const { return FPU_control & detail::FlagWrapper<u16, 12>::mask; }
 
-		bool FPU_I() const { return FPU_status & FlagWrapper<u16, 0>::mask; }
-		bool FPU_D() const { return FPU_status & FlagWrapper<u16, 1>::mask; }
-		bool FPU_Z() const { return FPU_status & FlagWrapper<u16, 2>::mask; }
-		bool FPU_O() const { return FPU_status & FlagWrapper<u16, 3>::mask; }
-		bool FPU_U() const { return FPU_status & FlagWrapper<u16, 4>::mask; }
-		bool FPU_P() const { return FPU_status & FlagWrapper<u16, 5>::mask; }
-		bool FPU_SF() const { return FPU_status & FlagWrapper<u16, 6>::mask; }
-		bool FPU_IR() const { return FPU_status & FlagWrapper<u16, 7>::mask; }
-		bool FPU_C0() const { return FPU_status & FlagWrapper<u16, 8>::mask; }
-		bool FPU_C1() const { return FPU_status & FlagWrapper<u16, 9>::mask; }
-		bool FPU_C2() const { return FPU_status & FlagWrapper<u16, 10>::mask; }
-		u16 FPU_TOP() const { return (FPU_control & BitfieldWrapper<u16, 11, 3>::mask) >> 11; }
-		bool FPU_C3() const { return FPU_status & FlagWrapper<u16, 14>::mask; }
-		bool FPU_B() const { return FPU_status & FlagWrapper<u16, 15>::mask; }
+		bool FPU_I() const { return FPU_status & detail::FlagWrapper<u16, 0>::mask; }
+		bool FPU_D() const { return FPU_status & detail::FlagWrapper<u16, 1>::mask; }
+		bool FPU_Z() const { return FPU_status & detail::FlagWrapper<u16, 2>::mask; }
+		bool FPU_O() const { return FPU_status & detail::FlagWrapper<u16, 3>::mask; }
+		bool FPU_U() const { return FPU_status & detail::FlagWrapper<u16, 4>::mask; }
+		bool FPU_P() const { return FPU_status & detail::FlagWrapper<u16, 5>::mask; }
+		bool FPU_SF() const { return FPU_status & detail::FlagWrapper<u16, 6>::mask; }
+		bool FPU_IR() const { return FPU_status & detail::FlagWrapper<u16, 7>::mask; }
+		bool FPU_C0() const { return FPU_status & detail::FlagWrapper<u16, 8>::mask; }
+		bool FPU_C1() const { return FPU_status & detail::FlagWrapper<u16, 9>::mask; }
+		bool FPU_C2() const { return FPU_status & detail::FlagWrapper<u16, 10>::mask; }
+		u16 FPU_TOP() const { return (FPU_control & detail::BitfieldWrapper<u16, 11, 3>::mask) >> 11; }
+		bool FPU_C3() const { return FPU_status & detail::FlagWrapper<u16, 14>::mask; }
+		bool FPU_B() const { return FPU_status & detail::FlagWrapper<u16, 15>::mask; }
 
 		// initializes the FPU as if by the FINIT instruction.
 		void FINIT() { FPU_control = 0x3bf; FPU_status = 0; FPU_tag = 0xffff; }
@@ -648,43 +644,43 @@ namespace CSX64
 		ST_Wrapper       ST(u64 num) { return {*this, (u32)((FPU_TOP() + num) & 7)}; }
 		const_ST_Wrapper ST(u64 num) const { return {*this, (u32)((FPU_TOP() + num) & 7)}; }
 		
-		ZMMRegister       &ZMM(u64 num) { return ZMMRegisters[num]; }
-		const ZMMRegister &ZMM(u64 num) const { return ZMMRegisters[num]; }
+		detail::ZMMRegister       &ZMM(u64 num) { return ZMMRegisters[num]; }
+		const detail::ZMMRegister &ZMM(u64 num) const { return ZMMRegisters[num]; }
 
 		u32 &MXCSR() { return _MXCSR; }
 		u32  MXCSR() const { return _MXCSR; }
 
-		FlagWrapper<u32, 0> MXCSR_IE() { return {_MXCSR}; }
-		FlagWrapper<u32, 1> MXCSR_DE() { return {_MXCSR}; }
-		FlagWrapper<u32, 2> MXCSR_ZE() { return {_MXCSR}; }
-		FlagWrapper<u32, 3> MXCSR_OE() { return {_MXCSR}; }
-		FlagWrapper<u32, 4> MXCSR_UE() { return {_MXCSR}; }
-		FlagWrapper<u32, 5> MXCSR_PE() { return {_MXCSR}; }
-		FlagWrapper<u32, 6> MXCSR_DAZ() { return {_MXCSR}; }
-		FlagWrapper<u32, 7> MXCSR_IM() { return {_MXCSR}; }
-		FlagWrapper<u32, 8> MXCSR_DM() { return {_MXCSR}; }
-		FlagWrapper<u32, 9> MXCSR_ZM() { return {_MXCSR}; }
-		FlagWrapper<u32, 10> MXCSR_OM() { return {_MXCSR}; }
-		FlagWrapper<u32, 11> MXCSR_UM() { return {_MXCSR}; }
-		FlagWrapper<u32, 12> MXCSR_PM() { return {_MXCSR}; }
-		BitfieldWrapper<u32, 13, 2> MXCSR_RC() { return {_MXCSR}; }
-		FlagWrapper<u32, 15> MXCSR_FTZ() { return {_MXCSR}; }
+		detail::FlagWrapper<u32, 0> MXCSR_IE() { return {_MXCSR}; }
+		detail::FlagWrapper<u32, 1> MXCSR_DE() { return {_MXCSR}; }
+		detail::FlagWrapper<u32, 2> MXCSR_ZE() { return {_MXCSR}; }
+		detail::FlagWrapper<u32, 3> MXCSR_OE() { return {_MXCSR}; }
+		detail::FlagWrapper<u32, 4> MXCSR_UE() { return {_MXCSR}; }
+		detail::FlagWrapper<u32, 5> MXCSR_PE() { return {_MXCSR}; }
+		detail::FlagWrapper<u32, 6> MXCSR_DAZ() { return {_MXCSR}; }
+		detail::FlagWrapper<u32, 7> MXCSR_IM() { return {_MXCSR}; }
+		detail::FlagWrapper<u32, 8> MXCSR_DM() { return {_MXCSR}; }
+		detail::FlagWrapper<u32, 9> MXCSR_ZM() { return {_MXCSR}; }
+		detail::FlagWrapper<u32, 10> MXCSR_OM() { return {_MXCSR}; }
+		detail::FlagWrapper<u32, 11> MXCSR_UM() { return {_MXCSR}; }
+		detail::FlagWrapper<u32, 12> MXCSR_PM() { return {_MXCSR}; }
+		detail::BitfieldWrapper<u32, 13, 2> MXCSR_RC() { return {_MXCSR}; }
+		detail::FlagWrapper<u32, 15> MXCSR_FTZ() { return {_MXCSR}; }
 
-		bool MXCSR_IE() const { return _MXCSR & FlagWrapper<u32, 0>::mask; }
-		bool MXCSR_DE() const { return _MXCSR & FlagWrapper<u32, 1>::mask; }
-		bool MXCSR_ZE() const { return _MXCSR & FlagWrapper<u32, 2>::mask; }
-		bool MXCSR_OE() const { return _MXCSR & FlagWrapper<u32, 3>::mask; }
-		bool MXCSR_UE() const { return _MXCSR & FlagWrapper<u32, 4>::mask; }
-		bool MXCSR_PE() const { return _MXCSR & FlagWrapper<u32, 5>::mask; }
-		bool MXCSR_DAZ() const { return _MXCSR & FlagWrapper<u32, 6>::mask; }
-		bool MXCSR_IM() const { return _MXCSR & FlagWrapper<u32, 7>::mask; }
-		bool MXCSR_DM() const { return _MXCSR & FlagWrapper<u32, 8>::mask; }
-		bool MXCSR_ZM() const { return _MXCSR & FlagWrapper<u32, 9>::mask; }
-		bool MXCSR_OM() const { return _MXCSR & FlagWrapper<u32, 10>::mask; }
-		bool MXCSR_UM() const { return _MXCSR & FlagWrapper<u32, 11>::mask; }
-		bool MXCSR_PM() const { return _MXCSR & FlagWrapper<u32, 12>::mask; }
-		u32 MXCSR_RC() const { return (_MXCSR & BitfieldWrapper<u32, 13, 2>::mask) >> 13; }
-		bool MXCSR_FTZ() const { return _MXCSR & FlagWrapper<u32, 15>::mask; }
+		bool MXCSR_IE() const { return _MXCSR & detail::FlagWrapper<u32, 0>::mask; }
+		bool MXCSR_DE() const { return _MXCSR & detail::FlagWrapper<u32, 1>::mask; }
+		bool MXCSR_ZE() const { return _MXCSR & detail::FlagWrapper<u32, 2>::mask; }
+		bool MXCSR_OE() const { return _MXCSR & detail::FlagWrapper<u32, 3>::mask; }
+		bool MXCSR_UE() const { return _MXCSR & detail::FlagWrapper<u32, 4>::mask; }
+		bool MXCSR_PE() const { return _MXCSR & detail::FlagWrapper<u32, 5>::mask; }
+		bool MXCSR_DAZ() const { return _MXCSR & detail::FlagWrapper<u32, 6>::mask; }
+		bool MXCSR_IM() const { return _MXCSR & detail::FlagWrapper<u32, 7>::mask; }
+		bool MXCSR_DM() const { return _MXCSR & detail::FlagWrapper<u32, 8>::mask; }
+		bool MXCSR_ZM() const { return _MXCSR & detail::FlagWrapper<u32, 9>::mask; }
+		bool MXCSR_OM() const { return _MXCSR & detail::FlagWrapper<u32, 10>::mask; }
+		bool MXCSR_UM() const { return _MXCSR & detail::FlagWrapper<u32, 11>::mask; }
+		bool MXCSR_PM() const { return _MXCSR & detail::FlagWrapper<u32, 12>::mask; }
+		u32 MXCSR_RC() const { return (_MXCSR & detail::BitfieldWrapper<u32, 13, 2>::mask) >> 13; }
+		bool MXCSR_FTZ() const { return _MXCSR & detail::FlagWrapper<u32, 15>::mask; }
 
 	private: // -- exe tables -- //
 
@@ -878,13 +874,13 @@ namespace CSX64
 		// Performs a round trip on the value based on the specified rounding mode (as per Intel x87)
 		// val - the value to round
 		// rc  - the rounding control field
-		[[nodiscard]] static long double PerformRoundTrip(long double val, u32 rc);
+		[[nodiscard]] static fext PerformRoundTrip(fext val, u32 rc);
 
-		[[nodiscard]] bool FetchFPUBinaryFormat(u8 &s, long double &a, long double &b);
-		[[nodiscard]] bool StoreFPUBinaryFormat(u8 s, long double res);
+		[[nodiscard]] bool FetchFPUBinaryFormat(u8 &s, fext &a, fext &b);
+		[[nodiscard]] bool StoreFPUBinaryFormat(u8 s, fext res);
 
-		[[nodiscard]] bool PushFPU(long double val);
-		[[nodiscard]] bool PopFPU(long double &val);
+		[[nodiscard]] bool PushFPU(fext val);
+		[[nodiscard]] bool PopFPU(fext &val);
 		[[nodiscard]] bool PopFPU();
 
 		[[nodiscard]] bool ProcessFSTLD_WORD();
@@ -1055,26 +1051,26 @@ namespace CSX64
 		[[nodiscard]] bool TryProcessVEC_FSQRT();
 		[[nodiscard]] bool TryProcessVEC_FRSQRT();
 
-		[[nodiscard]] bool _double_to_i32(u64 &res, u64 val);
+		[[nodiscard]] bool _f64_to_i32(u64 &res, u64 val);
 		[[nodiscard]] bool _single_to_i32(u64 &res, u64 val);
 
-		[[nodiscard]] bool _double_to_i64(u64 &res, u64 val);
+		[[nodiscard]] bool _f64_to_i64(u64 &res, u64 val);
 		[[nodiscard]] bool _single_to_i64(u64 &res, u64 val);
 
-		[[nodiscard]] bool _double_to_ti32(u64 &res, u64 val);
+		[[nodiscard]] bool _f64_to_ti32(u64 &res, u64 val);
 		[[nodiscard]] bool _single_to_ti32(u64 &res, u64 val);
 
-		[[nodiscard]] bool _double_to_ti64(u64 &res, u64 val);
+		[[nodiscard]] bool _f64_to_ti64(u64 &res, u64 val);
 		[[nodiscard]] bool _single_to_ti64(u64 &res, u64 val);
 
-		[[nodiscard]] bool _i32_to_double(u64 &res, u64 val);
+		[[nodiscard]] bool _i32_to_f64(u64 &res, u64 val);
 		[[nodiscard]] bool _i32_to_single(u64 &res, u64 val);
 
-		[[nodiscard]] bool _i64_to_double(u64 &res, u64 val);
+		[[nodiscard]] bool _i64_to_f64(u64 &res, u64 val);
 		[[nodiscard]] bool _i64_to_single(u64 &res, u64 val);
 
-		[[nodiscard]] bool _double_to_single(u64 &res, u64 val);
-		[[nodiscard]] bool _single_to_double(u64 &res, u64 val);
+		[[nodiscard]] bool _f64_to_single(u64 &res, u64 val);
+		[[nodiscard]] bool _single_to_f64(u64 &res, u64 val);
 
 		[[nodiscard]] bool TryProcessVEC_CVT();
 

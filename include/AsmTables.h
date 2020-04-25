@@ -9,7 +9,7 @@
 #include "Assembly.h"
 #include "AsmArgs.h"
 
-namespace CSX64
+namespace CSX64::detail
 {
 	extern const char CommentChar;
 	extern const char LabelDefChar;

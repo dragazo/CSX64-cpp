@@ -7,7 +7,7 @@
 
 namespace fs = std::filesystem;
 
-// -- Syscall -- //
+using namespace CSX64::detail;
 
 namespace CSX64
 {

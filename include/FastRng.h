@@ -6,12 +6,12 @@
 #include "CoreTypes.h"
 #include "Utility.h"
 
-// the number of fast rng elements - must be a power of 2
-#define FAST_RNG_COUNT 16
-
-namespace CSX64
+namespace CSX64::detail
 {
-	static_assert(IsPowerOf2(FAST_RNG_COUNT), "FAST_RNG_COUNT must be a power of 2");
+	// the number of fast rng elements - must be a power of 2
+	inline constexpr std::size_t FAST_RNG_COUNT = 16;
+
+	static_assert(is_pow2(FAST_RNG_COUNT), "FAST_RNG_COUNT must be a power of 2");
 
 	// represents a fast random number generator - produces poor results but is very fast about it.
 	class FastRNG
@@ -33,8 +33,7 @@ namespace CSX64
 			std::default_random_engine rand(seed);
 			
 			// fill the random array
-			for (u64 i = 0; i < FAST_RNG_COUNT; ++i)
-				elems[i] = ((u64)rand() << 32) | rand();
+			for (u64 &v : elems) v = ((u64)rand() << 32) | rand();
 
 			// set start position
 			pos = 0;

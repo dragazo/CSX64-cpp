@@ -10,7 +10,7 @@
 #include "CoreTypes.h"
 #include "Utility.h"
 
-namespace CSX64
+namespace CSX64::detail
 {
 	// Represents an expression used to compute a value, with options for using a symbol table for lookup
 	class Expr
@@ -39,7 +39,7 @@ namespace CSX64
 
 			Neg,
 			BitNot, LogNot,
-			
+
 			// function-like operators
 
 			Int, Float, // convert int <-> float
@@ -59,6 +59,7 @@ namespace CSX64
 		static const std::unordered_map<Expr::OPs, std::string> Op_to_Str;
 
 	private:
+
 		std::string _Token;
 
 		u64 _Result;
@@ -123,7 +124,7 @@ namespace CSX64
 		// Assigns this expression to be an evaluated integer
 		void IntResult(u64 val) { CacheResult(val, false); }
 		// Assigns this expression to be an evaluated floating-point value
-		void FloatResult(double val) { CacheResult(DoubleAsUInt64(val), true); }
+		void FloatResult(f64 val) { CacheResult(transmute<u64>(val), true); }
 
 		/// <summary>
 		/// Attempts to evaluate the hole, returning true on success
@@ -189,11 +190,11 @@ namespace CSX64
 
 		static Expr CreateToken(std::string val);
 		static Expr CreateInt(u64 val);
-		static Expr CreateFloat(double val);
+		static Expr CreateFloat(f64 val);
 
 		static std::unique_ptr<Expr> NewToken(std::string val);
 		static std::unique_ptr<Expr> NewInt(u64 val);
-		static std::unique_ptr<Expr> NewFloat(double val);
+		static std::unique_ptr<Expr> NewFloat(f64 val);
 
 		// Writes a binary representation of an expression to the stream
 		static std::ostream &WriteTo(std::ostream &writer, const Expr &expr);

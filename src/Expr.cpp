@@ -1,8 +1,9 @@
 #include "../include/Expr.h"
+#include "../include/asm_common.h"
 
 // -- Expr method impl  -- //
 
-namespace CSX64
+namespace CSX64::detail
 {
 	// this maps ops to a string representation - not used for parsing
 	const std::unordered_map<Expr::OPs, std::string> Expr::Op_to_Str
@@ -150,27 +151,27 @@ namespace CSX64
 			if (std::isdigit((*tok)[0]))
 			{
 				// remove underscores (e.g. 0b_0011_1101_1101_1111) and convert to lowercase for convenience
-				std::string fixed_tok = ToLower(remove_ch((*tok), '_'));
+				std::string fixed_tok = to_lower(remove_char(*tok, '_'));
 
 				// -- try parsing as int -- //
 
 				// hex prefixes
-				if (StartsWith(fixed_tok, "0x") || StartsWith(fixed_tok, "0h")) { if (TryParseUInt64(fixed_tok.substr(2), res, 16)) break; }
+				if (starts_with(fixed_tok, "0x") || starts_with(fixed_tok, "0h")) { if (TryParseUInt64(fixed_tok.substr(2), res, 16)) break; }
 				// hex suffixes
 				else if (fixed_tok.back() == 'x' || fixed_tok.back() == 'h') { if (TryParseUInt64(fixed_tok.substr(0, fixed_tok.size() - 1), res, 16)) break; }
 
 				// dec prefixes
-				else if (StartsWith(fixed_tok, "0d") || StartsWith(fixed_tok, "0t")) { if (TryParseUInt64(fixed_tok.substr(2), res, 10)) break; }
+				else if (starts_with(fixed_tok, "0d") || starts_with(fixed_tok, "0t")) { if (TryParseUInt64(fixed_tok.substr(2), res, 10)) break; }
 				// dec suffixes
 				else if (fixed_tok.back() == 'd' || fixed_tok.back() == 't') { if (TryParseUInt64(fixed_tok.substr(0, fixed_tok.size() - 1), res, 10)) break; }
 
 				// oct prefixes
-				else if (StartsWith(fixed_tok, "0o") || StartsWith(fixed_tok, "0q")) { if (TryParseUInt64(fixed_tok.substr(2), res, 8)) break; }
+				else if (starts_with(fixed_tok, "0o") || starts_with(fixed_tok, "0q")) { if (TryParseUInt64(fixed_tok.substr(2), res, 8)) break; }
 				// oct suffixes
 				else if (fixed_tok.back() == 'o' || fixed_tok.back() == 'q') { if (TryParseUInt64(fixed_tok.substr(0, fixed_tok.size() - 1), res, 8)) break; }
 
 				// bin prefixes
-				else if (StartsWith(fixed_tok, "0b") || StartsWith(fixed_tok, "0y")) { if (TryParseUInt64(fixed_tok.substr(2), res, 2)) break; }
+				else if (starts_with(fixed_tok, "0b") || starts_with(fixed_tok, "0y")) { if (TryParseUInt64(fixed_tok.substr(2), res, 2)) break; }
 				// bin suffixes
 				else if (fixed_tok.back() == 'b' || fixed_tok.back() == 'y') { if (TryParseUInt64(fixed_tok.substr(0, fixed_tok.size() - 1), res, 2)) break; }
 
@@ -180,8 +181,8 @@ namespace CSX64
 				// -- try parsing as float -- //
 
 				// try floating-point
-				double fval;
-				if (TryParseDouble(fixed_tok, fval)) { res = DoubleAsUInt64(fval); floating = true; break; }
+				f64 fval;
+				if (TryParseDouble(fixed_tok, fval)) { res = transmute<u64>(fval); floating = true; break; }
 
 				// if nothing worked, it's an ill-formed numeric literal
 				err = "Ill-formed numeric literal encountered: \"" + (*Token()) + "\"";
@@ -192,11 +193,11 @@ namespace CSX64
 			{
 				// get the characters
 				std::string chars;
-				if (!TryExtractStringChars((*tok), chars, err)) return false;
+				if (!TryExtractStringChars(*tok, chars, err)) return false;
 
 				// must be 1-8 chars
-				if (chars.size() == 0) { err = "Ill-formed character literal encountered (empty): " + (*tok); return false; }
-				if (chars.size() > 8) { err = "Ill-formed character literal encountered (too long): " + (*tok); return false; }
+				if (chars.size() == 0) { err = "Ill-formed character literal encountered (empty): " + *tok; return false; }
+				if (chars.size() > 8) { err = "Ill-formed character literal encountered (too long): " + *tok; return false; }
 
 				res = 0; // zero res just in case that's removed from the top of the function later on
 
@@ -206,19 +207,19 @@ namespace CSX64
 				break;
 			}
 			// if it's a defined symbol we haven't already visited
-			else if (!Contains(visited, *tok) && TryGetValue(symbols, (*tok), expr))
+			else if (!contains(visited, *tok) && try_get_value(symbols, *tok, expr))
 			{
-				visited.push_back((*tok)); // mark token as visited
+				visited.push_back(*tok); // mark token as visited
 
 				// if we can't evaluate it, fail
-				if (!expr->_Evaluate(symbols, res, floating, err, visited)) { err = "Failed to evaluate referenced symbol \"" + (*tok) + "\"\n-> " + err; return false; }
+				if (!expr->_Evaluate(symbols, res, floating, err, visited)) { err = "Failed to evaluate referenced symbol \"" + *tok + "\"\n-> " + err; return false; }
 
 				visited.pop_back(); // unmark token (must be done for diamond expressions i.e. a=b+c, b=d, c=d, d=0)
 
 				break; // break so we can resolve the reference
 			}
 			// otherwise we can't evaluate it
-			else { err = "Failed to evaluate \"" + (*tok) + "\""; return false; }
+			else { err = "Failed to evaluate \"" + *tok + "\""; return false; }
 
 		// -- binary operators -- //
 
@@ -227,7 +228,7 @@ namespace CSX64
 			if (!Right->_Evaluate(symbols, R, RF, err, visited)) ret = false;
 			if (ret == false) return false;
 
-			if (LF || RF) { res = DoubleAsUInt64((LF ? AsDouble(L) : (i64)L) * (RF ? AsDouble(R) : (i64)R)); floating = true; }
+			if (LF || RF) { res = transmute<u64>((LF ? transmute<f64>(L) : (i64)L) * (RF ? transmute<f64>(R) : (i64)R)); floating = true; }
 			else res = L * R;
 			break;
 
@@ -238,13 +239,13 @@ namespace CSX64
 
 			if (LF || RF)
 			{
-				double _num = LF ? AsDouble(L) : (double)L;
-				double _denom = RF ? AsDouble(R) : (double)R;
+				f64 _num = LF ? transmute<f64>(L) : (f64)L;
+				f64 _denom = RF ? transmute<f64>(R) : (f64)R;
 
 				// catch division by zero
 				if (_denom == 0) { err = "divide by zero"; return false; }
 
-				res = DoubleAsUInt64(_num / _denom);
+				res = transmute<u64>(_num / _denom);
 				floating = true;
 			}
 			else
@@ -262,13 +263,13 @@ namespace CSX64
 
 			if (LF || RF)
 			{
-				double _num = LF ? AsDouble(L) : (double)L;
-				double _denom = RF ? AsDouble(R) : (double)R;
+				f64 _num = LF ? transmute<f64>(L) : (f64)L;
+				f64 _denom = RF ? transmute<f64>(R) : (f64)R;
 
 				// catch division by zero
 				if (_denom == 0) { err = "divide by zero"; return false; }
 
-				res = DoubleAsUInt64(std::fmod(_num, _denom));
+				res = transmute<u64>(std::fmod(_num, _denom));
 				floating = true;
 			}
 			else
@@ -286,13 +287,13 @@ namespace CSX64
 
 			if (LF || RF)
 			{
-				double _num = LF ? AsDouble(L) : (double)(i64)L;
-				double _denom = RF ? AsDouble(R) : (double)(i64)R;
+				f64 _num = LF ? transmute<f64>(L) : (f64)(i64)L;
+				f64 _denom = RF ? transmute<f64>(R) : (f64)(i64)R;
 
 				// catch division by zero
 				if (_denom == 0) { err = "divide by zero"; return false; }
 
-				res = DoubleAsUInt64(_num / _denom);
+				res = transmute<u64>(_num / _denom);
 				floating = true;
 			}
 			else
@@ -311,13 +312,13 @@ namespace CSX64
 
 			if (LF || RF)
 			{
-				double _num = LF ? AsDouble(L) : (double)(i64)L;
-				double _denom = RF ? AsDouble(R) : (double)(i64)R;
+				f64 _num = LF ? transmute<f64>(L) : (f64)(i64)L;
+				f64 _denom = RF ? transmute<f64>(R) : (f64)(i64)R;
 
 				// catch division by zero in floating case
 				if (_denom == 0) { err = "divide by zero"; return false; }
 				
-				res = DoubleAsUInt64(std::fmod(_num, _denom));
+				res = transmute<u64>(std::fmod(_num, _denom));
 				floating = true;
 			}
 			else
@@ -333,7 +334,7 @@ namespace CSX64
 			if (!Right->_Evaluate(symbols, R, RF, err, visited)) ret = false;
 			if (ret == false) return false;
 
-			if (LF || RF) { res = DoubleAsUInt64((LF ? AsDouble(L) : (i64)L) + (RF ? AsDouble(R) : (i64)R)); floating = true; }
+			if (LF || RF) { res = transmute<u64>((LF ? transmute<f64>(L) : (i64)L) + (RF ? transmute<f64>(R) : (i64)R)); floating = true; }
 			else res = L + R;
 			break;
 		case OPs::Sub:
@@ -341,7 +342,7 @@ namespace CSX64
 			if (!Right->_Evaluate(symbols, R, RF, err, visited)) ret = false;
 			if (ret == false) return false;
 
-			if (LF || RF) { res = DoubleAsUInt64((LF ? AsDouble(L) : (i64)L) - (RF ? AsDouble(R) : (i64)R)); floating = true; }
+			if (LF || RF) { res = transmute<u64>((LF ? transmute<f64>(L) : (i64)L) - (RF ? transmute<f64>(R) : (i64)R)); floating = true; }
 			else res = L - R;
 			break;
 
@@ -365,7 +366,7 @@ namespace CSX64
 			if (!Right->_Evaluate(symbols, R, RF, err, visited)) ret = false;
 			if (ret == false) return false;
 
-			if (LF || RF) res = (LF ? AsDouble(L) : (i64)L) < (RF ? AsDouble(R) : (i64)R) ? 1 : 0ul;
+			if (LF || RF) res = (LF ? transmute<f64>(L) : (i64)L) < (RF ? transmute<f64>(R) : (i64)R) ? 1 : 0ul;
 			else res = (i64)L < (i64)R ? 1 : 0ul;
 			break;
 		case OPs::LessE:
@@ -373,7 +374,7 @@ namespace CSX64
 			if (!Right->_Evaluate(symbols, R, RF, err, visited)) ret = false;
 			if (ret == false) return false;
 
-			if (LF || RF) res = (LF ? AsDouble(L) : (i64)L) <= (RF ? AsDouble(R) : (i64)R) ? 1 : 0ul;
+			if (LF || RF) res = (LF ? transmute<f64>(L) : (i64)L) <= (RF ? transmute<f64>(R) : (i64)R) ? 1 : 0ul;
 			else res = (i64)L <= (i64)R ? 1 : 0ul;
 			break;
 		case OPs::Great:
@@ -381,7 +382,7 @@ namespace CSX64
 			if (!Right->_Evaluate(symbols, R, RF, err, visited)) ret = false;
 			if (ret == false) return false;
 
-			if (LF || RF) res = (LF ? AsDouble(L) : (i64)L) > (RF ? AsDouble(R) : (i64)R) ? 1 : 0ul;
+			if (LF || RF) res = (LF ? transmute<f64>(L) : (i64)L) > (RF ? transmute<f64>(R) : (i64)R) ? 1 : 0ul;
 			else res = (i64)L > (i64)R ? 1 : 0ul;
 			break;
 		case OPs::GreatE:
@@ -389,7 +390,7 @@ namespace CSX64
 			if (!Right->_Evaluate(symbols, R, RF, err, visited)) ret = false;
 			if (ret == false) return false;
 
-			if (LF || RF) res = (LF ? AsDouble(L) : (i64)L) >= (RF ? AsDouble(R) : (i64)R) ? 1 : 0ul;
+			if (LF || RF) res = (LF ? transmute<f64>(L) : (i64)L) >= (RF ? transmute<f64>(R) : (i64)R) ? 1 : 0ul;
 			else res = (i64)L >= (i64)R ? 1 : 0ul;
 			break;
 
@@ -398,7 +399,7 @@ namespace CSX64
 			if (!Right->_Evaluate(symbols, R, RF, err, visited)) ret = false;
 			if (ret == false) return false;
 
-			if (LF || RF) res = (LF ? AsDouble(L) : (i64)L) == (RF ? AsDouble(R) : (i64)R) ? 1 : 0ul;
+			if (LF || RF) res = (LF ? transmute<f64>(L) : (i64)L) == (RF ? transmute<f64>(R) : (i64)R) ? 1 : 0ul;
 			else res = L == R ? 1 : 0ul;
 			break;
 		case OPs::Neq:
@@ -406,7 +407,7 @@ namespace CSX64
 			if (!Right->_Evaluate(symbols, R, RF, err, visited)) ret = false;
 			if (ret == false) return false;
 
-			if (LF || RF) res = (LF ? AsDouble(L) : (i64)L) != (RF ? AsDouble(R) : (i64)R) ? 1 : 0ul;
+			if (LF || RF) res = (LF ? transmute<f64>(L) : (i64)L) != (RF ? transmute<f64>(R) : (i64)R) ? 1 : 0ul;
 			else res = L != R ? 1 : 0ul;
 			break;
 
@@ -452,7 +453,7 @@ namespace CSX64
 		case OPs::Neg:
 			if (!Left->_Evaluate(symbols, L, LF, err, visited)) return false;
 
-			res = LF ? DoubleAsUInt64(-AsDouble(L)) : ~L + 1; floating = LF;
+			res = LF ? transmute<u64>(-transmute<f64>(L)) : ~L + 1; floating = LF;
 			break;
 		case OPs::BitNot:
 			if (!Left->_Evaluate(symbols, L, LF, err, visited)) return false;
@@ -469,13 +470,13 @@ namespace CSX64
 			if (!Left->_Evaluate(symbols, L, LF, err, visited)) return false;
 
 			// float converts to int, otherwise pass-through
-			res = LF ? (u64)(i64)AsDouble(L) : L;
+			res = LF ? (u64)(i64)transmute<f64>(L) : L;
 			break;
 		case OPs::Float:
 			if (!Left->_Evaluate(symbols, L, LF, err, visited)) return false;
 
 			// int converts to float, otherwise pass-through
-			res = LF ? L : DoubleAsUInt64((double)(i64)L);
+			res = LF ? L : transmute<u64>((f64)(i64)L);
 			floating = true;
 			break;
 
@@ -483,28 +484,28 @@ namespace CSX64
 			if (!Left->_Evaluate(symbols, L, LF, err, visited)) return false;
 
 			// floor the result - results in a float
-			res = DoubleAsUInt64(std::floor(LF ? AsDouble(L) : (double)(i64)L));
+			res = transmute<u64>(std::floor(LF ? transmute<f64>(L) : (f64)(i64)L));
 			floating = true;
 			break;
 		case OPs::Ceil:
 			if (!Left->_Evaluate(symbols, L, LF, err, visited)) return false;
 
 			// ceil the result - results in a float
-			res = DoubleAsUInt64(std::ceil(LF ? AsDouble(L) : (double)(i64)L));
+			res = transmute<u64>(std::ceil(LF ? transmute<f64>(L) : (f64)(i64)L));
 			floating = true;
 			break;
 		case OPs::Round:
 			if (!Left->_Evaluate(symbols, L, LF, err, visited)) return false;
 
 			// round the result - results in a float
-			res = DoubleAsUInt64(std::round(LF ? AsDouble(L) : (double)(i64)L));
+			res = transmute<u64>(std::round(LF ? transmute<f64>(L) : (f64)(i64)L));
 			floating = true;
 			break;
 		case OPs::Trunc:
 			if (!Left->_Evaluate(symbols, L, LF, err, visited)) return false;
 
 			// trunc the result - results in a float
-			res = DoubleAsUInt64(std::trunc(LF ? AsDouble(L) : (double)(i64)L));
+			res = transmute<u64>(std::trunc(LF ? transmute<f64>(L) : (f64)(i64)L));
 			floating = true;
 			break;
 
@@ -520,7 +521,7 @@ namespace CSX64
 			if (!LF) { err = "REPR32 requires a floating-point argument"; return false; }
 
 			// convert the float to a 32-bit representation
-			res = FloatAsUInt32((float)AsDouble(L));
+			res = transmute<u32>((f32)transmute<f64>(L));
 			break;
 
 		case OPs::Float64:
@@ -536,7 +537,7 @@ namespace CSX64
 			if (LF) { err = "FLOAT32 requires an integer argument"; return false; }
 
 			// convert the 32-bit representation to a float
-			res = DoubleAsUInt64((double)AsFloat((u32)L));
+			res = transmute<u64>((f64)transmute<f32>((u32)L));
 			floating = true;
 			break;
 
@@ -595,7 +596,7 @@ namespace CSX64
 		if (OP == OPs::None)
 		{
 			// if we found the value, we're done
-			if ((upper ? ToUpper(_Token) : _Token) == value) return true;
+			if ((upper ? to_upper(_Token) : _Token) == value) return true;
 		}
 		// otherwise test children
 		else
@@ -652,7 +653,7 @@ namespace CSX64
 	Expr *Expr::Find(const std::string &value, bool upper)
 	{
 		// if we're a leaf, test ourself
-		if (OP == OPs::None) return (upper ? ToUpper(_Token) : _Token) == value ? this : nullptr;
+		if (OP == OPs::None) return (upper ? to_upper(_Token) : _Token) == value ? this : nullptr;
 		// otherwise test children
 		else
 		{
@@ -778,7 +779,7 @@ namespace CSX64
 		expr.IntResult(val);
 		return expr;
 	}
-	Expr Expr::CreateFloat(double val)
+	Expr Expr::CreateFloat(f64 val)
 	{
 		Expr expr;
 		expr.FloatResult(val);
@@ -797,7 +798,7 @@ namespace CSX64
 		expr->IntResult(val);
 		return expr;
 	}
-	std::unique_ptr<Expr> Expr::NewFloat(double val)
+	std::unique_ptr<Expr> Expr::NewFloat(f64 val)
 	{
 		std::unique_ptr<Expr> expr = std::make_unique<Expr>();
 		expr->FloatResult(val);
@@ -813,7 +814,7 @@ namespace CSX64
 		if (expr.OP == OPs::None)
 		{
 			// if it's a token, write that
-			if (!expr._Token.empty()) BinWrite(writer, expr._Token);
+			if (!expr._Token.empty()) write_str(writer, expr._Token);
 			// otherwise write the cached data
 			else write<u64>(writer, expr._Result);
 		}
@@ -844,7 +845,7 @@ namespace CSX64
 		if (expr->OP == OPs::None)
 		{
 			// if it's a token, read that
-			if (type & 128) BinRead(istr, expr->_Token);
+			if (type & 128) read_str(istr, expr->_Token);
 			// otherwise read the cached data
 			else
 			{
@@ -878,7 +879,7 @@ namespace CSX64
 		if (expr.OP == Expr::OPs::None)
 		{
 			if (!expr._Token.empty()) ostr << expr._Token;
-			else if (expr._Floating) ostr << AsDouble(expr._Result);
+			else if (expr._Floating) ostr << transmute<f64>(expr._Result);
 			else ostr << (i64)expr._Result;
 		}
 		else

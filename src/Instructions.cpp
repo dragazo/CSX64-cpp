@@ -40,6 +40,8 @@
 #define MASK_UNION_15(a,b,c,d,e,f,g,h,i,j,k,l,m,n,o)   (MASK_UNION_1(a) | MASK_UNION_14(b,c,d,e,f,g,h,i,j,k,l,m,n,o))
 #define MASK_UNION_16(a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p) (MASK_UNION_1(a) | MASK_UNION_15(b,c,d,e,f,g,h,i,j,k,l,m,n,o,p))
 
+using namespace CSX64::detail;
+
 namespace CSX64
 {
     bool Computer::FetchTernaryOpFormat(u8 &s, u64 &a, u64 &b)
@@ -54,7 +56,7 @@ namespace CSX64
         }
 
         // get b (imm)
-        if (!GetMemAdv(Size(sizecode), b)) return false;
+        if (!GetMemAdv(get_size(sizecode), b)) return false;
 
         // get a (reg or mem)
         if ((s & 1) == 0)
@@ -74,7 +76,7 @@ namespace CSX64
             else a = CPURegisters[t & 15][sizecode];
             return true;
         }
-        else return GetAddressAdv(a) && GetMemRaw(a, Size(sizecode), a);
+        else return GetAddressAdv(a) && GetMemRaw(a, get_size(sizecode), a);
     }
     bool Computer::StoreTernaryOPFormat(u8 s, u64 res)
     {
@@ -233,7 +235,7 @@ namespace CSX64
             return true;
 
         case 1:
-            return GetAddressAdv(m) && (!get_a || GetMemRaw(m, Size(a_sizecode), a));
+            return GetAddressAdv(m) && (!get_a || GetMemRaw(m, get_size(a_sizecode), a));
 
         default: return true; // this should never happen but compiler is complainy
         }
@@ -251,7 +253,7 @@ namespace CSX64
             return true;
 
         case 1:
-            return SetMemRaw(m, Size(sizecode), res);
+            return SetMemRaw(m, get_size(sizecode), res);
 
         default: return true; // this can't happen but compiler is stupid
         }
@@ -287,7 +289,7 @@ namespace CSX64
             return true;
         }
         // otherwise is memory value
-        else return GetAddressAdv(m) && GetMemRaw(m, Size(sizecode), val);
+        else return GetAddressAdv(m) && GetMemRaw(m, get_size(sizecode), val);
     }
     bool Computer::StoreShiftOpFormat(u8 s, u64 m, u64 res)
     {
@@ -303,7 +305,7 @@ namespace CSX64
             return true;
         }
         // otherwise dest is memory
-        else return SetMemRaw(m, Size(sizecode), res);
+        else return SetMemRaw(m, get_size(sizecode), res);
     }
 
     bool Computer::FetchIMMRMFormat(u8 &s, u64 &a, int _a_sizecode)
@@ -329,9 +331,9 @@ namespace CSX64
             a = CPURegisters[s >> 4].x8h();
             return true;
 
-        case 2: return GetMemAdv(Size(a_sizecode), a);
+        case 2: return GetMemAdv(get_size(a_sizecode), a);
 
-        case 3: return GetAddressAdv(a) && GetMemRaw(a, Size(a_sizecode), a);
+        case 3: return GetAddressAdv(a) && GetMemRaw(a, get_size(a_sizecode), a);
         }
 
         return true;
@@ -390,7 +392,7 @@ namespace CSX64
         // otherwise b is memory
         else
         {
-            if (!GetAddressAdv(b) || !GetMemRaw(b, Size(sizecode), b)) return false;
+            if (!GetAddressAdv(b) || !GetMemRaw(b, get_size(sizecode), b)) return false;
         }
 
         return true;
@@ -409,12 +411,12 @@ namespace CSX64
         if constexpr (FlagAccessMasking)
         {
             RFLAGS() &= ~MASK_UNION_3(ZF, SF, PF);
-			RFLAGS() |= (value == 0 ? MASK_UNION_1(ZF) : 0) | (Negative(value, sizecode) ? MASK_UNION_1(SF) : 0) | (parity_table[value & 0xff] ? MASK_UNION_1(PF) : 0);
+			RFLAGS() |= (value == 0 ? MASK_UNION_1(ZF) : 0) | (negative(value, sizecode) ? MASK_UNION_1(SF) : 0) | (parity_table[value & 0xff] ? MASK_UNION_1(PF) : 0);
         }
         else
         {
             ZF() = value == 0;
-            SF() = Negative(value, sizecode);
+            SF() = negative(value, sizecode);
             PF() = parity_table[value & 0xff];
         }
     }
@@ -443,7 +445,7 @@ namespace CSX64
         case 0:
         case 1: // VM and RF flags are cleared in the stored image
         case 2:
-            return PushRaw(Size(ext + 1), RFLAGS() & ~0x30000ul);
+            return PushRaw(get_size(ext + 1), RFLAGS() & ~0x30000ul);
 
             // popf
         case 3:
@@ -451,7 +453,7 @@ namespace CSX64
         case 5:
         {
             u64 t;
-            if (!PopRaw(Size(ext - 2), t)) return false;
+            if (!PopRaw(get_size(ext - 2), t)) return false;
             RFLAGS() = (RFLAGS() & ~ModifiableFlags) | (t & ModifiableFlags);
             return true;
         }
@@ -692,9 +694,9 @@ namespace CSX64
             u64 t;
 
             // get mem value into temp_2 (address in b)
-            if (!GetAddressAdv(t) || !GetMemRaw(t, Size(sizecode), temp_2)) return false;
+            if (!GetAddressAdv(t) || !GetMemRaw(t, get_size(sizecode), temp_2)) return false;
             // store b result
-            if (!SetMemRaw(t, Size(sizecode), temp_1)) return false;
+            if (!SetMemRaw(t, get_size(sizecode), temp_1)) return false;
         }
 
         // store a's result (b's was handled internally above)
@@ -857,7 +859,7 @@ namespace CSX64
             if (sizecode == 0) { terminate_err(ErrorCode::UndefinedBehavior); return false; }
         }
 
-        return PushRaw(Size(sizecode), a);
+        return PushRaw(get_size(sizecode), a);
     }
     /*
     [4: dest][2: size][1:][1: mem]
@@ -878,7 +880,7 @@ namespace CSX64
         }
 
         // get the value
-        if (!PopRaw(Size(sizecode), val)) return false;
+        if (!PopRaw(get_size(sizecode), val)) return false;
 
         // if register
         if ((s & 1) == 0)
@@ -890,7 +892,7 @@ namespace CSX64
         else
         {
             u64 t;
-            return GetAddressAdv(t) && SetMemRaw(t, Size(sizecode), val);
+            return GetAddressAdv(t) && SetMemRaw(t, get_size(sizecode), val);
         }
     }
 
@@ -922,12 +924,12 @@ namespace CSX64
         if (!FetchBinaryOpFormat(s1, s2, m, a, b)) return false;
         u64 sizecode = (s1 >> 2) & 3;
 
-        u64 res = Truncate(a + b, sizecode);
+        u64 res = truncate(a + b, sizecode);
 
         UpdateFlagsZSP(res, sizecode);
         CF() = res < a;
         AF() = (res & 0xf) < (a & 0xf); // AF is just like CF but only the low nibble
-        OF() = Positive(a ^ b, sizecode) && Negative(a ^ res, sizecode); // overflow if sign(a)=sign(b) and sign(a)!=sign(res)
+        OF() = positive(a ^ b, sizecode) && negative(a ^ res, sizecode); // overflow if sign(a)=sign(b) and sign(a)!=sign(res)
 
         return StoreBinaryOpFormat(s1, s2, m, res);
     }
@@ -943,20 +945,20 @@ namespace CSX64
         if (!FetchBinaryOpFormat(s1, s2, m, a, b)) return false;
         u64 sizecode = (s1 >> 2) & 3;
 
-        u64 res = Truncate(a - b, sizecode);
+        u64 res = truncate(a - b, sizecode);
 
         if constexpr (FlagAccessMasking)
         {
 			RFLAGS() &= ~MASK_UNION_6(ZF, SF, PF, CF, AF, OF);
-			RFLAGS() |= (res == 0 ? MASK_UNION_1(ZF) : 0) | (Negative(res, sizecode) ? MASK_UNION_1(SF) : 0) | (parity_table[res & 0xff] ? MASK_UNION_1(PF) : 0)
-                | (a < b ? MASK_UNION_1(CF) : 0) | ((a & 0xf) < (b & 0xf) ? MASK_UNION_1(AF) : 0) | (Negative((a ^ b) & (a ^ res), sizecode) ? MASK_UNION_1(OF) : 0);
+			RFLAGS() |= (res == 0 ? MASK_UNION_1(ZF) : 0) | (negative(res, sizecode) ? MASK_UNION_1(SF) : 0) | (parity_table[res & 0xff] ? MASK_UNION_1(PF) : 0)
+                | (a < b ? MASK_UNION_1(CF) : 0) | ((a & 0xf) < (b & 0xf) ? MASK_UNION_1(AF) : 0) | (negative((a ^ b) & (a ^ res), sizecode) ? MASK_UNION_1(OF) : 0);
         }
         else
         {
             UpdateFlagsZSP(res, sizecode);
             CF() = a < b; // if a < b, a borrow was taken from the highest bit
             AF() = (a & 0xf) < (b & 0xf); // AF is just like CF but only the low nibble
-            OF() = Negative((a ^ b) & (a ^ res), sizecode); // overflow if sign(a)!=sign(b) and sign(a)!=sign(res)
+            OF() = negative((a ^ b) & (a ^ res), sizecode); // overflow if sign(a)!=sign(b) and sign(a)!=sign(res)
         }
 
         return !apply || StoreBinaryOpFormat(s1, s2, m, res);
@@ -1059,7 +1061,7 @@ namespace CSX64
         u64 sizecode = (s >> 2) & 3;
 
         // get val as sign extended
-        i64 a = SignExtend(_a, sizecode);
+        i64 a = sign_extend(_a, sizecode);
         i64 res;
 
         // switch through register sizes
@@ -1101,8 +1103,8 @@ namespace CSX64
         u64 sizecode = (s1 >> 2) & 3;
 
         // get vals as sign extended
-        i64 a = SignExtend(_a, sizecode);
-        i64 b = SignExtend(_b, sizecode);
+        i64 a = sign_extend(_a, sizecode);
+        i64 b = sign_extend(_b, sizecode);
 
         i64 res = 0;
 
@@ -1142,8 +1144,8 @@ namespace CSX64
         u64 sizecode = (s >> 2) & 3;
 
         // get vals as sign extended
-        i64 a = SignExtend(_a, sizecode);
-        i64 b = SignExtend(_b, sizecode);
+        i64 a = sign_extend(_a, sizecode);
+        i64 b = sign_extend(_b, sizecode);
 
         i64 res = 0;
 
@@ -1231,7 +1233,7 @@ namespace CSX64
         if (_a == 0) { terminate_err(ErrorCode::ArithmeticError); return false; }
 
         // get val as signed
-        i64 a = (i64)SignExtend(_a, sizecode);
+        i64 a = (i64)sign_extend(_a, sizecode);
 
         i64 full, quo, rem;
 
@@ -1281,11 +1283,11 @@ namespace CSX64
         // shift of zero is no-op
         if (count != 0)
         {
-            u64 res = Truncate(val << count, sizecode);
+            u64 res = truncate(val << count, sizecode);
 
             UpdateFlagsZSP(res, sizecode);
-            CF() = count < SizeBits(sizecode) ? ((val >> (SizeBits(sizecode) - count)) & 1) == 1 : Rand() & 1; // CF holds last bit shifted out (UND for sh >= #bits)
-            OF() = count == 1 ? Negative(res, sizecode) != CF() : Rand() & 1; // OF is 1 if top 2 bits of original value were different (UND for sh != 1)
+            CF() = count < get_size_bits(sizecode) ? ((val >> (get_size_bits(sizecode) - count)) & 1) == 1 : Rand() & 1; // CF holds last bit shifted out (UND for sh >= #bits)
+            OF() = count == 1 ? negative(res, sizecode) != CF() : Rand() & 1; // OF is 1 if top 2 bits of original value were different (UND for sh != 1)
             AF() = Rand() & 1; // AF is undefined
 
             return StoreShiftOpFormat(s, m, res);
@@ -1305,8 +1307,8 @@ namespace CSX64
             u64 res = val >> count;
 
             UpdateFlagsZSP(res, sizecode);
-            CF() = count < SizeBits(sizecode) ? ((val >> (count - 1)) & 1) == 1 : Rand() & 1; // CF holds last bit shifted out (UND for sh >= #bits)
-            OF() = count == 1 ? Negative(val, sizecode) : Rand() & 1; // OF is high bit of original value (UND for sh != 1)
+            CF() = count < get_size_bits(sizecode) ? ((val >> (count - 1)) & 1) == 1 : Rand() & 1; // CF holds last bit shifted out (UND for sh >= #bits)
+            OF() = count == 1 ? negative(val, sizecode) : Rand() & 1; // OF is high bit of original value (UND for sh != 1)
             AF() = Rand() & 1; // AF is undefined
 
             return StoreShiftOpFormat(s, m, res);
@@ -1324,11 +1326,11 @@ namespace CSX64
         // shift of zero is no-op
         if (count != 0)
         {
-            u64 res = Truncate((u64)((i64)SignExtend(val, sizecode) << count), sizecode);
+            u64 res = truncate((u64)((i64)sign_extend(val, sizecode) << count), sizecode);
 
             UpdateFlagsZSP(res, sizecode);
-            CF() = count < SizeBits(sizecode) ? ((val >> (SizeBits(sizecode) - count)) & 1) == 1 : Rand() & 1; // CF holds last bit shifted out (UND for sh >= #bits)
-            OF() = count == 1 ? Negative(res, sizecode) != CF() : Rand() & 1; // OF is 1 if top 2 bits of original value were different (UND for sh != 1)
+            CF() = count < get_size_bits(sizecode) ? ((val >> (get_size_bits(sizecode) - count)) & 1) == 1 : Rand() & 1; // CF holds last bit shifted out (UND for sh >= #bits)
+            OF() = count == 1 ? negative(res, sizecode) != CF() : Rand() & 1; // OF is 1 if top 2 bits of original value were different (UND for sh != 1)
             AF() = Rand() & 1; // AF is undefined
 
             return StoreShiftOpFormat(s, m, res);
@@ -1345,10 +1347,10 @@ namespace CSX64
         // shift of zero is no-op
         if (count != 0)
         {
-            u64 res = Truncate((u64)((i64)SignExtend(val, sizecode) >> count), sizecode);
+            u64 res = truncate((u64)((i64)sign_extend(val, sizecode) >> count), sizecode);
 
             UpdateFlagsZSP(res, sizecode);
-            CF() = count < SizeBits(sizecode) ? ((val >> (count - 1)) & 1) == 1 : Rand() & 1; // CF holds last bit shifted out (UND for sh >= #bits)
+            CF() = count < get_size_bits(sizecode) ? ((val >> (count - 1)) & 1) == 1 : Rand() & 1; // CF holds last bit shifted out (UND for sh >= #bits)
             OF() = count == 1 ? false : Rand() & 1; // OF is cleared (UND for sh != 1)
             AF() = Rand() & 1; // AF is undefined
 
@@ -1364,15 +1366,15 @@ namespace CSX64
         if (!FetchShiftOpFormat(s, m, val, count)) return false;
         u64 sizecode = (s >> 2) & 3;
 
-        count %= SizeBits(sizecode); // rotate performed modulo-n
+        count %= get_size_bits(sizecode); // rotate performed modulo-n
 
         // shift of zero is no-op
         if (count != 0)
         {
-            u64 res = Truncate((val << count) | (val >> (SizeBits(sizecode) - count)), sizecode);
+            u64 res = truncate((val << count) | (val >> (get_size_bits(sizecode) - count)), sizecode);
 
-            CF() = ((val >> (SizeBits(sizecode) - count)) & 1) == 1; // CF holds last bit shifted around
-            OF() = count == 1 ? CF() ^ Negative(res, sizecode) : Rand() & 1; // OF is xor of CF (after rotate) and high bit of result (UND if sh != 1)
+            CF() = ((val >> (get_size_bits(sizecode) - count)) & 1) == 1; // CF holds last bit shifted around
+            OF() = count == 1 ? CF() ^ negative(res, sizecode) : Rand() & 1; // OF is xor of CF (after rotate) and high bit of result (UND if sh != 1)
 
             return StoreShiftOpFormat(s, m, res);
         }
@@ -1385,15 +1387,15 @@ namespace CSX64
         if (!FetchShiftOpFormat(s, m, val, count)) return false;
         u64 sizecode = (s >> 2) & 3;
 
-        count %= SizeBits(sizecode); // rotate performed modulo-n
+        count %= get_size_bits(sizecode); // rotate performed modulo-n
 
         // shift of zero is no-op
         if (count != 0)
         {
-            u64 res = Truncate((val >> count) | (val << (SizeBits(sizecode) - count)), sizecode);
+            u64 res = truncate((val >> count) | (val << (get_size_bits(sizecode) - count)), sizecode);
 
             CF() = ((val >> (count - 1)) & 1) == 1; // CF holds last bit shifted around
-            OF() = count == 1 ? Negative(res, sizecode) ^ (((res >> (SizeBits(sizecode) - 2)) & 1) != 0) : Rand() & 1; // OF is xor of 2 highest bits of result
+            OF() = count == 1 ? negative(res, sizecode) ^ (((res >> (get_size_bits(sizecode) - 2)) & 1) != 0) : Rand() & 1; // OF is xor of 2 highest bits of result
 
             return StoreShiftOpFormat(s, m, res);
         }
@@ -1407,13 +1409,13 @@ namespace CSX64
         if (!FetchShiftOpFormat(s, m, val, count)) return false;
         u64 sizecode = (s >> 2) & 3;
 
-        count %= SizeBits(sizecode) + 1; // rotate performed modulo-n+1
+        count %= get_size_bits(sizecode) + 1; // rotate performed modulo-n+1
 
         // shift of zero is no-op
         if (count != 0)
         {
             u64 res = val, temp;
-            u64 high_mask = (u64)1 << (SizeBits(sizecode) - 1); // mask for highest bit
+            u64 high_mask = (u64)1 << (get_size_bits(sizecode) - 1); // mask for highest bit
             for (u16 i = 0; i < count; ++i)
             {
                 temp = res << 1; // shift res left by 1, store in temp
@@ -1422,7 +1424,7 @@ namespace CSX64
                 res = temp; // store back to res
             }
 
-            OF() = count == 1 ? CF() ^ Negative(res, sizecode) : Rand() & 1; // OF is xor of CF (after rotate) and high bit of result (UND if sh != 1)
+            OF() = count == 1 ? CF() ^ negative(res, sizecode) : Rand() & 1; // OF is xor of CF (after rotate) and high bit of result (UND if sh != 1)
 
             return StoreShiftOpFormat(s, m, res);
         }
@@ -1435,13 +1437,13 @@ namespace CSX64
         if (!FetchShiftOpFormat(s, m, val, count)) return false;
         u64 sizecode = (s >> 2) & 3;
 
-        count %= SizeBits(sizecode) + 1; // rotate performed modulo-n+1
+        count %= get_size_bits(sizecode) + 1; // rotate performed modulo-n+1
 
         // shift of zero is no-op
         if (count != 0)
         {
             u64 res = val, temp;
-            u64 high_mask = (u64)1 << (SizeBits(sizecode) - 1); // mask for highest bit
+            u64 high_mask = (u64)1 << (get_size_bits(sizecode) - 1); // mask for highest bit
             for (u16 i = 0; i < count; ++i)
             {
                 temp = res >> 1; // shift res right by 1, store in temp
@@ -1450,7 +1452,7 @@ namespace CSX64
                 res = temp; // store back to res
             }
 
-            OF() = count == 1 ? Negative(res, sizecode) ^ (((res >> (SizeBits(sizecode) - 2)) & 1) != 0) : Rand() & 1; // OF is xor of 2 highest bits of result
+            OF() = count == 1 ? negative(res, sizecode) ^ (((res >> (get_size_bits(sizecode) - 2)) & 1) != 0) : Rand() & 1; // OF is xor of 2 highest bits of result
 
             return StoreShiftOpFormat(s, m, res);
         }
@@ -1518,19 +1520,19 @@ namespace CSX64
         if (!FetchUnaryOpFormat(s, m, a)) return false;
         u64 sizecode = (s >> 2) & 3;
 
-        u64 res = Truncate(a + 1, sizecode);
+        u64 res = truncate(a + 1, sizecode);
 
         if constexpr (FlagAccessMasking)
         {
 			RFLAGS() &= ~MASK_UNION_5(ZF, SF, PF, AF, OF);
-			RFLAGS() |= (res == 0 ? MASK_UNION_1(ZF) : 0) | (Negative(res, sizecode) ? MASK_UNION_1(SF) : 0) | (parity_table[res & 0xff] ? MASK_UNION_1(PF) : 0)
-                | ((res & 0xf) == 0 ? MASK_UNION_1(AF) : 0) | (Positive(a, sizecode) && Negative(res, sizecode) ? MASK_UNION_1(OF) : 0);
+			RFLAGS() |= (res == 0 ? MASK_UNION_1(ZF) : 0) | (negative(res, sizecode) ? MASK_UNION_1(SF) : 0) | (parity_table[res & 0xff] ? MASK_UNION_1(PF) : 0)
+                | ((res & 0xf) == 0 ? MASK_UNION_1(AF) : 0) | (positive(a, sizecode) && negative(res, sizecode) ? MASK_UNION_1(OF) : 0);
         }
         else
         {
             UpdateFlagsZSP(res, sizecode);
             AF() = (res & 0xf) == 0; // low nibble of 0 was a nibble overflow (TM)
-            OF() = Positive(a, sizecode) && Negative(res, sizecode); // + -> - is overflow
+            OF() = positive(a, sizecode) && negative(res, sizecode); // + -> - is overflow
         }
 
         return StoreUnaryOpFormat(s, m, res);
@@ -1542,19 +1544,19 @@ namespace CSX64
         if (!FetchUnaryOpFormat(s, m, a)) return false;
         u64 sizecode = (s >> 2) & 3;
 
-        u64 res = Truncate(a - 1, sizecode);
+        u64 res = truncate(a - 1, sizecode);
 
         if constexpr (FlagAccessMasking)
         {
 			RFLAGS() &= ~MASK_UNION_5(ZF, SF, PF, AF, OF);
-			RFLAGS() |= (res == 0 ? MASK_UNION_1(ZF) : 0) | (Negative(res, sizecode) ? MASK_UNION_1(SF) : 0) | (parity_table[res & 0xff] ? MASK_UNION_1(PF) : 0)
-                | ((a & 0xf) == 0 ? MASK_UNION_1(AF) : 0) | (Negative(a, sizecode) && Positive(res, sizecode) ? MASK_UNION_1(OF) : 0);
+			RFLAGS() |= (res == 0 ? MASK_UNION_1(ZF) : 0) | (negative(res, sizecode) ? MASK_UNION_1(SF) : 0) | (parity_table[res & 0xff] ? MASK_UNION_1(PF) : 0)
+                | ((a & 0xf) == 0 ? MASK_UNION_1(AF) : 0) | (negative(a, sizecode) && positive(res, sizecode) ? MASK_UNION_1(OF) : 0);
         }
         else
         {
             UpdateFlagsZSP(res, sizecode);
             AF() = (a & 0xf) == 0; // nibble a = 0 results in borrow from the low nibble
-            OF() = Negative(a, sizecode) && Positive(res, sizecode); // - -> + is overflow
+            OF() = negative(a, sizecode) && positive(res, sizecode); // - -> + is overflow
         }
 
         return StoreUnaryOpFormat(s, m, res);
@@ -1567,12 +1569,12 @@ namespace CSX64
         if (!FetchUnaryOpFormat(s, m, a)) return false;
         u64 sizecode = (s >> 2) & 3;
 
-        u64 res = Truncate(0 - a, sizecode);
+        u64 res = truncate(0 - a, sizecode);
 
         UpdateFlagsZSP(res, sizecode);
         CF() = 0 < a; // if 0 < a, a borrow was taken from the highest bit (see SUB code where a=0, b=a)
         AF() = 0 < (a & 0xf); // AF is just like CF but only the low nibble
-        OF() = Negative(a, sizecode) && Negative(res, sizecode);
+        OF() = negative(a, sizecode) && negative(res, sizecode);
 
         return StoreUnaryOpFormat(s, m, res);
     }
@@ -1583,7 +1585,7 @@ namespace CSX64
         if (!FetchUnaryOpFormat(s, m, a)) return false;
         u64 sizecode = (s >> 2) & 3;
 
-        u64 res = Truncate(~a, sizecode);
+        u64 res = truncate(~a, sizecode);
 
         return StoreUnaryOpFormat(s, m, res);
     }
@@ -1626,8 +1628,8 @@ namespace CSX64
         if (!FetchBinaryOpFormat(s1, s2, m, a, b, true, -1, 1)) return false;
         u64 sizecode = (s1 >> 2) & 3;
 
-        int pos = (int)((b >> 8) % SizeBits(sizecode));
-        int len = (int)((b & 0xff) % SizeBits(sizecode));
+        int pos = (int)((b >> 8) % get_size_bits(sizecode));
+        int len = (int)((b & 0xff) % get_size_bits(sizecode));
 
         u64 res = (a >> pos) & (((u64)1 << len) - 1);
 
@@ -1648,7 +1650,7 @@ namespace CSX64
         u64 res = a & (~a + 1);
 
         ZF() = res == 0;
-        SF() = Negative(res, sizecode);
+        SF() = negative(res, sizecode);
         CF() = a != 0;
         OF() = false;
 		RFLAGS() ^= Rand() & MASK_UNION_2(AF, PF);
@@ -1662,9 +1664,9 @@ namespace CSX64
         if (!FetchUnaryOpFormat(s, m, a)) return false;
         u64 sizecode = (s >> 2) & 3;
 
-        u64 res = Truncate(a ^ (a - 1), sizecode);
+        u64 res = truncate(a ^ (a - 1), sizecode);
 
-        SF() = Negative(res, sizecode);
+        SF() = negative(res, sizecode);
         CF() = a == 0;
         ZF() = OF() = false;
 		RFLAGS() ^= Rand() & MASK_UNION_2(AF, PF);
@@ -1681,7 +1683,7 @@ namespace CSX64
         u64 res = a & (a - 1);
 
         ZF() = res == 0;
-        SF() = Negative(res, sizecode);
+        SF() = negative(res, sizecode);
         CF() = a == 0;
         OF() = false;
 		RFLAGS() ^= Rand() & MASK_UNION_2(AF, PF);
@@ -1704,7 +1706,7 @@ namespace CSX64
         u64 res = ~a & b;
 
         ZF() = res == 0;
-        SF() = Negative(res, sizecode);
+        SF() = negative(res, sizecode);
         OF() = false;
         CF() = false;
 		RFLAGS() ^= Rand() & MASK_UNION_2(AF, PF);
@@ -1729,7 +1731,7 @@ namespace CSX64
         if (!FetchBinaryOpFormat(s1, s2, m, a, b, true, -1, 0, false)) return false;
         u64 sizecode = (s1 >> 2) & 3;
 
-        u64 mask = (u64)1 << (b % SizeBits(sizecode)); // performed modulo-n
+        u64 mask = (u64)1 << (b % get_size_bits(sizecode)); // performed modulo-n
 
         CF() = (a & mask) != 0;
 		RFLAGS() ^= Rand() & MASK_UNION_4(OF, SF, AF, PF);
@@ -1843,16 +1845,16 @@ namespace CSX64
         switch (s1 & 15)
         {
         case 0: CPURegisters[s1 >> 4].x16() = (u16)src; break;
-        case 1: CPURegisters[s1 >> 4].x16() = (u16)SignExtend(src, 0); break;
+        case 1: CPURegisters[s1 >> 4].x16() = (u16)sign_extend(src, 0); break;
 
         case 2: case 3: CPURegisters[s1 >> 4].x32() = (u32)src; break;
-        case 4: CPURegisters[s1 >> 4].x32() = (u32)SignExtend(src, 0); break;
-        case 5: CPURegisters[s1 >> 4].x32() = (u32)SignExtend(src, 1); break;
+        case 4: CPURegisters[s1 >> 4].x32() = (u32)sign_extend(src, 0); break;
+        case 5: CPURegisters[s1 >> 4].x32() = (u32)sign_extend(src, 1); break;
 
         case 6: case 7: CPURegisters[s1 >> 4].x64() = src; break;
-        case 8: CPURegisters[s1 >> 4].x64() = SignExtend(src, 0); break;
-        case 9: CPURegisters[s1 >> 4].x64() = SignExtend(src, 1); break;
-        case 10: CPURegisters[s1 >> 4].x64() = SignExtend(src, 2); break;
+        case 8: CPURegisters[s1 >> 4].x64() = sign_extend(src, 0); break;
+        case 9: CPURegisters[s1 >> 4].x64() = sign_extend(src, 1); break;
+        case 10: CPURegisters[s1 >> 4].x64() = sign_extend(src, 2); break;
         }
 
         return true;
@@ -1884,7 +1886,7 @@ namespace CSX64
         default: terminate_err(ErrorCode::UndefinedBehavior); return false;
         }
 
-        res = Truncate(res, sizecode);
+        res = truncate(res, sizecode);
 
         switch (ext)
         {
@@ -1892,13 +1894,13 @@ namespace CSX64
             CF() = res < a;
             UpdateFlagsZSP(res, sizecode);
             AF() = (res & 0xf) < (a & 0xf); // AF is just like CF but only the low nibble
-            OF() = Positive(a, sizecode) == Positive(b, sizecode) && Positive(a, sizecode) != Positive(res, sizecode);
+            OF() = positive(a, sizecode) == positive(b, sizecode) && positive(a, sizecode) != positive(res, sizecode);
             break;
         case 1:
             CF() = res < a;
             break;
         case 2:
-            OF() = Positive(a, sizecode) == Positive(b, sizecode) && Positive(a, sizecode) != Positive(res, sizecode);
+            OF() = positive(a, sizecode) == positive(b, sizecode) && positive(a, sizecode) != positive(res, sizecode);
             break;
         }
 
@@ -2023,7 +2025,7 @@ namespace CSX64
     // helper for MOVS - performs the actual move
     bool Computer::_ProcessSTRING_MOVS(u64 sizecode)
     {
-        u64 size = Size(sizecode);
+        u64 size = get_size(sizecode);
         u64 temp;
 
         if (!GetMemRaw(RSI(), size, temp) || !SetMemRaw(RDI(), size, temp)) return false;
@@ -2035,7 +2037,7 @@ namespace CSX64
     }
     bool Computer::_ProcessSTRING_CMPS(u64 sizecode)
     {
-        u64 size = Size(sizecode);
+        u64 size = get_size(sizecode);
         u64 a, b;
 
         if (!GetMemRaw(RSI(), size, a) || !GetMemRaw(RDI(), size, b)) return false;
@@ -2043,19 +2045,19 @@ namespace CSX64
         if (DF()) { RSI() -= size; RDI() -= size; }
         else { RSI() += size; RDI() += size; }
 
-        u64 res = Truncate(a - b, sizecode);
+        u64 res = truncate(a - b, sizecode);
 
         // update flags
         UpdateFlagsZSP(res, sizecode);
         CF() = a < b; // if a < b, a borrow was taken from the highest bit
         AF() = (a & 0xf) < (b & 0xf); // AF is just like CF but only the low nibble
-        OF() = Negative(a ^ b, sizecode) && Negative(a ^ res, sizecode); // overflow if sign(a)!=sign(b) and sign(a)!=sign(res)
+        OF() = negative(a ^ b, sizecode) && negative(a ^ res, sizecode); // overflow if sign(a)!=sign(b) and sign(a)!=sign(res)
 
         return true;
     }
     bool Computer::_ProcessSTRING_LODS(u64 sizecode)
     {
-        u64 size = Size(sizecode);
+        u64 size = get_size(sizecode);
         u64 temp;
 
         if (!GetMemRaw(RSI(), size, temp)) return false;
@@ -2069,7 +2071,7 @@ namespace CSX64
     }
     bool Computer::_ProcessSTRING_STOS(u64 sizecode)
     {
-        u64 size = Size(sizecode);
+        u64 size = get_size(sizecode);
 
         if (!SetMemRaw(RDI(), size, CPURegisters[0][sizecode])) return false;
 
@@ -2080,19 +2082,19 @@ namespace CSX64
     }
     bool Computer::_ProcessSTRING_SCAS(u64 sizecode)
     {
-        u64 size = Size(sizecode);
+        u64 size = get_size(sizecode);
         u64 a = CPURegisters[0][sizecode];
         u64 b;
 
         if (!GetMemRaw(RDI(), size, b)) return false;
 
-        u64 res = Truncate(a - b, sizecode);
+        u64 res = truncate(a - b, sizecode);
 
         // update flags
         UpdateFlagsZSP(res, sizecode);
         CF() = a < b; // if a < b, a borrow was taken from the highest bit
         AF() = (a & 0xf) < (b & 0xf); // AF is just like CF but only the low nibble
-        OF() = Negative(a ^ b, sizecode) && Negative(a ^ res, sizecode); // overflow if sign(a)!=sign(b) and sign(a)!=sign(res)
+        OF() = negative(a ^ b, sizecode) && negative(a ^ res, sizecode); // overflow if sign(a)!=sign(b) and sign(a)!=sign(res)
 
         if (DF()) RDI() -= size;
         else RDI() += size;
@@ -2305,7 +2307,7 @@ namespace CSX64
         // if src is mem
         if (s & 64)
         {
-            if (!GetAddressAdv(src) || !GetMemRaw(src, Size(sizecode), src)) return false;
+            if (!GetAddressAdv(src) || !GetMemRaw(src, get_size(sizecode), src)) return false;
         }
         // otherwise src is reg
         else
@@ -2333,7 +2335,7 @@ namespace CSX64
         else
         {
             ZF() = false;
-            res = Sizecode(s & 128 ? IsolateLowBit(src) : IsolateHighBit(src));
+            res = get_sizecode(s & 128 ? isolate_low_bit(src) : isolate_high_bit(src));
         }
 
         // update dest and flags
@@ -2353,13 +2355,13 @@ namespace CSX64
         if (src == 0)
         {
             CF() = true;
-            res = SizeBits(sizecode); // result is operand size (in bits) in this case
+            res = get_size_bits(sizecode); // result is operand size (in bits) in this case
         }
         // otherwise perform the search
         else
         {
             CF() = false;
-            res = Sizecode(IsolateLowBit(src));
+            res = get_sizecode(isolate_low_bit(src));
         }
 
         // update dest and flags
@@ -2421,7 +2423,7 @@ namespace CSX64
         return true;
     }
 
-    long double Computer::PerformRoundTrip(long double val, u32 rc)
+    fext Computer::PerformRoundTrip(fext val, u32 rc)
     {
         switch (rc)
         {
@@ -2445,7 +2447,7 @@ namespace CSX64
     mode = 6: st(0) <- f(st(0), int32M)
     else UND
     */
-    bool Computer::FetchFPUBinaryFormat(u8 &s, long double &a, long double &b)
+    bool Computer::FetchFPUBinaryFormat(u8 &s, fext &a, fext &b)
     {
         u64 m;
         if (!GetMemAdv<u8>(s)) return false;
@@ -2467,16 +2469,16 @@ namespace CSX64
             if (!GetAddressAdv(m)) return false;
             switch (s & 7)
             {
-            case 3: if (u32 t; read_mem<u32>(m, t)) b = (long double)AsFloat(t); else return false; return true;
-            case 4: if (u64 t; read_mem<u64>(m, t)) b = (long double)AsDouble(t); else return false; return true;
-            case 5: if (u16 t; read_mem<u16>(m, t)) b = (long double)(i64)(i16)t; else return false; return true;
-            case 6: if (u32 t; read_mem<u32>(m, t)) b = (long double)(i64)(i32)t; else return false; return true;
+            case 3: if (u32 t; read_mem<u32>(m, t)) b = (fext)transmute<f32>(t); else return false; return true;
+            case 4: if (u64 t; read_mem<u64>(m, t)) b = (fext)transmute<f64>(t); else return false; return true;
+            case 5: if (u16 t; read_mem<u16>(m, t)) b = (fext)(i64)(i16)t; else return false; return true;
+            case 6: if (u32 t; read_mem<u32>(m, t)) b = (fext)(i64)(i32)t; else return false; return true;
 
             default: terminate_err(ErrorCode::UndefinedBehavior); return false;
             }
         }
     }
-    bool Computer::StoreFPUBinaryFormat(u8 s, long double res)
+    bool Computer::StoreFPUBinaryFormat(u8 s, fext res)
     {
         switch (s & 7)
         {
@@ -2487,7 +2489,7 @@ namespace CSX64
         }
     }
 
-    bool Computer::PushFPU(long double val)
+    bool Computer::PushFPU(fext val)
 	{
         // decrement top (wraps automatically as a 3-bit unsigned value)
         --FPU_TOP();
@@ -2500,7 +2502,7 @@ namespace CSX64
 
         return true;
     }
-    bool Computer::PopFPU(long double &val)
+    bool Computer::PopFPU(fext &val)
     {
         // if this register is not in use, it's an error
         if (ST(0).Empty()) { terminate_err(ErrorCode::FPUStackUnderflow); return false; }
@@ -2516,7 +2518,7 @@ namespace CSX64
     }
     bool Computer::PopFPU()
     {
-        long double _;
+        fext _;
         return PopFPU(_);
     }
 
@@ -2575,15 +2577,15 @@ namespace CSX64
             if (!write_mem<u32>(m + 20, (u32)m)) return false;
             if (!write_mem<u16>(m + 24, (u16)0)) return false;
 
-            // for cross-platformability/speed, writes native double instead of some tword hacks
-            if (!write_mem<u64>(m + 28, DoubleAsUInt64((double)ST(0)))) return false;
-            if (!write_mem<u64>(m + 38, DoubleAsUInt64((double)ST(1)))) return false;
-            if (!write_mem<u64>(m + 48, DoubleAsUInt64((double)ST(2)))) return false;
-            if (!write_mem<u64>(m + 58, DoubleAsUInt64((double)ST(3)))) return false;
-            if (!write_mem<u64>(m + 68, DoubleAsUInt64((double)ST(4)))) return false;
-            if (!write_mem<u64>(m + 78, DoubleAsUInt64((double)ST(5)))) return false;
-            if (!write_mem<u64>(m + 88, DoubleAsUInt64((double)ST(6)))) return false;
-            if (!write_mem<u64>(m + 98, DoubleAsUInt64((double)ST(7)))) return false;
+            // for cross-platformability/speed, writes native f64 instead of some tword hacks
+            if (!write_mem<u64>(m + 28, transmute<u64>((f64)ST(0)))) return false;
+            if (!write_mem<u64>(m + 38, transmute<u64>((f64)ST(1)))) return false;
+            if (!write_mem<u64>(m + 48, transmute<u64>((f64)ST(2)))) return false;
+            if (!write_mem<u64>(m + 58, transmute<u64>((f64)ST(3)))) return false;
+            if (!write_mem<u64>(m + 68, transmute<u64>((f64)ST(4)))) return false;
+            if (!write_mem<u64>(m + 78, transmute<u64>((f64)ST(5)))) return false;
+            if (!write_mem<u64>(m + 88, transmute<u64>((f64)ST(6)))) return false;
+            if (!write_mem<u64>(m + 98, transmute<u64>((f64)ST(7)))) return false;
 
             // after storing fpu state, re-initializes
             FINIT();
@@ -2593,17 +2595,17 @@ namespace CSX64
             if (!read_mem<u16>(m + 4, FPU_status)) return false;
             if (!read_mem<u16>(m + 8, FPU_tag)) return false;
 
-            // for cross-platformability/speed, reads native double instead of some tword hacks
+            // for cross-platformability/speed, reads native f64 instead of some tword hacks
             {
                 u64 t;
-                if (!read_mem<u64>(m + 28, t)) { return false; } ST(0) = AsDouble(t);
-                if (!read_mem<u64>(m + 38, t)) { return false; } ST(1) = AsDouble(t);
-                if (!read_mem<u64>(m + 48, t)) { return false; } ST(2) = AsDouble(t);
-                if (!read_mem<u64>(m + 58, t)) { return false; } ST(3) = AsDouble(t);
-                if (!read_mem<u64>(m + 68, t)) { return false; } ST(4) = AsDouble(t);
-                if (!read_mem<u64>(m + 78, t)) { return false; } ST(5) = AsDouble(t);
-                if (!read_mem<u64>(m + 88, t)) { return false; } ST(6) = AsDouble(t);
-                if (!read_mem<u64>(m + 98, t)) { return false; } ST(7) = AsDouble(t);
+                if (!read_mem<u64>(m + 28, t)) { return false; } ST(0) = transmute<f64>(t);
+                if (!read_mem<u64>(m + 38, t)) { return false; } ST(1) = transmute<f64>(t);
+                if (!read_mem<u64>(m + 48, t)) { return false; } ST(2) = transmute<f64>(t);
+                if (!read_mem<u64>(m + 58, t)) { return false; } ST(3) = transmute<f64>(t);
+                if (!read_mem<u64>(m + 68, t)) { return false; } ST(4) = transmute<f64>(t);
+                if (!read_mem<u64>(m + 78, t)) { return false; } ST(5) = transmute<f64>(t);
+                if (!read_mem<u64>(m + 88, t)) { return false; } ST(6) = transmute<f64>(t);
+                if (!read_mem<u64>(m + 98, t)) { return false; } ST(7) = transmute<f64>(t);
             }
 
             return true;
@@ -2679,12 +2681,12 @@ namespace CSX64
             if (!GetAddressAdv(m)) return false;
             switch (s & 7)
             {
-            case 1: { u32 t; return read_mem<u32>(m, t) && PushFPU((long double)AsFloat(t)); }
-            case 2: { u64 t; return read_mem<u64>(m, t) && PushFPU((long double)AsDouble(t)); }
+            case 1: { u32 t; return read_mem<u32>(m, t) && PushFPU((fext)transmute<f32>(t)); }
+            case 2: { u64 t; return read_mem<u64>(m, t) && PushFPU((fext)transmute<f64>(t)); }
 
-            case 3: { u16 t; return read_mem<u16>(m, t) && PushFPU((long double)(i64)(i16)t); }
-            case 4: { u32 t; return read_mem<u32>(m, t) && PushFPU((long double)(i64)(i32)t); }
-            case 5: { u64 t; return read_mem<u64>(m, t) && PushFPU((long double)(i64)t); }
+            case 3: { u16 t; return read_mem<u16>(m, t) && PushFPU((fext)(i64)(i16)t); }
+            case 4: { u32 t; return read_mem<u32>(m, t) && PushFPU((fext)(i64)(i32)t); }
+            case 5: { u64 t; return read_mem<u64>(m, t) && PushFPU((fext)(i64)t); }
 
             default: terminate_err(ErrorCode::UndefinedBehavior); return false;
             }
@@ -2732,8 +2734,8 @@ namespace CSX64
             if (!GetAddressAdv(m)) return false;
             switch (s & 15)
             {
-            case 2: case 3: if (!write_mem<u32>(m, FloatAsUInt32((float)ST(0)))) return false; break;
-            case 4: case 5: if (!write_mem<u64>(m, DoubleAsUInt64((double)ST(0)))) return false; break;
+            case 2: case 3: if (!write_mem<u32>(m, transmute<u32>((f32)ST(0)))) return false; break;
+            case 4: case 5: if (!write_mem<u64>(m, transmute<u64>((f64)ST(0)))) return false; break;
             case 6: case 7: if (!write_mem<u16>(m, (u16)(u64)(i64)PerformRoundTrip(ST(0), FPU_RC()))) return false; break;
             case 8: case 9: if (!write_mem<u32>(m, (u32)(u64)(i64)PerformRoundTrip(ST(0), FPU_RC()))) return false; break;
             case 10: if (!write_mem<u64>(m, (u64)(i64)PerformRoundTrip(ST(0), FPU_RC()))) return false; break;
@@ -2761,7 +2763,7 @@ namespace CSX64
         // make sure they're both in use
         if (ST(0).Empty() || ST(i).Empty()) { terminate_err(ErrorCode::FPUAccessViolation); return false; }
 
-        long double temp = ST(0);
+        fext temp = ST(0);
         ST(0) = ST(i);
         ST(i) = temp;
 
@@ -2818,10 +2820,10 @@ namespace CSX64
     bool Computer::ProcessFADD()
     {
         u8 s;
-        long double a, b;
+        fext a, b;
         if (!FetchFPUBinaryFormat(s, a, b)) return false;
 
-        long double res = a + b;
+        fext res = a + b;
 
         FPU_status ^= Rand() & MASK_UNION_4(FPU_C0, FPU_C1, FPU_C2, FPU_C3);
 
@@ -2830,10 +2832,10 @@ namespace CSX64
     bool Computer::ProcessFSUB()
     {
         u8 s;
-        long double a, b;
+        fext a, b;
         if (!FetchFPUBinaryFormat(s, a, b)) return false;
 
-        long double res = a - b;
+        fext res = a - b;
 
         FPU_status ^= Rand() & MASK_UNION_4(FPU_C0, FPU_C1, FPU_C2, FPU_C3);
 
@@ -2842,10 +2844,10 @@ namespace CSX64
     bool Computer::ProcessFSUBR()
     {
         u8 s;
-        long double a, b;
+        fext a, b;
         if (!FetchFPUBinaryFormat(s, a, b)) return false;
 
-        long double res = b - a;
+        fext res = b - a;
 
         FPU_status ^= Rand() & MASK_UNION_4(FPU_C0, FPU_C1, FPU_C2, FPU_C3);
 
@@ -2855,10 +2857,10 @@ namespace CSX64
     bool Computer::ProcessFMUL()
     {
         u8 s;
-        long double a, b;
+        fext a, b;
         if (!FetchFPUBinaryFormat(s, a, b)) return false;
 
-        long double res = a * b;
+        fext res = a * b;
 
         FPU_status ^= Rand() & MASK_UNION_4(FPU_C0, FPU_C1, FPU_C2, FPU_C3);
 
@@ -2867,10 +2869,10 @@ namespace CSX64
     bool Computer::ProcessFDIV()
     {
         u8 s;
-        long double a, b;
+        fext a, b;
         if (!FetchFPUBinaryFormat(s, a, b)) return false;
 
-        long double res = a / b;
+        fext res = a / b;
 
         FPU_status ^= Rand() & MASK_UNION_4(FPU_C0, FPU_C1, FPU_C2, FPU_C3);
 
@@ -2879,10 +2881,10 @@ namespace CSX64
     bool Computer::ProcessFDIVR()
     {
         u8 s;
-        long double a, b;
+        fext a, b;
         if (!FetchFPUBinaryFormat(s, a, b)) return false;
 
-        long double res = b / a;
+        fext res = b / a;
 
         FPU_status ^= Rand() & MASK_UNION_4(FPU_C0, FPU_C1, FPU_C2, FPU_C3);
 
@@ -2894,7 +2896,7 @@ namespace CSX64
         if (ST(0).Empty()) { terminate_err(ErrorCode::FPUAccessViolation); return false; }
 
         // get the value
-        double val = ST(0);
+        f64 val = ST(0);
         // val must be in range [-1, 1]
         if (val < -1 || val > 1) { terminate_err(ErrorCode::FPUError); return false; }
 
@@ -2930,17 +2932,17 @@ namespace CSX64
     {
         if (ST(0).Empty() || ST(1).Empty()) { terminate_err(ErrorCode::FPUAccessViolation); return false; }
 
-        long double a = ST(0);
-        long double b = ST(1);
+        fext a = ST(0);
+        fext b = ST(1);
 
         // compute remainder with truncation
-		long double res = std::fmod(a, b);
+		fext res = std::fmod(a, b);
 
         // store value
         ST(0) = res;
 
         // get the bits
-        u64 bits = DoubleAsUInt64(res);
+        u64 bits = transmute<u64>((f64)res);
 
         FPU_C0() = (bits & 4) != 0;
         FPU_C1() = (bits & 1) != 0;
@@ -2953,17 +2955,17 @@ namespace CSX64
     {
         if (ST(0).Empty() || ST(1).Empty()) { terminate_err(ErrorCode::FPUAccessViolation); return false; }
 
-        long double a = ST(0);
-        long double b = ST(1);
+        fext a = ST(0);
+        fext b = ST(1);
 
         // compute remainder with rounding
-		long double res = std::remainder(a, b);
+		fext res = std::remainder(a, b);
 
         // store value
         ST(0) = res;
 
         // get the bits - should be from 80-bit fp, but we have no control over that :(
-        u64 bits = DoubleAsUInt64(res);
+        u64 bits = transmute<u64>((f64)res);
 
         FPU_C0() = (bits & 4) != 0;
         FPU_C1() = (bits & 1) != 0;
@@ -2976,8 +2978,8 @@ namespace CSX64
     {
         if (ST(0).Empty()) { terminate_err(ErrorCode::FPUAccessViolation); return false; }
 
-        long double val = ST(0);
-        long double res = PerformRoundTrip(val, FPU_RC());
+        fext val = ST(0);
+        fext res = PerformRoundTrip(val, FPU_RC());
 
         ST(0) = res;
 
@@ -3000,8 +3002,8 @@ namespace CSX64
     {
         if (ST(0).Empty() || ST(1).Empty()) { terminate_err(ErrorCode::FPUAccessViolation); return false; }
 
-        long double a = ST(0);
-        long double b = ST(1);
+        fext a = ST(0);
+        fext b = ST(1);
 
         (void)PopFPU(); // pop stack and place in the new st(0) - discarding result because check above ensures this will succeed
         ST(0) = b * std::log2(a);
@@ -3014,8 +3016,8 @@ namespace CSX64
     {
         if (ST(0).Empty() || ST(1).Empty()) { terminate_err(ErrorCode::FPUAccessViolation); return false; }
 
-        long double a = ST(0);
-        long double b = ST(1);
+        fext a = ST(0);
+        fext b = ST(1);
 
         (void)PopFPU(); // pop stack and place in the new st(0) - discarding result because check above ensures this will succeed
         ST(0) = b * std::log2(a + 1);
@@ -3031,7 +3033,7 @@ namespace CSX64
         FPU_status ^= Rand() & MASK_UNION_4(FPU_C0, FPU_C1, FPU_C2, FPU_C3);
 
         // get value and extract exponent/significand
-        double exp, sig;
+        f64 exp, sig;
         ExtractDouble(ST(0), exp, sig);
 
         // exponent in st0, then push the significand
@@ -3042,11 +3044,11 @@ namespace CSX64
     {
         if (ST(0).Empty() || ST(1).Empty()) { terminate_err(ErrorCode::FPUAccessViolation); return false; }
 
-        double a = ST(0);
-        double b = ST(1);
+        f64 a = ST(0);
+        f64 b = ST(1);
 
         // get exponent and significand of st0
-        double exp, sig;
+        f64 exp, sig;
         ExtractDouble(a, exp, sig);
 
         // add (truncated) st1 to exponent of st0
@@ -3059,8 +3061,8 @@ namespace CSX64
 
     bool Computer::ProcessFXAM()
     {
-        long double val = ST(0);
-        u64 bits = DoubleAsUInt64(val);
+        fext val = ST(0);
+        u64 bits = transmute<u64>((f64)val);
 
         // C1 gets sign bit
         FPU_C1() = (bits & 0x8000000000000000) != 0;
@@ -3084,7 +3086,7 @@ namespace CSX64
     {
         if (ST(0).Empty()) { terminate_err(ErrorCode::FPUAccessViolation); return false; }
 
-        long double a = ST(0);
+        fext a = ST(0);
 
         // for FTST, nan is an arithmetic error
         if (std::isnan(a)) { terminate_err(ErrorCode::ArithmeticError); return false; }
@@ -3123,7 +3125,7 @@ namespace CSX64
         u64 m;
         if (!GetMemAdv<u8>(s)) return false;
 
-        long double a, b;
+        fext a, b;
 
         // swith through mode
         switch (s & 15)
@@ -3143,11 +3145,11 @@ namespace CSX64
             if (!GetAddressAdv(m)) return false;
             switch (s & 15)
             {
-            case 3: case 4: if (u32 t; read_mem<u32>(m, t)) b = (long double)AsFloat(t); else return false; break;
-            case 5: case 6: if (u64 t; read_mem<u64>(m, t)) b = (long double)AsDouble(t); else return false; break;
+            case 3: case 4: if (u32 t; read_mem<u32>(m, t)) b = (fext)transmute<f32>(t); else return false; break;
+            case 5: case 6: if (u64 t; read_mem<u64>(m, t)) b = (fext)transmute<f64>(t); else return false; break;
 
-            case 7: case 8: if (u16 t; read_mem<u16>(m, t)) b = (long double)(i64)(i16)t; else return false; break;
-            case 9: case 10: if (u32 t; read_mem<u32>(m, t)) b = (long double)(i64)(i32)t; else return false; break;
+            case 7: case 8: if (u16 t; read_mem<u16>(m, t)) b = (fext)(i64)(i16)t; else return false; break;
+            case 9: case 10: if (u32 t; read_mem<u32>(m, t)) b = (fext)(i64)(i32)t; else return false; break;
 
             default: terminate_err(ErrorCode::UndefinedBehavior); return false;
             }
@@ -3222,7 +3224,7 @@ namespace CSX64
         FPU_C2() = false;
 
         // get the value
-        long double val = ST(0);
+        fext val = ST(0);
 
         // st(0) <- sin, push cos
         ST(0) = std::sin(val);
@@ -3244,8 +3246,8 @@ namespace CSX64
     {
         if (ST(0).Empty() || ST(1).Empty()) { terminate_err(ErrorCode::FPUAccessViolation); return false; }
 
-        long double a = ST(0);
-        long double b = ST(1);
+        fext a = ST(0);
+        fext b = ST(1);
 
         (void)PopFPU(); // pop stack and place in new st(0) - discarding result because check above ensures this will succeed
         ST(0) = std::atan2(b, a);
@@ -3328,11 +3330,11 @@ namespace CSX64
         // -- prepare for execution -- //
 
         // get number of elements to process (accounting for scalar flag)
-        const u64 elem_count = s2 & 0x20 ? 1 : Size(reg_sizecode + 4) >> elem_sizecode;
+        const u64 elem_count = s2 & 0x20 ? 1 : get_size(reg_sizecode + 4) >> elem_sizecode;
 
         // get the mask (default of all 1's)
         u64 mask = ~(u64)0;
-        if ((s2 & 0x80) != 0 && !GetMemAdv(BitsToBytes(elem_count), mask)) return false;
+        if ((s2 & 0x80) != 0 && !GetMemAdv(bits_to_bytes(elem_count), mask)) return false;
         // get the zmask flag
         bool zmask = (s2 & 0x40) != 0;
 
@@ -3363,13 +3365,13 @@ namespace CSX64
         case 1:
             if (!GetAddressAdv(m)) return false;
             // if we're in vector mode and aligned flag is set, make sure address is aligned
-            if (elem_count > 1 && (s1 & 4) != 0 && m % Size(reg_sizecode + 4) != 0) { terminate_err(ErrorCode::AlignmentViolation); return false; }
+            if (elem_count > 1 && (s1 & 4) != 0 && m % get_size(reg_sizecode + 4) != 0) { terminate_err(ErrorCode::AlignmentViolation); return false; }
 
-            for (u64 i = 0; i < elem_count; ++i, mask >>= 1, m += Size(elem_sizecode))
+            for (u64 i = 0; i < elem_count; ++i, mask >>= 1, m += get_size(elem_sizecode))
             {
                 if (mask & 1)
                 {
-                    if (!GetMemRaw(m, Size(elem_sizecode), temp)) return false;
+                    if (!GetMemRaw(m, get_size(elem_sizecode), temp)) return false;
                     reg.uint((int)elem_sizecode, i) = temp;
                 }
                 else if (zmask) reg.uint(elem_sizecode, i) = 0;
@@ -3379,15 +3381,15 @@ namespace CSX64
         case 2:
             if (!GetAddressAdv(m)) return false;
             // if we're in vector mode and aligned flag is set, make sure address is aligned
-            if (elem_count > 1 && (s1 & 4) != 0 && m % Size(reg_sizecode + 4) != 0) { terminate_err(ErrorCode::AlignmentViolation); return false; }
+            if (elem_count > 1 && (s1 & 4) != 0 && m % get_size(reg_sizecode + 4) != 0) { terminate_err(ErrorCode::AlignmentViolation); return false; }
 
-            for (u64 i = 0; i < elem_count; ++i, mask >>= 1, m += Size(elem_sizecode))
+            for (u64 i = 0; i < elem_count; ++i, mask >>= 1, m += get_size(elem_sizecode))
             {
                 if (mask & 1)
                 {
-                    if (!SetMemRaw(m, Size(elem_sizecode), reg.uint(elem_sizecode, i))) return false;
+                    if (!SetMemRaw(m, get_size(elem_sizecode), reg.uint(elem_sizecode, i))) return false;
                 }
-                else if (zmask && !SetMemRaw(m, Size(elem_sizecode), 0)) return false;
+                else if (zmask && !SetMemRaw(m, get_size(elem_sizecode), 0)) return false;
             }
 
             break;
@@ -3412,7 +3414,7 @@ namespace CSX64
         u64 elem_sizecode = (s2 >> 2) & 3;
 
         // make sure this element size is allowed
-        if ((Size(elem_sizecode) & elem_size_mask) == 0) { terminate_err(ErrorCode::UndefinedBehavior); return false; }
+        if ((get_size(elem_sizecode) & elem_size_mask) == 0) { terminate_err(ErrorCode::UndefinedBehavior); return false; }
 
         // -- get the register to work with -- //
 
@@ -3430,11 +3432,11 @@ namespace CSX64
         // -- prepare for execution -- //
 
         // get number of elements to process (accounting for scalar flag)
-        u64 elem_count = s2 & 0x20 ? 1 : Size(dest_sizecode + 4) >> elem_sizecode;
+        u64 elem_count = s2 & 0x20 ? 1 : get_size(dest_sizecode + 4) >> elem_sizecode;
 
         // get the mask (default of all 1's)
         u64 mask = ~(u64)0;
-        if ((s2 & 0x80) != 0 && !GetMemAdv(BitsToBytes((u64)elem_count), mask)) return false;
+        if ((s2 & 0x80) != 0 && !GetMemAdv(bits_to_bytes((u64)elem_count), mask)) return false;
         // get the zmask flag
         bool zmask = (s2 & 0x40) != 0;
 
@@ -3478,12 +3480,12 @@ namespace CSX64
         {
             if (!GetAddressAdv(m)) return false;
             // if we're in vector mode and aligned flag is set, make sure address is aligned
-            if (elem_count > 1 && (s1 & 4) != 0 && m % Size(dest_sizecode + 4) != 0) { terminate_err(ErrorCode::AlignmentViolation); return false; }
+            if (elem_count > 1 && (s1 & 4) != 0 && m % get_size(dest_sizecode + 4) != 0) { terminate_err(ErrorCode::AlignmentViolation); return false; }
 
-            for (u64 i = 0; i < elem_count; ++i, mask >>= 1, m += Size(elem_sizecode))
+            for (u64 i = 0; i < elem_count; ++i, mask >>= 1, m += get_size(elem_sizecode))
                 if (mask & 1)
                 {
-                    if (!GetMemRaw(m, Size(elem_sizecode), res)) return false;
+                    if (!GetMemRaw(m, get_size(elem_sizecode), res)) return false;
 
                     // hand over to the delegate for processing
                     if (!(this->*func)(elem_sizecode, res, src1.uint(elem_sizecode, i), res, i)) return false;
@@ -3509,7 +3511,7 @@ namespace CSX64
         u64 elem_sizecode = (s2 >> 2) & 3;
 
         // make sure this element size is allowed
-        if ((Size(elem_sizecode) & elem_size_mask) == 0) { terminate_err(ErrorCode::UndefinedBehavior); return false; }
+        if ((get_size(elem_sizecode) & elem_size_mask) == 0) { terminate_err(ErrorCode::UndefinedBehavior); return false; }
 
         // -- get the register to work with -- //
 
@@ -3527,11 +3529,11 @@ namespace CSX64
         // -- prepare for execution -- //
 
         // get number of elements to process (accounting for scalar flag)
-        u64 elem_count = s2 & 0x20 ? 1 : Size(dest_sizecode + 4) >> elem_sizecode;
+        u64 elem_count = s2 & 0x20 ? 1 : get_size(dest_sizecode + 4) >> elem_sizecode;
         
         // get the mask (default of all 1's)
         u64 mask = ~(u64)0;
-        if (s2 & 0x80 && !GetMemAdv(BitsToBytes((u64)elem_count), mask)) return false;
+        if (s2 & 0x80 && !GetMemAdv(bits_to_bytes((u64)elem_count), mask)) return false;
         // get the zmask flag
         bool zmask = s2 & 0x40;
 
@@ -3563,12 +3565,12 @@ namespace CSX64
         {
             if (!GetAddressAdv(m)) return false;
             // if we're in vector mode and aligned flag is set, make sure address is aligned
-            if (elem_count > 1 && (s1 & 4) != 0 && m % Size(dest_sizecode + 4) != 0) { terminate_err(ErrorCode::AlignmentViolation); return false; }
+            if (elem_count > 1 && (s1 & 4) != 0 && m % get_size(dest_sizecode + 4) != 0) { terminate_err(ErrorCode::AlignmentViolation); return false; }
 
-            for (u64 i = 0; i < elem_count; ++i, mask >>= 1, m += Size(elem_sizecode))
+            for (u64 i = 0; i < elem_count; ++i, mask >>= 1, m += get_size(elem_sizecode))
                 if (mask & 1)
                 {
-                    if (!GetMemRaw(m, Size(elem_sizecode), res)) return false;
+                    if (!GetMemRaw(m, get_size(elem_sizecode), res)) return false;
                     
                     // hand over to the delegate for processing
                     if (!(this->*func)(elem_sizecode, res, res, i)) return false;
@@ -3594,7 +3596,7 @@ namespace CSX64
 
         // get the mask (default of all 1's)
         u64 mask = 0xffffffffffffffff;
-        if (s & 2 && !GetMemAdv(BitsToBytes(elem_count), mask)) return false;
+        if (s & 2 && !GetMemAdv(bits_to_bytes(elem_count), mask)) return false;
         // get the zmask flag
         bool zmask = s & 1;
 
@@ -3631,11 +3633,11 @@ namespace CSX64
             // make sure source address is aligned
             if (m % (elem_count << from_elem_sizecode) != 0) { terminate_err(ErrorCode::AlignmentViolation); return false; }
 
-            for (u64 i = 0; i < elem_count; ++i, mask >>= 1, m += Size(from_elem_sizecode))
+            for (u64 i = 0; i < elem_count; ++i, mask >>= 1, m += get_size(from_elem_sizecode))
             {
                 if (mask & 1)
                 {
-                    if (!GetMemRaw(m, Size(from_elem_sizecode), res)) return false;
+                    if (!GetMemRaw(m, get_size(from_elem_sizecode), res)) return false;
 
                     // hand over to the delegate for processing
                     if (!(this->*func)(res, res)) return false;
@@ -3698,7 +3700,7 @@ namespace CSX64
         if (!GetMemAdv<u8>(s)) return false;
 
         // get value to convert in temp
-        if (!GetAddressAdv(temp) || !GetMemRaw(temp, Size(from_elem_sizecode), temp)) return false;
+        if (!GetAddressAdv(temp) || !GetMemRaw(temp, get_size(from_elem_sizecode), temp)) return false;
 
         // perform the conversion
         if (!(this->*func)(temp, temp)) return false;
@@ -3737,7 +3739,7 @@ namespace CSX64
         if (!GetMemAdv<u8>(s)) return false;
 
         // get value to convert in temp
-        if (!GetAddressAdv(temp) || !GetMemRaw(temp, Size(from_elem_sizecode), temp)) return false;
+        if (!GetAddressAdv(temp) || !GetMemRaw(temp, get_size(from_elem_sizecode), temp)) return false;
 
         // perform the conversion
         if (!(this->*func)(temp, temp)) return false;
@@ -3751,36 +3753,36 @@ namespace CSX64
     bool Computer::_TryPerformVEC_FADD(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64)
     {
         // 64-bit fp
-        if (elem_sizecode == 3) res = DoubleAsUInt64(AsDouble(a) + AsDouble(b));
+        if (elem_sizecode == 3) res = transmute<u64>(transmute<f64>(a) + transmute<f64>(b));
         // 32-bit fp
-        else res = FloatAsUInt32(AsFloat((u32)a) + AsFloat((u32)b));
+        else res = transmute<u32>(transmute<f32>((u32)a) + transmute<f32>((u32)b));
 
         return true;
     }
     bool Computer::_TryPerformVEC_FSUB(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64)
     {
         // 64-bit fp
-        if (elem_sizecode == 3) res = DoubleAsUInt64(AsDouble(a) - AsDouble(b));
+        if (elem_sizecode == 3) res = transmute<u64>(transmute<f64>(a) - transmute<f64>(b));
         // 32-bit fp
-        else res = FloatAsUInt32(AsFloat((u32)a) - AsFloat((u32)b));
+        else res = transmute<u32>(transmute<f32>((u32)a) - transmute<f32>((u32)b));
 
         return true;
     }
     bool Computer::_TryPerformVEC_FMUL(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64)
     {
         // 64-bit fp
-        if (elem_sizecode == 3) res = DoubleAsUInt64(AsDouble(a) * AsDouble(b));
+        if (elem_sizecode == 3) res = transmute<u64>(transmute<f64>(a) * transmute<f64>(b));
         // 32-bit fp
-        else res = FloatAsUInt32(AsFloat((u32)a) * AsFloat((u32)b));
+        else res = transmute<u32>(transmute<f32>((u32)a) * transmute<f32>((u32)b));
 
         return true;
     }
     bool Computer::_TryPerformVEC_FDIV(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64)
     {
         // 64-bit fp
-        if (elem_sizecode == 3) res = DoubleAsUInt64(AsDouble(a) / AsDouble(b));
+        if (elem_sizecode == 3) res = transmute<u64>(transmute<f64>(a) / transmute<f64>(b));
         // 32-bit fp
-        else res = FloatAsUInt32(AsFloat((u32)a) / AsFloat((u32)b));
+        else res = transmute<u32>(transmute<f32>((u32)a) / transmute<f32>((u32)b));
 
         return true;
     }
@@ -3824,7 +3826,7 @@ namespace CSX64
     bool Computer::_TryPerformVEC_ADDS(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64)
     {
         // get sign mask
-        u64 smask = SignMask(elem_sizecode);
+        u64 smask = sign_mask(elem_sizecode);
 
         res = a + b;
 
@@ -3841,7 +3843,7 @@ namespace CSX64
     bool Computer::_TryPerformVEC_ADDUS(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64)
     {
         // get trunc mask
-        u64 tmask = TruncMask(elem_sizecode);
+        u64 tmask = trunc_mask(elem_sizecode);
 
         res = (a + b) & tmask; // truncated for logic below
 
@@ -3863,7 +3865,7 @@ namespace CSX64
     bool Computer::_TryPerformVEC_SUBS(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index)
     {
         // since this one's signed, we can just add the negative
-        return _TryPerformVEC_ADDS(elem_sizecode, res, a, Truncate(~b + 1, elem_sizecode), index);
+        return _TryPerformVEC_ADDS(elem_sizecode, res, a, truncate(~b + 1, elem_sizecode), index);
     }
     bool Computer::_TryPerformVEC_SUBUS(u64, u64 &res, u64 a, u64 b, u64)
     {
@@ -3878,7 +3880,7 @@ namespace CSX64
 
     bool Computer::_TryPerformVEC_MULL(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64)
     {
-        res = (i64)SignExtend(a, elem_sizecode) * (i64)SignExtend(b, elem_sizecode);
+        res = (i64)sign_extend(a, elem_sizecode) * (i64)sign_extend(b, elem_sizecode);
         return true;
     }
 
@@ -3887,16 +3889,16 @@ namespace CSX64
     bool Computer::_TryProcessVEC_FMIN(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64)
     {
         // this exploits c++ returning false on comparison to NaN. see http://www.felixcloutier.com/x86/MINPD.html for the actual algorithm
-        if (elem_sizecode == 3) res = AsDouble(a) < AsDouble(b) ? a : b;
-        else res = AsFloat((u32)a) < AsFloat((u32)b) ? a : b;
+        if (elem_sizecode == 3) res = transmute<f64>(a) < transmute<f64>(b) ? a : b;
+        else res = transmute<f32>((u32)a) < transmute<f32>((u32)b) ? a : b;
 
         return true;
     }
     bool Computer::_TryProcessVEC_FMAX(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64)
     {
         // this exploits c++ returning false on comparison to NaN. see http://www.felixcloutier.com/x86/MAXPD.html for the actual algorithm
-        if (elem_sizecode == 3) res = AsDouble(a) > AsDouble(b) ? a : b;
-        else res = AsFloat((u32)a) > AsFloat((u32)b) ? a : b;
+        if (elem_sizecode == 3) res = transmute<f64>(a) > transmute<f64>(b) ? a : b;
+        else res = transmute<f32>((u32)a) > transmute<f32>((u32)b) ? a : b;
 
         return true;
     }
@@ -3912,7 +3914,7 @@ namespace CSX64
     bool Computer::_TryProcessVEC_SMIN(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64)
     {
         // just extend to 64-bit and do a signed compare
-        res = (i64)SignExtend(a, elem_sizecode) < (i64)SignExtend(b, elem_sizecode) ? a : b;
+        res = (i64)sign_extend(a, elem_sizecode) < (i64)sign_extend(b, elem_sizecode) ? a : b;
         return true;
     }
     bool Computer::_TryProcessVEC_UMAX(u64, u64 &res, u64 a, u64 b, u64)
@@ -3923,7 +3925,7 @@ namespace CSX64
     bool Computer::_TryProcessVEC_SMAX(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64)
     {
         // just extend to 64-bit and do a signed compare
-        res = (i64)SignExtend(a, elem_sizecode) > (i64)SignExtend(b, elem_sizecode) ? a : b;
+        res = (i64)sign_extend(a, elem_sizecode) > (i64)sign_extend(b, elem_sizecode) ? a : b;
         return true;
     }
 
@@ -3935,9 +3937,9 @@ namespace CSX64
     bool Computer::_TryPerformVEC_FADDSUB(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 index)
     {
         // 64-bit fp
-        if (elem_sizecode == 3) res = DoubleAsUInt64(index % 2 == 0 ? AsDouble(a) - AsDouble(b) : AsDouble(a) + AsDouble(b));
+        if (elem_sizecode == 3) res = transmute<u64>(index % 2 == 0 ? transmute<f64>(a) - transmute<f64>(b) : transmute<f64>(a) + transmute<f64>(b));
         // 32-bit fp
-        else res = FloatAsUInt32(index % 2 == 0 ? AsFloat((u32)a) - AsFloat((u32)b) : AsFloat((u32)a) + AsFloat((u32)b));
+        else res = transmute<u32>(index % 2 == 0 ? transmute<f32>((u32)a) - transmute<f32>((u32)b) : transmute<f32>((u32)a) + transmute<f32>((u32)b));
 
         return true;
     }
@@ -3952,16 +3954,16 @@ namespace CSX64
 
     bool Computer::TryProcessVEC_AVG() { return ProcessVPUBinary(3, &Computer::_TryPerformVEC_AVG); }
 
-    // constants used to represent the result of a "true" simd floatint-point comparison
+    // constants used to represent the result of a "true" simd floating-point comparison
     inline static constexpr u64 _fp64_simd_cmp_true = 0xffffffffffffffff;
     inline static constexpr u64 _fp32_simd_cmp_true = 0xffffffff;
 
-    bool Computer::_TryProcessVEC_FCMP_helper(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 /*index*/,
-        bool great, bool less, bool equal, bool unord, bool signal) 
+    bool Computer::_TryProcessVEC_FCMP_helper(u64 elem_sizecode, u64 &res, u64 a, u64 b, u64 /*index*/, bool great, bool less, bool equal, bool unord, bool signal) 
     {
         if (elem_sizecode == 3)
         {
-            double fa = AsDouble(a), fb = AsDouble(b);
+            const auto fa = transmute<f64>(a);
+            const auto fb = transmute<f64>(b);
             bool cmp;
             if (std::isnan(fa) || std::isnan(fb))
             {
@@ -3976,7 +3978,9 @@ namespace CSX64
         }
         else
         {
-            float fa = AsFloat((u32)a), fb = AsFloat((u32)b);
+            const auto fa = transmute<f32>((u32)a);
+            const auto fb = transmute<f32>((u32)b);
+
             bool cmp;
             if (std::isnan(fa) || std::isnan(fb))
             {
@@ -4049,7 +4053,8 @@ namespace CSX64
 
         if (elem_sizecode == 3)
         {
-            double a = AsDouble(_a), b = AsDouble(_b);
+            const auto a = transmute<f64>(_a);
+            const auto b = transmute<f64>(_b);
 
             if (a > b) { x = false; y = false; z = false; }
             else if (a < b) { x = false; y = false; z = true; }
@@ -4059,7 +4064,8 @@ namespace CSX64
         }
         else
         {
-            double a = AsFloat((u32)_a), b = AsFloat((u32)_b);
+            const auto a = transmute<f32>((u32)_a);
+            const auto b = transmute<f32>((u32)_b);
 
             if (a > b) { x = false; y = false; z = false; }
             else if (a < b) { x = false; y = false; z = true; }
@@ -4089,15 +4095,15 @@ namespace CSX64
     {
         if (elem_sizecode == 3)
         {
-            double f = AsDouble(a);
+            const auto f = transmute<f64>(a);
             if (f < 0) { terminate_err(ErrorCode::ArithmeticError); return false; }
-            res = DoubleAsUInt64(std::sqrt(f));
+            res = transmute<u64>(std::sqrt(f));
         }
         else
         {
-            float f = AsFloat((u32)a);
+            const auto f = transmute<f32>((u32)a);
             if (f < 0) { terminate_err(ErrorCode::ArithmeticError); return false; }
-            res = FloatAsUInt32(std::sqrt(f));
+            res = transmute<u32>(std::sqrt(f));
         }
         return true;
     }
@@ -4105,15 +4111,15 @@ namespace CSX64
     {
         if (elem_sizecode == 3)
         {
-            double f = AsDouble(a);
+            const auto f = transmute<f64>(a);
             if (f < 0) { terminate_err(ErrorCode::ArithmeticError); return false; }
-            res = DoubleAsUInt64(1.0 / std::sqrt(f));
+            res = transmute<u64>(1.0 / std::sqrt(f));
         }
         else
         {
-            float f = AsFloat((u32)a);
+            const auto f = transmute<f32>((u32)a);
             if (f < 0) { terminate_err(ErrorCode::ArithmeticError); return false; }
-            res = FloatAsUInt32(1.0f / std::sqrt(f));
+            res = transmute<u32>(1.0f / std::sqrt(f));
         }
         return true;
     }
@@ -4122,80 +4128,80 @@ namespace CSX64
     bool Computer::TryProcessVEC_FRSQRT() { return ProcessVPUUnary(12, &Computer::_TryProcessVEC_FRSQRT); }
 
     // VPUCVTDelegates for conversions
-    bool Computer::_double_to_i32(u64 &res, u64 val)
+    bool Computer::_f64_to_i32(u64 &res, u64 val)
     {
-        res = (u32)(i32)PerformRoundTrip(AsDouble(val), MXCSR_RC());
+        res = (u32)(i32)PerformRoundTrip(transmute<f64>(val), MXCSR_RC());
         return true;
     }
     bool Computer::_single_to_i32(u64 &res, u64 val)
     {
-        res = (u32)(i32)PerformRoundTrip(AsFloat((u32)val), MXCSR_RC());
+        res = (u32)(i32)PerformRoundTrip(transmute<f32>((u32)val), MXCSR_RC());
         return true;
     }
 
-    bool Computer::_double_to_i64(u64 &res, u64 val)
+    bool Computer::_f64_to_i64(u64 &res, u64 val)
     {
-        res = (u64)(i64)PerformRoundTrip(AsDouble(val), MXCSR_RC());
+        res = (u64)(i64)PerformRoundTrip(transmute<f64>(val), MXCSR_RC());
         return true;
     }
     bool Computer::_single_to_i64(u64 &res, u64 val)
     {
-        res = (u64)(i64)PerformRoundTrip(AsFloat((u32)val), MXCSR_RC());
+        res = (u64)(i64)PerformRoundTrip(transmute<f32>((u32)val), MXCSR_RC());
         return true;
     }
 
-    bool Computer::_double_to_ti32(u64 &res, u64 val)
+    bool Computer::_f64_to_ti32(u64 &res, u64 val)
     {
-        res = (u32)(i32)AsDouble(val);
+        res = (u32)(i32)transmute<f64>(val);
         return true;
     }
     bool Computer::_single_to_ti32(u64 &res, u64 val)
     {
-        res = (u32)(i32)AsFloat((u32)val);
+        res = (u32)(i32)transmute<f32>((u32)val);
         return true;
     }
 
-    bool Computer::_double_to_ti64(u64 &res, u64 val)
+    bool Computer::_f64_to_ti64(u64 &res, u64 val)
     {
-        res = (u64)(i64)AsDouble(val);
+        res = (u64)(i64)transmute<f64>(val);
         return true;
     }
     bool Computer::_single_to_ti64(u64 &res, u64 val)
     {
-        res = (u64)(i64)AsFloat((u32)val);
+        res = (u64)(i64)transmute<f32>((u32)val);
         return true;
     }
 
-    bool Computer::_i32_to_double(u64 &res, u64 val)
+    bool Computer::_i32_to_f64(u64 &res, u64 val)
     {
-        res = DoubleAsUInt64((double)(i32)val);
+        res = transmute<u64>((f64)(i32)val);
         return true;
     }
     bool Computer::_i32_to_single(u64 &res, u64 val)
     {
-        res = FloatAsUInt32((float)(i32)val);
+        res = transmute<u32>((f32)(i32)val);
         return true;
     }
 
-    bool Computer::_i64_to_double(u64 &res, u64 val)
+    bool Computer::_i64_to_f64(u64 &res, u64 val)
     {
-        res = DoubleAsUInt64((double)(i64)val);
+        res = transmute<u64>((f64)(i64)val);
         return true;
     }
     bool Computer::_i64_to_single(u64 &res, u64 val)
     {
-        res = FloatAsUInt32((float)(i64)val);
+        res = transmute<u32>((f32)(i64)val);
         return true;
     }
 
-    bool Computer::_double_to_single(u64 &res, u64 val)
+    bool Computer::_f64_to_single(u64 &res, u64 val)
     {
-        res = FloatAsUInt32((float)AsDouble(val));
+        res = transmute<u32>((f32)transmute<f64>(val));
         return true;
     }
-    bool Computer::_single_to_double(u64 &res, u64 val)
+    bool Computer::_single_to_f64(u64 &res, u64 val)
     {
-        res = DoubleAsUInt64((double)AsFloat((u32)val));
+        res = transmute<u64>((f64)transmute<f32>((u32)val));
         return true;
     }
 
@@ -4283,75 +4289,75 @@ namespace CSX64
         // route to handlers
         switch (mode)
         {
-        case 0: return ProcessVPUCVT_scalar_reg_xmm(2, 3, &Computer::_double_to_i32);
-        case 1: return ProcessVPUCVT_scalar_reg_mem(2, 3, &Computer::_double_to_i32);
-        case 2: return ProcessVPUCVT_scalar_reg_xmm(3, 3, &Computer::_double_to_i64);
-        case 3: return ProcessVPUCVT_scalar_reg_mem(3, 3, &Computer::_double_to_i64);
+        case 0: return ProcessVPUCVT_scalar_reg_xmm(2, 3, &Computer::_f64_to_i32);
+        case 1: return ProcessVPUCVT_scalar_reg_mem(2, 3, &Computer::_f64_to_i32);
+        case 2: return ProcessVPUCVT_scalar_reg_xmm(3, 3, &Computer::_f64_to_i64);
+        case 3: return ProcessVPUCVT_scalar_reg_mem(3, 3, &Computer::_f64_to_i64);
 
         case 4: return ProcessVPUCVT_scalar_reg_xmm(2, 2, &Computer::_single_to_i32);
         case 5: return ProcessVPUCVT_scalar_reg_mem(2, 2, &Computer::_single_to_i32);
         case 6: return ProcessVPUCVT_scalar_reg_xmm(3, 2, &Computer::_single_to_i64);
         case 7: return ProcessVPUCVT_scalar_reg_mem(3, 2, &Computer::_single_to_i64);
 
-        case 8: return ProcessVPUCVT_scalar_reg_xmm(2, 3, &Computer::_double_to_ti32);
-        case 9: return ProcessVPUCVT_scalar_reg_mem(2, 3, &Computer::_double_to_ti32);
-        case 10: return ProcessVPUCVT_scalar_reg_xmm(3, 3, &Computer::_double_to_ti64);
-        case 11: return ProcessVPUCVT_scalar_reg_mem(3, 3, &Computer::_double_to_ti64);
+        case 8: return ProcessVPUCVT_scalar_reg_xmm(2, 3, &Computer::_f64_to_ti32);
+        case 9: return ProcessVPUCVT_scalar_reg_mem(2, 3, &Computer::_f64_to_ti32);
+        case 10: return ProcessVPUCVT_scalar_reg_xmm(3, 3, &Computer::_f64_to_ti64);
+        case 11: return ProcessVPUCVT_scalar_reg_mem(3, 3, &Computer::_f64_to_ti64);
 
         case 12: return ProcessVPUCVT_scalar_reg_xmm(2, 2, &Computer::_single_to_ti32);
         case 13: return ProcessVPUCVT_scalar_reg_mem(2, 2, &Computer::_single_to_ti32);
         case 14: return ProcessVPUCVT_scalar_reg_xmm(3, 2, &Computer::_single_to_ti64);
         case 15: return ProcessVPUCVT_scalar_reg_mem(3, 2, &Computer::_single_to_ti64);
 
-        case 16: return ProcessVPUCVT_scalar_xmm_reg(3, 2, &Computer::_i32_to_double);
-        case 17: return ProcessVPUCVT_scalar_xmm_mem(3, 2, &Computer::_i32_to_double);
-        case 18: return ProcessVPUCVT_scalar_xmm_reg(3, 3, &Computer::_i64_to_double);
-        case 19: return ProcessVPUCVT_scalar_xmm_mem(3, 3, &Computer::_i64_to_double);
+        case 16: return ProcessVPUCVT_scalar_xmm_reg(3, 2, &Computer::_i32_to_f64);
+        case 17: return ProcessVPUCVT_scalar_xmm_mem(3, 2, &Computer::_i32_to_f64);
+        case 18: return ProcessVPUCVT_scalar_xmm_reg(3, 3, &Computer::_i64_to_f64);
+        case 19: return ProcessVPUCVT_scalar_xmm_mem(3, 3, &Computer::_i64_to_f64);
 
         case 20: return ProcessVPUCVT_scalar_xmm_reg(2, 2, &Computer::_i32_to_single);
         case 21: return ProcessVPUCVT_scalar_xmm_mem(2, 2, &Computer::_i32_to_single);
         case 22: return ProcessVPUCVT_scalar_xmm_reg(2, 3, &Computer::_i64_to_single);
         case 23: return ProcessVPUCVT_scalar_xmm_mem(2, 3, &Computer::_i64_to_single);
 
-        case 24: return ProcessVPUCVT_scalar_xmm_xmm(2, 3, &Computer::_double_to_single);
-        case 25: return ProcessVPUCVT_scalar_xmm_mem(2, 3, &Computer::_double_to_single);
+        case 24: return ProcessVPUCVT_scalar_xmm_xmm(2, 3, &Computer::_f64_to_single);
+        case 25: return ProcessVPUCVT_scalar_xmm_mem(2, 3, &Computer::_f64_to_single);
 
-        case 26: return ProcessVPUCVT_scalar_xmm_xmm(3, 2, &Computer::_single_to_double);
-        case 27: return ProcessVPUCVT_scalar_xmm_mem(3, 2, &Computer::_single_to_double);
+        case 26: return ProcessVPUCVT_scalar_xmm_xmm(3, 2, &Computer::_single_to_f64);
+        case 27: return ProcessVPUCVT_scalar_xmm_mem(3, 2, &Computer::_single_to_f64);
 
         // ------------------------------------------------------------------------ //
 
-        case 28: return ProcessVPUCVT_packed(2, 2, 3, &Computer::_double_to_i32);
-        case 29: return ProcessVPUCVT_packed(4, 2, 3, &Computer::_double_to_i32);
-        case 30: return ProcessVPUCVT_packed(8, 2, 3, &Computer::_double_to_i32);
+        case 28: return ProcessVPUCVT_packed(2, 2, 3, &Computer::_f64_to_i32);
+        case 29: return ProcessVPUCVT_packed(4, 2, 3, &Computer::_f64_to_i32);
+        case 30: return ProcessVPUCVT_packed(8, 2, 3, &Computer::_f64_to_i32);
 
         case 31: return ProcessVPUCVT_packed(4, 2, 2, &Computer::_single_to_i32);
         case 32: return ProcessVPUCVT_packed(8, 2, 2, &Computer::_single_to_i32);
         case 33: return ProcessVPUCVT_packed(16, 2, 2, &Computer::_single_to_i32);
 
-        case 34: return ProcessVPUCVT_packed(2, 2, 3, &Computer::_double_to_ti32);
-        case 35: return ProcessVPUCVT_packed(4, 2, 3, &Computer::_double_to_ti32);
-        case 36: return ProcessVPUCVT_packed(8, 2, 3, &Computer::_double_to_ti32);
+        case 34: return ProcessVPUCVT_packed(2, 2, 3, &Computer::_f64_to_ti32);
+        case 35: return ProcessVPUCVT_packed(4, 2, 3, &Computer::_f64_to_ti32);
+        case 36: return ProcessVPUCVT_packed(8, 2, 3, &Computer::_f64_to_ti32);
 
         case 37: return ProcessVPUCVT_packed(4, 2, 2, &Computer::_single_to_ti32);
         case 38: return ProcessVPUCVT_packed(8, 2, 2, &Computer::_single_to_ti32);
         case 39: return ProcessVPUCVT_packed(16, 2, 2, &Computer::_single_to_ti32);
 
-        case 40: return ProcessVPUCVT_packed(2, 3, 2, &Computer::_i32_to_double);
-        case 41: return ProcessVPUCVT_packed(4, 3, 2, &Computer::_i32_to_double);
-        case 42: return ProcessVPUCVT_packed(8, 3, 2, &Computer::_i32_to_double);
+        case 40: return ProcessVPUCVT_packed(2, 3, 2, &Computer::_i32_to_f64);
+        case 41: return ProcessVPUCVT_packed(4, 3, 2, &Computer::_i32_to_f64);
+        case 42: return ProcessVPUCVT_packed(8, 3, 2, &Computer::_i32_to_f64);
 
         case 43: return ProcessVPUCVT_packed(4, 2, 2, &Computer::_i32_to_single);
         case 44: return ProcessVPUCVT_packed(8, 2, 2, &Computer::_i32_to_single);
         case 45: return ProcessVPUCVT_packed(16, 2, 2, &Computer::_i32_to_single);
 
-        case 46: return ProcessVPUCVT_packed(2, 2, 3, &Computer::_double_to_single);
-        case 47: return ProcessVPUCVT_packed(4, 2, 3, &Computer::_double_to_single);
-        case 48: return ProcessVPUCVT_packed(8, 2, 3, &Computer::_double_to_single);
+        case 46: return ProcessVPUCVT_packed(2, 2, 3, &Computer::_f64_to_single);
+        case 47: return ProcessVPUCVT_packed(4, 2, 3, &Computer::_f64_to_single);
+        case 48: return ProcessVPUCVT_packed(8, 2, 3, &Computer::_f64_to_single);
 
-        case 49: return ProcessVPUCVT_packed(2, 3, 2, &Computer::_single_to_double);
-        case 50: return ProcessVPUCVT_packed(4, 3, 2, &Computer::_single_to_double);
-        case 51: return ProcessVPUCVT_packed(8, 3, 2, &Computer::_single_to_double);
+        case 49: return ProcessVPUCVT_packed(2, 3, 2, &Computer::_single_to_f64);
+        case 50: return ProcessVPUCVT_packed(4, 3, 2, &Computer::_single_to_f64);
+        case 51: return ProcessVPUCVT_packed(8, 3, 2, &Computer::_single_to_f64);
 
         default: terminate_err(ErrorCode::UndefinedBehavior); return false;
         }

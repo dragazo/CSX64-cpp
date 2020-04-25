@@ -4,42 +4,42 @@
 #include "../include/Utility.h"
 #include "../ios-frstor/iosfrstor.h"
 
-namespace CSX64
+namespace CSX64::detail
 {
 	// -- assertions -- //
 
 	static_assert(std::endian::native == std::endian::little || std::endian::native == std::endian::big, "mixed endian systems are not currently supported");
 	static_assert(CHAR_BIT == 8, "only 8-bit byte systems are currently supported");
-	static_assert(sizeof(u8) == 1, "u8 is not size 1");
+	static_assert(sizeof(u8) == 1, "u8 is not get_size 1");
 
 	// -- serialization -- //
 
-	std::ostream &BinWrite(std::ostream &ostr, const void *p, std::size_t count)
+	std::ostream &write_bin(std::ostream &ostr, const void *p, std::size_t count)
 	{
 		ostr.write(reinterpret_cast<const char*>(p), count);
 		return ostr;
 	}
-	std::istream &BinRead(std::istream &istr, void *p, std::size_t count)
+	std::istream &read_bin(std::istream &istr, void *p, std::size_t count)
 	{
 		istr.read(reinterpret_cast<char*>(p), count);
 		if ((std::size_t)istr.gcount() != count) istr.setstate(std::ios::failbit);
 		return istr;
 	}
 
-	std::ostream &BinWrite(std::ostream &ostr, const std::string &str)
+	std::ostream &write_str(std::ostream &ostr, const std::string &str)
 	{
 		u16 len = (u16)str.size();
-		if (len != str.size()) throw std::invalid_argument("BinWrite(std::string): string was too long");
+		if (len != str.size()) throw std::invalid_argument("write_str(std::string): string was too long");
 
 		write<u16>(ostr, len);
-		return BinWrite(ostr, str.data(), len);
+		return write_bin(ostr, str.data(), len);
 	}
-	std::istream &BinRead(std::istream &istr, std::string &str)
+	std::istream &read_str(std::istream &istr, std::string &str)
 	{
 		u16 len;
 		read<u16>(istr, len);
 		str.resize(len);
-		return BinRead(istr, str.data(), len);
+		return read_bin(istr, str.data(), len);
 	}
 
 	// -- memory utilities -- //
@@ -101,43 +101,36 @@ namespace CSX64
 
 	// -- string stuff -- //
 	
-	std::string TrimStart(const std::string &str)
+	std::string to_upper(std::string str)
+	{
+		for (char &i : str) i = std::toupper((unsigned char)i);
+		return str;
+	}
+	std::string to_lower(std::string str)
+	{
+		for (char &i : str) i = std::tolower((unsigned char)i);
+		return str;
+	}
+
+	std::string trim_start(std::string_view str)
 	{
 		std::size_t i;
 		for (i = 0; i < str.size() && std::isspace((unsigned char)str[i]); ++i);
-
-		std::string res = str.substr(i);
-		return res;
+		return { str.begin() + i, str.end() };
 	}
-	std::string TrimEnd(const std::string &str)
+	std::string trim_end(std::string str)
 	{
-		std::size_t sz;
-		for (sz = str.size(); sz > 0 && std::isspace((unsigned char)str[sz - 1]); --sz);
-		
-		std::string res = str.substr(0, sz);
-		return res;
+		std::size_t i;
+		for (i = str.size(); i > 0 && std::isspace((unsigned char)str[i - 1]); --i);
+		str.resize(i);
+		return str;
 	}
-	std::string TrimEnd(std::string &&str)
+	std::string trim(std::string str)
 	{
-		std::size_t sz;
-		for (sz = str.size(); sz > 0 && std::isspace((unsigned char)str[sz - 1]); --sz);
-
-		// if it's an rvalue we can exploit std::string being a dynamic array
-		std::string res = std::move(str);
-		res.resize(sz);
-		return res;
-	}
-	std::string Trim(const std::string &str)
-	{
-		std::size_t i, sz;
-		for (i = 0; i < str.size() && std::isspace((unsigned char)str[i]); ++i);
-		for (sz = str.size(); sz > 0 && std::isspace((unsigned char)str[sz - 1]); --sz);
-
-		std::string res = str.substr(i, sz - i);
-		return res;
+		return trim_start(trim_end(std::move(str)));
 	}
 
-	std::string remove_ch(const std::string &str, char ch)
+	std::string remove_char(std::string_view str, char ch)
 	{
 		std::string res;
 		res.reserve(str.size());
@@ -203,9 +196,9 @@ namespace CSX64
 
 		return true;
 	}
-	bool TryParseDouble(const std::string &str, double &val)
+	bool TryParseDouble(const std::string &str, f64 &val)
 	{
-		// extract the double value
+		// extract the f64 value
 		std::istringstream istr(str);
 		istr >> val;
 
@@ -213,48 +206,24 @@ namespace CSX64
 		return istr && istr.peek() == EOF;
 	}
 
-	/// <summary>
-	/// Returns true if the string contains at least one occurrence of the specified character
-	/// </summary>
-	/// <param name="str">the string to test</param>
-	/// <param name="ch">the character to look for</param>
-	bool Contains(const std::string &str, char ch)
+	bool starts_with(const std::string &str, const std::string &val)
 	{
-		for (std::size_t i = 0; i < str.size(); ++i) if (str[i] == ch) return true;
-
-		return false;
+		if (str.size() < val.size()) return false; // must be at least long enough to hold it
+		if (val.size() == 0) return true;          // everything starts with empty string
+		
+		return std::memcmp(str.data(), val.data(), val.size()) == 0;
 	}
-
-	bool StartsWith(const std::string &str, char ch)
+	bool starts_with_token(const std::string &str, const std::string &val)
 	{
-		return !str.empty() && str[0] == ch;
-	}
-	bool StartsWith(const std::string &str, const std::string &val)
-	{
-		// must be at least long enough to hold it
-		if (str.size() < val.size()) return false;
-
-		// make sure all the characters match
-		for (std::size_t i = 0; i < val.size(); ++i)
-			if (str[i] != val[i]) return false;
-
-		return true;
-	}
-	bool StartsWithToken(const std::string &str, const std::string &val)
-	{
-		return StartsWith(str, val) && (str.size() == val.size() || std::isspace((unsigned char)str[val.size()]));
+		return starts_with(str, val) && (str.size() == val.size() || std::isspace((unsigned char)str[val.size()]));
 	}
 	
-	bool EndsWith(const std::string &str, const std::string &val)
+	bool ends_with(const std::string &str, const std::string &val)
 	{
-		// must be at least long enough to hold it
-		if (str.size() < val.size()) return false;
+		if (str.size() < val.size()) return false; // must be at least long enough to hold it
+		if (val.size() == 0) return true;          // everything ends with empty string
 
-		// make sure all the characters match
-		for (std::size_t i = 0, base = str.size() - val.size(); i < val.size(); ++i)
-			if (str[base + i] != val[i]) return false;
-
-		return true;
+		return std::memcmp(str.data() + (str.size() - val.size()), val.data(), val.size()) == 0;
 	}
 
 	/// <summary>
@@ -312,49 +281,37 @@ namespace CSX64
 
 	// -- CSX64 encoding utilities -- //
 
-	bool Extract2PowersOf2(u64 val, u64 &a, u64 &b)
-	{
-		b = val & (~val + 1);  // isolate the lowest power of 2
-		val = val & (val - 1); // disable the lowest power of 2
-
-		a = val & (~val + 1);  // isolate the next lowest power of 2
-		val = val & (val - 1); // disable the next lowest power of 2
-
-		// if val is now zero and a and b are nonzero, we got 2 distinct powers of 2
-		return val == 0 && a != 0 && b != 0;
-	}
-
-	void ExtractDouble(double val, double &exp, double &sig)
+	void ExtractDouble(f64 val, f64 &exp, f64 &sig)
 	{
 		if (std::isnan(val))
 		{
-			exp = sig = std::numeric_limits<double>::quiet_NaN();
+			exp = sig = std::numeric_limits<f64>::quiet_NaN();
 		}
 		else if (std::isinf(val))
 		{
 			if (val > 0)
 			{
-				exp = std::numeric_limits<double>::infinity();
+				exp = std::numeric_limits<f64>::infinity();
 				sig = 1;
 			}
 			else
 			{
-				exp = std::numeric_limits<double>::infinity();
+				exp = std::numeric_limits<f64>::infinity();
 				sig = -1;
 			}
 		}
 		else
 		{
 			// get the raw bits
-			u64 bits = DoubleAsUInt64(val);
+			u64 bits = transmute<u64>(val);
 
 			// get the raw exponent
 			u64 raw_exp = (bits >> 52) & 0x7ff;
 
 			// get exponent and subtract bias
-			exp = (double)raw_exp - 1023;
+			exp = (f64)raw_exp - 1023;
 			// get significand (m.0) and offset to 0.m
-			sig = (double)(bits & 0xfffffffffffff) / ((u64)1 << 52);
+			sig = (f64)(bits & 0xfffffffffffff) / ((u64)1 << 52);
 
 			// if it's denormalized, add 1 to exponent
 			if (raw_exp == 0) exp += 1;
@@ -365,7 +322,7 @@ namespace CSX64
 			if (val < 0) sig = -sig;
 		}
 	}
-	double AssembleDouble(double exp, double sig)
+	f64 AssembleDouble(f64 exp, f64 sig)
 	{
 		return sig * pow(2, exp);
 	}

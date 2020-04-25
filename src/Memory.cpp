@@ -1,5 +1,7 @@
 #include "../include/Computer.h"
 
+using namespace CSX64::detail;
+
 namespace CSX64
 {
     bool Computer::read_str(const u64 pos, std::string &str)
@@ -58,12 +60,12 @@ namespace CSX64
         case 4: res = read<u32>(mem.data() + pos); return true;
         case 8: res = read<u64>(mem.data() + pos); return true;
 
-        default: throw std::runtime_error("GetMemRaw size was non-standard");
+        default: throw std::runtime_error("GetMemRaw get_size was non-standard");
         }
     }
     bool Computer::GetMemRaw_szc(u64 pos, u64 sizecode, u64 &res)
     {
-        if (pos >= mem.size() || pos + Size(sizecode) > mem.size()) { terminate_err(ErrorCode::OutOfBounds); return false; }
+        if (pos >= mem.size() || pos + get_size(sizecode) > mem.size()) { terminate_err(ErrorCode::OutOfBounds); return false; }
 
         switch (sizecode)
         {
@@ -72,7 +74,7 @@ namespace CSX64
         case 2: res = read<u32>(mem.data() + pos); return true;
         case 3: res = read<u64>(mem.data() + pos); return true;
 
-        default: throw std::runtime_error("GetMemRaw size was non-standard");
+        default: throw std::runtime_error("GetMemRaw get_size was non-standard");
         }
     }
 
@@ -88,12 +90,12 @@ namespace CSX64
         case 4: write<u32>(mem.data() + pos, (u32)val); return true;
         case 8: write<u64>(mem.data() + pos, (u64)val); return true;
 
-        default: throw std::runtime_error("GetMemRaw size was non-standard");
+        default: throw std::runtime_error("GetMemRaw get_size was non-standard");
         }
     }
     bool Computer::SetMemRaw_szc(u64 pos, u64 sizecode, u64 val)
     {
-        if (pos >= mem.size() || pos + Size(sizecode) > mem.size()) { terminate_err(ErrorCode::OutOfBounds); return false; }
+        if (pos >= mem.size() || pos + get_size(sizecode) > mem.size()) { terminate_err(ErrorCode::OutOfBounds); return false; }
         if (pos < readonly_barrier) { terminate_err(ErrorCode::AccessViolation); std::cerr << "\ntried to access: " << std::hex << pos << std::dec << '\n'; return false; }
 
         switch (sizecode)
@@ -103,7 +105,7 @@ namespace CSX64
         case 2: write<u32>(mem.data() + pos, (u32)val); return true;
         case 3: write<u64>(mem.data() + pos, (u64)val); return true;
 
-        default: throw std::runtime_error("GetMemRaw size was non-standard");
+        default: throw std::runtime_error("GetMemRaw get_size was non-standard");
         }
     }
 
@@ -116,7 +118,7 @@ namespace CSX64
     bool Computer::GetMemAdv_szc(u64 sizecode, u64 &res)
     {
         if (!GetMemRaw_szc(RIP(), sizecode, res)) return false;
-        RIP() += Size(sizecode);
+        RIP() += get_size(sizecode);
         return true;
     }
 
@@ -140,7 +142,7 @@ namespace CSX64
         }
 
         // get the imm if applicable - store into res
-        if ((settings & 0x80) != 0 && !GetMemAdv(Size(sizecode), res)) return false;
+        if ((settings & 0x80) != 0 && !GetMemAdv(get_size(sizecode), res)) return false;
 
         // if r1 was used, add that pre-multiplied by the multiplier
         if ((settings & 2) != 0) res += CPURegisters[regs >> 4][sizecode] << ((settings >> 4) & 3);

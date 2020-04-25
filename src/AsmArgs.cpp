@@ -10,9 +10,11 @@
 #include "../include/AsmArgs.h"
 #include "../include/CoreTypes.h"
 #include "../include/Utility.h"
+#include "../include/asm_common.h"
 
-namespace CSX64
-{
+using namespace CSX64;
+using namespace CSX64::detail;
+
 void AssembleArgs::UpdateLinePos()
 {
 	// update current line pos
@@ -58,7 +60,7 @@ bool AssembleArgs::TryExtractLineHeader(std::string &rawline)
 	std::string err;
 
 	// extract the found token (as upper case)
-	std::string tok = ToUpper(rawline.substr(pos, end - pos));
+	std::string tok = to_upper(rawline.substr(pos, end - pos));
 
 	// decode tok 0 is no TIMES/IF prefix, 1 is TIMES prefix, 2 is IF prefix
 	const int rep_code = tok == "TIMES" ? 1 : tok == "IF" ? 2 : 0;
@@ -95,13 +97,13 @@ bool AssembleArgs::TryExtractLineHeader(std::string &rawline)
 		if (IsReservedSymbol(label_def)) { res = { AssembleError::InvalidLabel, "line " + tostr(line) + ": Symbol name is reserved: " + label_def }; return false; }
 
 		// ensure we don't define an external
-		if (Contains(file.ExternalSymbols, label_def)) { res = { AssembleError::SymbolRedefinition, "line " + tostr(line) + ": Cannot define external symbol internally: " + label_def }; return false; }
+		if (contains(file.ExternalSymbols, label_def)) { res = { AssembleError::SymbolRedefinition, "line " + tostr(line) + ": Cannot define external symbol internally: " + label_def }; return false; }
 
 		// if this line isn't an EQU directive, inject a label (EQU will handle the insertion otherwise - prevents erroneous ptrdiff simplifications if first defined as a label)
-		if (ToUpper(rawline.substr(pos, end - pos)) != "EQU")
+		if (to_upper(rawline.substr(pos, end - pos)) != "EQU")
 		{
 			// ensure we don't redefine a symbol. not outside this if because we definitely insert a symbol here, but EQU might not (e.g. if TIMES = 0) - so let EQU decide how to handle that.
-			if (ContainsKey(file.Symbols, label_def)) { res = { AssembleError::SymbolRedefinition, "line " + tostr(line) + ": Symbol was already defined: " + label_def }; return false; }
+			if (contains_key(file.Symbols, label_def)) { res = { AssembleError::SymbolRedefinition, "line " + tostr(line) + ": Symbol was already defined: " + label_def }; return false; }
 
 			// addresses must be in a valid segment
 			if (current_seg == AsmSegment::INVALID) { res = { AssembleError::FormatError, "line " + tostr(line) + ": Attempt to address outside of a segment" }; return false; }
@@ -206,7 +208,7 @@ bool AssembleArgs::TrySplitOnCommas(std::vector<std::string> &vec, const std::st
 		if (depth != 0) { res = { AssembleError::FormatError, "Unmatched parens in argument" }; return false; }
 
 		// get the arg (remove leading/trailing white space - some logic requires them not be there e.g. address parser)
-		std::string arg = Trim(str.substr(pos, end - pos));
+		std::string arg = trim(str.substr(pos, end - pos));
 		// make sure arg isn't empty
 		if (arg.empty()) { res = { AssembleError::FormatError, "Empty argument encountered" }; return false; }
 		// add this token
@@ -340,7 +342,7 @@ bool AssembleArgs::TryAppendCompactImm(Expr &&expr, u64 sizecode, bool strict)
 		u8 prefix = strict ? (u8)(sizecode) : GetCompactImmPrefix(val);
 
 		// write the prefix byte and its appropriately-sized compact imm
-		return TryAppendByte(prefix) && TryAppendVal(Size(prefix & 3), val);
+		return TryAppendByte(prefix) && TryAppendVal(get_size(prefix & 3), val);
 	}
 	// otherwise it'll need to be a dynamic hole
 	else
@@ -357,9 +359,9 @@ bool AssembleArgs::TryAppendExpr(u64 size, Expr &&expr, std::vector<HoleData> &h
 
 	// create the hole data
 	HoleData data;
-	data.Address = segment.size();
-	data.Size = (decltype(data.Size))size;
-	data.Line = line;
+	data.address = segment.size();
+	data.size = (decltype(data.size))size;
+	data.line = line;
 	data.expr = std::move(expr);
 
 	// write a dummy (all 1's for easy manual identification)
@@ -392,7 +394,7 @@ bool AssembleArgs::TryAppendAddress(u64 a, u64 b, Expr &&hole)
 {
 	if (!TryAppendByte((u8)a)) return false;
 	if (a & 3) { if (!TryAppendByte((u8)b)) return false; }
-	if (a & 0x80) { if (!TryAppendExpr(Size((a >> 2) & 3), std::move(hole))) return false; }
+	if (a & 0x80) { if (!TryAppendExpr(get_size((a >> 2) & 3), std::move(hole))) return false; }
 
 	return true;
 }
@@ -400,7 +402,7 @@ bool AssembleArgs::TryAppendAddress(u64 a, u64 b, Expr &&hole)
 bool AssembleArgs::TryAlign(u64 size)
 {
 	// it's really important that size is a power of 2, so do a (hopefully redundant) check
-	if (!IsPowerOf2(size)) throw std::invalid_argument("alignment size must be a power of 2");
+	if (!is_pow2(size)) throw std::invalid_argument("alignment get_size must be a power of 2");
 
 	switch (current_seg)
 	{
@@ -546,7 +548,7 @@ bool AssembleArgs::TryExtractExpr(const std::string &str, const std::size_t str_
 		else if (str[pos] == '$')
 		{
 			// get the value to insert (uppercase because user-level assembler tokens are case insensitive)
-			std::string val = ToUpper(str.substr(pos, end - pos));
+			std::string val = to_upper(str.substr(pos, end - pos));
 
 			// if it's the current line macro
 			if (val == CurrentLineMacro)
@@ -606,7 +608,7 @@ bool AssembleArgs::TryExtractExpr(const std::string &str, const std::size_t str_
 					else if (TryParseImm(arg, _expr, _sizecode, _explicit_size, _strict))
 					{
 						// we only allow bytes here, so disallow any kind of explicit size control flags
-						if (_explicit_size) { res = {AssembleError::UsageError, "line " + tostr(line) + ": A size directive in this context is not allowed"}; return false; }
+						if (_explicit_size) { res = {AssembleError::UsageError, "line " + tostr(line) + ": A get_size directive in this context is not allowed"}; return false; }
 						if (_strict) { res = {AssembleError::UsageError, "line " + tostr(line) + ": A STRICT specifier in this context is not allowed"}; return false; }
 
 						// additionally, expressions used in binary/string literals are critical expressions
@@ -636,7 +638,7 @@ bool AssembleArgs::TryExtractExpr(const std::string &str, const std::size_t str_
 				term_leaf->Token(BinaryLiteralSymbolPrefix + tohex(literal_index));
 			}
 			// if it's a function-like operator
-			else if (TryGetValue(FunctionOperator_to_OP, val, term_leaf->OP))
+			else if (try_get_value(FunctionOperator_to_OP, val, term_leaf->OP))
 			{
 				// get the index of the first paren
 				for (; end < str_end && str[end] != '('; ++end);
@@ -781,7 +783,7 @@ bool AssembleArgs::TryParseImm(const std::string &token, Expr &expr, u64 &sizeco
 	for (end = pos; end < token.size() && !std::isspace((unsigned char)token[end]); ++end);
 
 	// if that's a STRICT specifier
-	if (ToUpper(token.substr(pos, end - pos)) == "STRICT")
+	if (to_upper(token.substr(pos, end - pos)) == "STRICT")
 	{
 		strict = true;
 
@@ -793,7 +795,7 @@ bool AssembleArgs::TryParseImm(const std::string &token, Expr &expr, u64 &sizeco
 	else strict = false;
 
 	// extract that token (as upper case)
-	std::string ut = ToUpper(token.substr(pos, end - pos));
+	std::string ut = to_upper(token.substr(pos, end - pos));
 
 	// handle explicit size specifiers
 	if (ut == "BYTE") { sizecode = 0; explicit_size = true; }
@@ -843,7 +845,7 @@ bool AssembleArgs::TryExtractPtrVal(const Expr *expr, const Expr *&val, const st
 		if (*expr->Token() == _base) return true;
 
 		// otherwise get the symbol
-		if (!TryGetValue(file.Symbols, *expr->Token(), expr)) return false;
+		if (!try_get_value(file.Symbols, *expr->Token(), expr)) return false;
 	}
 
 	// must be of standard label form
@@ -943,7 +945,7 @@ bool AssembleArgs::TryParseInstantPrefixedImm(const std::string &token, const st
 	floating = explicit_size = false;
 
 	// must begin with prefix
-	if (!StartsWith(token, prefix)) { res = {AssembleError::FormatError, "line " + tostr(line) + ": Token did not start with \"" + prefix + "\" prefix: \"" + token + "\""}; return false; }
+	if (!starts_with(token, prefix)) { res = {AssembleError::FormatError, "line " + tostr(line) + ": Token did not start with \"" + prefix + "\" prefix: \"" + token + "\""}; return false; }
 	// aside from the prefix, must not be empty
 	if (token.size() == prefix.size()) { res = {AssembleError::FormatError, "line " + tostr(line) + ": Empty token encountered after \"" + prefix + "\" prefix: \"" + token + "\""}; return false; }
 
@@ -984,7 +986,7 @@ bool AssembleArgs::TryParseCPURegister(const std::string &token, u64 &reg, u64 &
 {
 	// copy data if we can parse it
 	const std::tuple<u8, u8, bool> *info;
-	if (TryGetValue(CPURegisterInfo, ToUpper(token), info))
+	if (try_get_value(CPURegisterInfo, to_upper(token), info))
 	{
 		reg = std::get<0>(*info);
 		sizecode = std::get<1>(*info);
@@ -1001,7 +1003,7 @@ bool AssembleArgs::TryParseCPURegister(const std::string &token, u64 &reg, u64 &
 bool AssembleArgs::TryParseFPURegister(const std::string &token, u64 &reg)
 {
 	const u8 *info;
-	if (TryGetValue(FPURegisterInfo, ToUpper(token), info))
+	if (try_get_value(FPURegisterInfo, to_upper(token), info))
 	{
 		reg = *info;
 		return true;
@@ -1016,7 +1018,7 @@ bool AssembleArgs::TryParseVPURegister(const std::string &token, u64 &reg, u64 &
 {
 	// copy data if we can parse it
 	const std::tuple<u8, u8> *info;
-	if (TryGetValue(VPURegisterInfo, ToUpper(token), info))
+	if (try_get_value(VPURegisterInfo, to_upper(token), info))
 	{
 		reg = std::get<0>(*info);
 		sizecode = std::get<1>(*info);
@@ -1140,7 +1142,7 @@ bool AssembleArgs::TryGetRegMult(const std::string &label, Expr &hole, u64 &mult
 					list.erase(list.begin() + (i - 1));
 				}
 				// otherwise something horrible happened (this should never happen, but is left in for sanity-checking and future-proofing)
-				else throw std::runtime_error("Unknown address simplification step: OP = " + tostr((int)toward->OP));
+				else throw std::runtime_error("Unknown address simplification step: OP = " + tostr((unsigned)toward->OP));
 
 				--i; // decrement i to follow the multiplication all the way down the rabbit hole
 				if (i < 2) i = 2; // but if it gets under the starting point, reset it
@@ -1191,23 +1193,23 @@ bool AssembleArgs::TryParseAddress(std::string token, u64 &a, u64 &b, Expr &ptr_
 	sizecode = 0; explicit_size = false;
 
 	// account for exlicit sizecode prefix
-	std::string utoken = ToUpper(token);
-	if (StartsWithToken(utoken, "BYTE")) { sizecode = 0; explicit_size = true; utoken = TrimStart(utoken.substr(4)); }
-	else if (StartsWithToken(utoken, "WORD")) { sizecode = 1; explicit_size = true; utoken = TrimStart(utoken.substr(4)); }
-	else if (StartsWithToken(utoken, "DWORD")) { sizecode = 2; explicit_size = true; utoken = TrimStart(utoken.substr(5)); }
-	else if (StartsWithToken(utoken, "QWORD")) { sizecode = 3; explicit_size = true; utoken = TrimStart(utoken.substr(5)); }
-	else if (StartsWithToken(utoken, "XMMWORD")) { sizecode = 4; explicit_size = true; utoken = TrimStart(utoken.substr(7)); }
-	else if (StartsWithToken(utoken, "YMMWORD")) { sizecode = 5; explicit_size = true; utoken = TrimStart(utoken.substr(7)); }
-	else if (StartsWithToken(utoken, "ZMMWORD")) { sizecode = 6; explicit_size = true; utoken = TrimStart(utoken.substr(7)); }
+	std::string utoken = to_upper(token);
+	if (starts_with_token(utoken, "BYTE")) { sizecode = 0; explicit_size = true; utoken = trim_start(utoken.substr(4)); }
+	else if (starts_with_token(utoken, "WORD")) { sizecode = 1; explicit_size = true; utoken = trim_start(utoken.substr(4)); }
+	else if (starts_with_token(utoken, "DWORD")) { sizecode = 2; explicit_size = true; utoken = trim_start(utoken.substr(5)); }
+	else if (starts_with_token(utoken, "QWORD")) { sizecode = 3; explicit_size = true; utoken = trim_start(utoken.substr(5)); }
+	else if (starts_with_token(utoken, "XMMWORD")) { sizecode = 4; explicit_size = true; utoken = trim_start(utoken.substr(7)); }
+	else if (starts_with_token(utoken, "YMMWORD")) { sizecode = 5; explicit_size = true; utoken = trim_start(utoken.substr(7)); }
+	else if (starts_with_token(utoken, "ZMMWORD")) { sizecode = 6; explicit_size = true; utoken = trim_start(utoken.substr(7)); }
 
 	// if there was an explicit size
 	if (explicit_size)
 	{
 		// CSX64 uses the DWORD PTR syntax, so now we need to start with PTR
-		if (!StartsWith(utoken, "PTR")) { res = {AssembleError::FormatError, "line " + tostr(line) + ": Explicit memory operand size encountered without the PTR designator"}; return false; }
+		if (!starts_with(utoken, "PTR")) { res = {AssembleError::FormatError, "line " + tostr(line) + ": Explicit memory operand get_size encountered without the PTR designator"}; return false; }
 
 		// take all of that stuff off of token
-		token = TrimStart(token.substr(token.size() - utoken.size() + 3));
+		token = trim_start(token.substr(token.size() - utoken.size() + 3));
 	}
 
 	// must be of [*] format
@@ -1267,7 +1269,7 @@ bool AssembleArgs::TryParseAddress(std::string token, u64 &a, u64 &b, Expr &ptr_
 			case 4: m1 = 2; break;
 			case 8: m1 = 3; break;
 
-			default: res = {AssembleError::UsageError, "line " + tostr(line) + ": Register multiplier must be 1, 2, 4, or 8. Got " + tostr((i64)mult) + "*" + entry.first}; return false;
+			default: res = {AssembleError::UsageError, "line " + tostr(line) + ": Register multiplier must be 1, 2, 4, or 8. Got " + tostr(mult) + "*" + entry.first}; return false;
 			}
 
 			// if r1 is empty, put it there
@@ -1307,10 +1309,10 @@ bool AssembleArgs::VerifyLegalExpression(Expr &expr)
 		// if it's already been evaluated or we know about it somehow, we're good
 		if (expr.IsEvaluated()) return true;
 		const std::string &tok = *expr.Token();
-		if (ContainsKey(file.Symbols, tok) || Contains(file.ExternalSymbols, tok)
-			|| ContainsValue(SegOffsets, tok) || ContainsValue(SegOrigins, tok)
-			|| Contains(VerifyLegalExpressionIgnores, tok)
-			|| StartsWith(tok, BinaryLiteralSymbolPrefix))
+		if (contains_key(file.Symbols, tok) || contains(file.ExternalSymbols, tok)
+			|| contains_value(SegOffsets, tok) || contains_value(SegOrigins, tok)
+			|| contains(VerifyLegalExpressionIgnores, tok)
+			|| starts_with(tok, BinaryLiteralSymbolPrefix))
 			return true;
 		// otherwise we don't know what it is
 		else { res = {AssembleError::UnknownSymbol, "Unknown symbol: " + tok}; return false; }
@@ -1322,7 +1324,7 @@ bool AssembleArgs::VerifyIntegrity()
 {
 	// make sure all global symbols were actually defined prior to link-time
 	for (const std::string &global : file.GlobalSymbols)
-		if (!ContainsKey(file.Symbols, global)) { res = {AssembleError::UnknownSymbol, "Global symbol was never defined: " + global}; return false; }
+		if (!contains_key(file.Symbols, global)) { res = {AssembleError::UnknownSymbol, "Global symbol was never defined: " + global}; return false; }
 
 	// make sure all symbol expressions were valid
 	for (auto &entry : file.Symbols) if (!VerifyLegalExpression(entry.second)) return false;
@@ -1339,11 +1341,11 @@ bool AssembleArgs::VerifyIntegrity()
 bool AssembleArgs::IsReservedSymbol(std::string symbol)
 {
 	// make the symbol uppercase (all reserved symbols are case insensitive)
-	symbol = ToUpper(std::move(symbol));
+	symbol = to_upper(std::move(symbol));
 
 	// check against register dictionaries
-	return ContainsKey(CPURegisterInfo, symbol) || ContainsKey(FPURegisterInfo, symbol)
-		|| ContainsKey(VPURegisterInfo, symbol) || Contains(AdditionalReservedSymbols, symbol);
+	return contains_key(CPURegisterInfo, symbol) || contains_key(FPURegisterInfo, symbol)
+		|| contains_key(VPURegisterInfo, symbol) || contains(AdditionalReservedSymbols, symbol);
 }
 	
 bool AssembleArgs::TryProcessAlignXX(u64 size)
@@ -1362,13 +1364,13 @@ bool AssembleArgs::TryProcessAlign()
 	if (!TryParseInstantImm(args[0], val, floating, sizecode, explicit_size, strict)) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Alignment value must be instant\n-> " + res.ErrorMsg}; return false; }
 	
 	// it doesn't really make sense to give size information to an alignment value
-	if (explicit_size) { res = {AssembleError::UsageError, "line " + tostr(line) + ": A size directive in this context is not allowed"}; return false; }
+	if (explicit_size) { res = {AssembleError::UsageError, "line " + tostr(line) + ": A get_size directive in this context is not allowed"}; return false; }
 	if (strict) { res = {AssembleError::UsageError, "line " + tostr(line) + ": A STRICT specifier in this context is not allowed"}; return false; }
 	
 	// alignment must be an integer power of 2
 	if (floating) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Alignment value cannot be floating-point"}; return false; }
 	if (val == 0) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Attempt to align to a multiple of zero"}; return false; }
-	if (!IsPowerOf2(val)) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Alignment value must be a power of 2. Got " + tostr(val)}; return false; }
+	if (!is_pow2(val)) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Alignment value must be a power of 2. Got " + tostr(val)}; return false; }
 
 	return TryAlign(val);
 }
@@ -1386,9 +1388,9 @@ bool AssembleArgs::TryProcessGlobal()
 		if (!IsValidName(symbol, err)) { res = {AssembleError::InvalidLabel, "line " + tostr(line) + ": " + err}; return false; }
 
 		// don't add to global list twice
-		if (Contains(file.GlobalSymbols, symbol)) { res = {AssembleError::SymbolRedefinition, "line " + tostr(line) + ": Attempt to export \"" + symbol + "\" multiple times"}; return false; }
+		if (contains(file.GlobalSymbols, symbol)) { res = {AssembleError::SymbolRedefinition, "line " + tostr(line) + ": Attempt to export \"" + symbol + "\" multiple times"}; return false; }
 		// ensure we don't global an external
-		if (Contains(file.ExternalSymbols, symbol)) { res = {AssembleError::SymbolRedefinition, "line " + tostr(line) + ": Cannot define external \"" + symbol + "\" as global"}; return false; }
+		if (contains(file.ExternalSymbols, symbol)) { res = {AssembleError::SymbolRedefinition, "line " + tostr(line) + ": Cannot define external \"" + symbol + "\" as global"}; return false; }
 
 		// add it to the globals list
 		file.GlobalSymbols.emplace(symbol);
@@ -1409,12 +1411,12 @@ bool AssembleArgs::TryProcessExtern()
 		if (!IsValidName(symbol, err)) { res = {AssembleError::InvalidLabel, "line " + tostr(line) + ": " + err}; return false; }
 
 		// ensure we don't extern a symbol that already exists
-		if (ContainsKey(file.Symbols, symbol)) { res = {AssembleError::SymbolRedefinition, "line " + tostr(line) + ": Cannot define symbol \"" + symbol + "\" (defined internally) as external"}; return false; }
+		if (contains_key(file.Symbols, symbol)) { res = {AssembleError::SymbolRedefinition, "line " + tostr(line) + ": Cannot define symbol \"" + symbol + "\" (defined internally) as external"}; return false; }
 
 		// don't add to external list twice
-		if (Contains(file.ExternalSymbols, symbol)) { res = {AssembleError::SymbolRedefinition, "line " + tostr(line) + ": Attempt to import \"" + symbol + "\" multiple times"}; return false; }
+		if (contains(file.ExternalSymbols, symbol)) { res = {AssembleError::SymbolRedefinition, "line " + tostr(line) + ": Attempt to import \"" + symbol + "\" multiple times"}; return false; }
 		// ensure we don't extern a global
-		if (Contains(file.GlobalSymbols, symbol)) { res = {AssembleError::SymbolRedefinition, "line " + tostr(line) + ": Cannot define global \"" + symbol + "\" as external"}; return false; }
+		if (contains(file.GlobalSymbols, symbol)) { res = {AssembleError::SymbolRedefinition, "line " + tostr(line) + ": Cannot define global \"" + symbol + "\" as external"}; return false; }
 
 		// add it to the external list
 		file.ExternalSymbols.emplace(symbol);
@@ -1449,7 +1451,7 @@ bool AssembleArgs::TryProcessDeclare(u64 size)
 			// can only use standard sizes
 			if (size > 8) { res = { AssembleError::FormatError, "line " + tostr(line) + ": Attempt to write a numeric value in an unsuported format" }; return false; }
 			// we're given a size we have to use, so don't allow explicit operand sizes as well
-			if (explicit_size) { res = { AssembleError::UsageError, "line " + tostr(line) + ": A size directive in this context is not allowed" }; return false; }
+			if (explicit_size) { res = { AssembleError::UsageError, "line " + tostr(line) + ": A get_size directive in this context is not allowed" }; return false; }
 			// in this context, we're writing user-readable binary data, so compacting is not allowed, so explicitly using a STRICT specifier should not be allowed either
 			if (strict) { res = {AssembleError::UsageError, "line " + tostr(line) + ": A STRICT specifier in this context is not allowed"}; return false; }
 
@@ -1472,7 +1474,7 @@ bool AssembleArgs::TryProcessReserve(u64 size)
 	if (!TryParseInstantImm(args[0], count, floating, sizecode, explicit_size, strict)) return false;
 	
 	// it doesn't really make sense to give size information to the length of an array
-	if (explicit_size) { res = {AssembleError::UsageError, "line " + tostr(line) + ": A size directive in this context is not allowed"}; return false; }
+	if (explicit_size) { res = {AssembleError::UsageError, "line " + tostr(line) + ": A get_size directive in this context is not allowed"}; return false; }
 	if (strict) { res = {AssembleError::UsageError, "line " + tostr(line) + ": A STRICT specifier in this context is not allowed"}; return false; }
 
 	// must be an integer
@@ -1496,11 +1498,11 @@ bool AssembleArgs::TryProcessEQU()
 	u64 sizecode;
 	bool explicit_size, strict;
 	if (!TryParseImm(args[0], expr, sizecode, explicit_size, strict)) return false;
-	if (explicit_size) { res = { AssembleError::UsageError, "line " + tostr(line) + ": A size directive in this context is not allowed" }; return false; }
+	if (explicit_size) { res = { AssembleError::UsageError, "line " + tostr(line) + ": A get_size directive in this context is not allowed" }; return false; }
 	if (strict) { res = {AssembleError::UsageError, "line " + tostr(line) + ": A STRICT specifier in this context is not allowed"}; return false; }
 
 	// make sure the symbol isn't already defined (this could be the case for a TIMES prefix on an EQU directive)
-	if (ContainsKey(file.Symbols, label_def)) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Symbol " + label_def + " was already defined"}; return false; }
+	if (contains_key(file.Symbols, label_def)) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Symbol " + label_def + " was already defined"}; return false; }
 
 	// inject the symbol
 	file.Symbols.emplace(label_def, std::move(expr));
@@ -1517,7 +1519,7 @@ bool AssembleArgs::TryProcessStaticAssert()
 	u64 sizecode;
 	bool explicit_size, strict;
 	if (!TryParseImm(args[0], expr, sizecode, explicit_size, strict)) return false;
-	if (explicit_size) { res = {AssembleError::UsageError, "line " + tostr(line) + ": A size directive in this context is not allowed"}; return false; }
+	if (explicit_size) { res = {AssembleError::UsageError, "line " + tostr(line) + ": A get_size directive in this context is not allowed"}; return false; }
 	if (strict) { res = {AssembleError::UsageError, "line " + tostr(line) + ": A STRICT specifier in this context is not allowed"}; return false; }
 
 	// it must be a critical expression - get its value
@@ -1544,7 +1546,7 @@ bool AssembleArgs::TryProcessSegment()
 	if (!label_def.empty()) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Label has ambiguous segment ownership"}; return false; }
 
 	// get the segment we're going to
-	std::string useg = ToUpper(args[0]);
+	std::string useg = to_upper(args[0]);
 	if (useg == ".TEXT") current_seg = AsmSegment::TEXT;
 	else if (useg == ".RODATA") current_seg = AsmSegment::RODATA;
 	else if (useg == ".DATA") current_seg = AsmSegment::DATA;
@@ -1587,7 +1589,7 @@ bool AssembleArgs::TryProcessINCBIN()
 		if (!TryParseInstantImm(args[1], val, floating, sizecode, explicit_size, strict)) return false;
 
 		// it doesn't really make sense to give size information to a file position
-		if (explicit_size) { res = {AssembleError::UsageError, "line " + tostr(line) + ": A size directive in this context is not allowed"}; return false; }
+		if (explicit_size) { res = {AssembleError::UsageError, "line " + tostr(line) + ": A get_size directive in this context is not allowed"}; return false; }
 		if (strict) { res = {AssembleError::UsageError, "line " + tostr(line) + ": A STRICT specifier in this context is not allowed"}; return false; }
 
 		// must be an integer
@@ -1605,7 +1607,7 @@ bool AssembleArgs::TryProcessINCBIN()
 		if (!TryParseInstantImm(args[1], val, floating, sizecode, explicit_size, strict)) return false;
 
 		// it doesn't really make sense to give size information to the size of an array
-		if (explicit_size) { res = { AssembleError::UsageError, "line " + tostr(line) + ": A size directive in this context is not allowed" }; return false; }
+		if (explicit_size) { res = { AssembleError::UsageError, "line " + tostr(line) + ": A get_size directive in this context is not allowed" }; return false; }
 		if (strict) { res = {AssembleError::UsageError, "line " + tostr(line) + ": A STRICT specifier in this context is not allowed"}; return false; }
 
 		// must be an integer
@@ -1654,7 +1656,7 @@ bool AssembleArgs::TryProcessINCBIN()
 	catch (const std::bad_alloc&) { res = { AssembleError::Failure, "line " + tostr(line) + ": Failed to allocate space for binary file"}; return false; }
 
 	// copy the binary into the segment
-	if (!bin.read(reinterpret_cast<char*>(seg->data()) + old_seglen, inc_len) || bin.gcount() != inc_len) { res = { AssembleError::Failure, "line " + tostr(line) + ": Failed to read binary file"}; return false; }
+	if (!read_bin(bin, seg->data() + old_seglen, inc_len)) { res = { AssembleError::Failure, "line " + tostr(line) + ": Failed to read binary file"}; return false; }
 
 	return true;
 }
@@ -1672,7 +1674,7 @@ bool AssembleArgs::TryProcessMOVx_trans(u64 sizecode)
 	// r, *
 	if (TryParseCPURegister(args[0], dest, szc, high))
 	{
-		if (szc != sizecode) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Unsupported destination size"}; return false; }
+		if (szc != sizecode) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Unsupported destination get_size"}; return false; }
 
 		// r, xmm
 		if (TryParseVPURegister(args[1], src, szc) && szc == 4)
@@ -1687,11 +1689,11 @@ bool AssembleArgs::TryProcessMOVx_trans(u64 sizecode)
 		// xmm, r
 		if (TryParseCPURegister(args[1], src, szc, high))
 		{
-			if (szc != sizecode) { res = { AssembleError::UsageError, "line " + tostr(line) + ": Unsupported destination size" }; return false; }
+			if (szc != sizecode) { res = { AssembleError::UsageError, "line " + tostr(line) + ": Unsupported destination get_size" }; return false; }
 
 			if (!TryAppendByte(sizecode == 3 ? 3 : 1) || !TryAppendByte((u8)((dest << 4) | src))) return false;
 		}
-		else { res = { AssembleError::UsageError, "line " + tostr(line) + ": Unsupported destination size" }; return false; }
+		else { res = { AssembleError::UsageError, "line " + tostr(line) + ": Unsupported destination get_size" }; return false; }
 	}
 	else { res = {AssembleError::UsageError, "line " + tostr(line) + ": Expected dest to be cpu or vpu register"}; return false; }
 
@@ -1712,7 +1714,7 @@ bool AssembleArgs::TryProcessDEBUG_mem()
 	if (!TryParseAddress(args[0], a, b, ptr_base, sizecode, explicit_size)) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Expected memory operand as first arg\n-> " + res.ErrorMsg}; return false; }
 
 	if (!TryParseImm(args[1], count, sizecode, explicit_size, strict)) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Expected imm as second arg\n-> " + res.ErrorMsg}; return false; }
-	if (explicit_size) { res = {AssembleError::UsageError, "line " + tostr(line) + ": A size directive in this context is not allowed"}; return false; }
+	if (explicit_size) { res = {AssembleError::UsageError, "line " + tostr(line) + ": A get_size directive in this context is not allowed"}; return false; }
 	if (strict) { res = {AssembleError::UsageError, "line " + tostr(line) + ": A STRICT specifier in this context is not allowed"}; return false; }
 
 	if (!TryAppendAddress(a, b, std::move(ptr_base))) return false;
@@ -1735,18 +1737,18 @@ bool AssembleArgs::TryProcessTernaryOp(OPCode opcode, bool has_ext_op, u8 ext_op
 	if (!TryParseCPURegister(args[0], dest, a_sizecode, dest_high)) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Expected cpu register as first operand"}; return false; }
 	if (!TryParseImm(args[2], imm, imm_sz, imm_sz_explicit, imm_strict)) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Expected imm as third operand"}; return false; }
 
-	if (imm_sz_explicit && imm_sz != a_sizecode) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Operand size mismatch"}; return false; }
-	if ((Size(a_sizecode) & sizemask) == 0) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Specified size is not supported"}; return false; }
+	if (imm_sz_explicit && imm_sz != a_sizecode) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Operand get_size mismatch"}; return false; }
+	if ((get_size(a_sizecode) & sizemask) == 0) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Specified get_size is not supported"}; return false; }
 
 	// reg
 	u64 reg, b_sizecode;
 	bool reg_high;
 	if (TryParseCPURegister(args[1], reg, b_sizecode, reg_high))
 	{
-		if (a_sizecode != b_sizecode) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Operand size missmatch"}; return false; }
+		if (a_sizecode != b_sizecode) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Operand get_size missmatch"}; return false; }
 
 		if (!TryAppendVal(1, (dest << 4) | (a_sizecode << 2) | (dest_high ? 2 : 0ul) | 0)) return false;
-		if (!TryAppendExpr(Size(a_sizecode), std::move(imm))) return false;
+		if (!TryAppendExpr(get_size(a_sizecode), std::move(imm))) return false;
 		if (!TryAppendVal(1, (reg_high ? 128 : 0ul) | reg)) return false;
 	}
 	// mem
@@ -1757,10 +1759,10 @@ bool AssembleArgs::TryProcessTernaryOp(OPCode opcode, bool has_ext_op, u8 ext_op
 		bool explicit_size;
 		if (!TryParseAddress(args[1], a, b, ptr_base, b_sizecode, explicit_size)) return false;
 
-		if (explicit_size && a_sizecode != b_sizecode) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Operand size missmatch"}; return false; }
+		if (explicit_size && a_sizecode != b_sizecode) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Operand get_size missmatch"}; return false; }
 
 		if (!TryAppendVal(1, (dest << 4) | (a_sizecode << 2) | (dest_high ? 2 : 0ul) | 1)) return false;
-		if (!TryAppendExpr(Size(a_sizecode), std::move(imm))) return false;
+		if (!TryAppendExpr(get_size(a_sizecode), std::move(imm))) return false;
 		if (!TryAppendAddress(a, b, std::move(ptr_base))) return false;
 	}
 	// imm
@@ -1781,14 +1783,14 @@ bool AssembleArgs::TryProcessBinaryOp(OPCode opcode, bool has_ext_op, u8 ext_op,
 	bool dest_high;
 	if (TryParseCPURegister(args[0], dest, a_sizecode, dest_high))
 	{
-		if ((Size(a_sizecode) & sizemask) == 0) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Specified size not supported"}; return false; }
+		if ((get_size(a_sizecode) & sizemask) == 0) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Specified get_size not supported"}; return false; }
 
 		// reg, reg
 		u64 src, b_sizecode;
 		bool src_high;
 		if (TryParseCPURegister(args[1], src, b_sizecode, src_high))
 		{
-			if (a_sizecode != b_sizecode) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Operand size missmatch"}; return false; }
+			if (a_sizecode != b_sizecode) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Operand get_size missmatch"}; return false; }
 
 			if (!TryAppendVal(1, (dest << 4) | (a_sizecode << 2) | (dest_high ? 2 : 0ul) | (src_high ? 1 : 0ul))) return false;
 			if (!TryAppendVal(1, src)) return false;
@@ -1801,7 +1803,7 @@ bool AssembleArgs::TryProcessBinaryOp(OPCode opcode, bool has_ext_op, u8 ext_op,
 			Expr ptr_base;
 			if (!TryParseAddress(args[1], a, b, ptr_base, b_sizecode, explicit_size)) return false;
 
-			if (explicit_size && a_sizecode != b_sizecode) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Operand size missmatch"}; return false; }
+			if (explicit_size && a_sizecode != b_sizecode) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Operand get_size missmatch"}; return false; }
 
 			if (!TryAppendVal(1, (dest << 4) | (a_sizecode << 2) | (dest_high ? 2 : 0ul))) return false;
 			if (!TryAppendVal(1, (2 << 4))) return false;
@@ -1817,7 +1819,7 @@ bool AssembleArgs::TryProcessBinaryOp(OPCode opcode, bool has_ext_op, u8 ext_op,
 			// fix up size codes
 			if (_force_b_imm_sizecode == -1)
 			{
-				if (explicit_size) { if (a_sizecode != b_sizecode) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Operand size missmatch"}; return false; } }
+				if (explicit_size) { if (a_sizecode != b_sizecode) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Operand get_size missmatch"}; return false; } }
 				else b_sizecode = a_sizecode;
 			}
 			else if (_force_b_imm_sizecode == -666) { res = {AssembleError::UsageError, "line " + tostr(line) + ": An imm in this context is not allowed"}; return false; }
@@ -1825,7 +1827,7 @@ bool AssembleArgs::TryProcessBinaryOp(OPCode opcode, bool has_ext_op, u8 ext_op,
 
 			if (!TryAppendVal(1, (dest << 4) | (a_sizecode << 2) | (dest_high ? 2 : 0ul))) return false;
 			if (!TryAppendVal(1, (1 << 4))) return false;
-			if (!TryAppendExpr(Size(b_sizecode), std::move(imm))) return false;
+			if (!TryAppendExpr(get_size(b_sizecode), std::move(imm))) return false;
 		}
 	}
 	// mem, *
@@ -1841,9 +1843,9 @@ bool AssembleArgs::TryProcessBinaryOp(OPCode opcode, bool has_ext_op, u8 ext_op,
 		bool src_high;
 		if (TryParseCPURegister(args[1], src, b_sizecode, src_high))
 		{
-			if ((Size(b_sizecode) & sizemask) == 0) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Specified size not supported"}; return false; }
+			if ((get_size(b_sizecode) & sizemask) == 0) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Specified get_size not supported"}; return false; }
 
-			if (a_explicit && a_sizecode != b_sizecode) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Argument size missmatch"}; return false; }
+			if (a_explicit && a_sizecode != b_sizecode) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Argument get_size missmatch"}; return false; }
 
 			if (!TryAppendVal(1, (b_sizecode << 2) | (src_high ? 1 : 0ul))) return false;
 			if (!TryAppendVal(1, (3 << 4) | src)) return false;
@@ -1861,20 +1863,20 @@ bool AssembleArgs::TryProcessBinaryOp(OPCode opcode, bool has_ext_op, u8 ext_op,
 			// fix up the size codes
 			if (_force_b_imm_sizecode == -1)
 			{
-				if (a_explicit && b_explicit) { if (a_sizecode != b_sizecode) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Operand size mismatch"}; return false; } }
+				if (a_explicit && b_explicit) { if (a_sizecode != b_sizecode) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Operand get_size mismatch"}; return false; } }
 				else if (b_explicit) a_sizecode = b_sizecode;
 				else if (a_explicit) b_sizecode = a_sizecode;
-				else { res = {AssembleError::UsageError, "line " + tostr(line) + ": Could not deduce operand size"}; return false; }
+				else { res = {AssembleError::UsageError, "line " + tostr(line) + ": Could not deduce operand get_size"}; return false; }
 			}
 			else if (_force_b_imm_sizecode == -666) { res = { AssembleError::UsageError, "line " + tostr(line) + ": An imm in this context is not allowed" }; return false; }
 			else b_sizecode = (u64)_force_b_imm_sizecode;
 
-			if ((Size(a_sizecode) & sizemask) == 0) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Specified size not supported"}; return false; }
+			if ((get_size(a_sizecode) & sizemask) == 0) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Specified get_size not supported"}; return false; }
 
 			if (!TryAppendVal(1, a_sizecode << 2)) return false;
 			if (!TryAppendVal(1, 4 << 4)) return false;
 			if (!TryAppendAddress(a, b, std::move(ptr_base))) return false;
-			if (!TryAppendExpr(Size(b_sizecode), std::move(imm))) return false;
+			if (!TryAppendExpr(get_size(b_sizecode), std::move(imm))) return false;
 		}
 	}
 	// imm, *
@@ -1895,7 +1897,7 @@ bool AssembleArgs::TryProcessUnaryOp(OPCode opcode, bool has_ext_op, u8 ext_op, 
 	bool reg_high;
 	if (TryParseCPURegister(args[0], reg, a_sizecode, reg_high))
 	{
-		if ((Size(a_sizecode) & sizemask) == 0) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Specified size not supported"}; return false; }
+		if ((get_size(a_sizecode) & sizemask) == 0) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Specified get_size not supported"}; return false; }
 
 		if (!TryAppendVal(1, (reg << 4) | (a_sizecode << 2) | (reg_high ? 2 : 0ul))) return false;
 	}
@@ -1907,9 +1909,9 @@ bool AssembleArgs::TryProcessUnaryOp(OPCode opcode, bool has_ext_op, u8 ext_op, 
 		bool explicit_size;
 		if (!TryParseAddress(args[0], a, b, ptr_base, a_sizecode, explicit_size)) return false;
 
-		if (!explicit_size) { res = {AssembleError::FormatError, "line " + tostr(line) + ": Could not deduce operand size"}; return false; }
+		if (!explicit_size) { res = {AssembleError::FormatError, "line " + tostr(line) + ": Could not deduce operand get_size"}; return false; }
 
-		if ((Size(a_sizecode) & sizemask) == 0) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Specified size not supported"}; return false; }
+		if ((get_size(a_sizecode) & sizemask) == 0) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Specified get_size not supported"}; return false; }
 
 		if (!TryAppendVal(1, (a_sizecode << 2) | 1)) return false;
 		if (!TryAppendAddress(a, b, std::move(ptr_base))) return false;
@@ -1932,7 +1934,7 @@ bool AssembleArgs::TryProcessIMMRM(OPCode opcode, bool has_ext_op, u8 ext_op, u6
 	bool reg_high;
 	if (TryParseCPURegister(args[0], reg, a_sizecode, reg_high))
 	{
-		if ((Size(a_sizecode) & sizemask) == 0) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Specified size not supported"}; return false; }
+		if ((get_size(a_sizecode) & sizemask) == 0) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Specified get_size not supported"}; return false; }
 
 		if (!TryAppendVal(1, (reg << 4) | (a_sizecode << 2) | (reg_high ? 1 : 0ul))) return false;
 	}
@@ -1946,10 +1948,10 @@ bool AssembleArgs::TryProcessIMMRM(OPCode opcode, bool has_ext_op, u8 ext_op, u6
 
 		if (!explicit_size)
 		{
-			if (default_sizecode == -1) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Could not deduce operand size"}; return false; }
+			if (default_sizecode == -1) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Could not deduce operand get_size"}; return false; }
 			else a_sizecode = (u64)default_sizecode;
 		}
-		if ((Size(a_sizecode) & sizemask) == 0) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Specified size not supported"}; return false; }
+		if ((get_size(a_sizecode) & sizemask) == 0) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Specified get_size not supported"}; return false; }
 
 		if (!TryAppendVal(1, (a_sizecode << 2) | 3)) return false;
 		if (!TryAppendAddress(a, b, std::move(ptr_base))) return false;
@@ -1963,13 +1965,13 @@ bool AssembleArgs::TryProcessIMMRM(OPCode opcode, bool has_ext_op, u8 ext_op, u6
 
 		if (!explicit_size)
 		{
-			if (default_sizecode == -1) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Could not deduce operand size"}; return false; }
+			if (default_sizecode == -1) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Could not deduce operand get_size"}; return false; }
 			else a_sizecode = (u64)default_sizecode;
 		}
-		if ((Size(a_sizecode) & sizemask) == 0) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Specified size not supported"}; return false; }
+		if ((get_size(a_sizecode) & sizemask) == 0) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Specified get_size not supported"}; return false; }
 
 		if (!TryAppendVal(1, (a_sizecode << 2) | 2)) return false;
-		if (!TryAppendExpr(Size(a_sizecode), std::move(imm))) return false;
+		if (!TryAppendExpr(get_size(a_sizecode), std::move(imm))) return false;
 	}
 
 	return true;
@@ -1988,7 +1990,7 @@ bool AssembleArgs::TryProcessRR_RM(OPCode opcode, bool has_ext_op, u8 ext_op, u6
 	if (TryParseCPURegister(args[0], dest, sizecode, dest_high))
 	{
 		// apply size mask
-		if ((Size(sizecode) & sizemask) == 0) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Specified size not supported"}; return false; }
+		if ((get_size(sizecode) & sizemask) == 0) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Specified get_size not supported"}; return false; }
 
 		// reg, reg, *
 		u64 src_1, src_1_sizecode;
@@ -2000,7 +2002,7 @@ bool AssembleArgs::TryProcessRR_RM(OPCode opcode, bool has_ext_op, u8 ext_op, u6
 			bool src_2_high;
 			if (TryParseCPURegister(args[2], src_2, src_2_sizecode, src_2_high))
 			{
-				if (sizecode != src_1_sizecode || sizecode != src_2_sizecode) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Operand size mismatch"}; return false; }
+				if (sizecode != src_1_sizecode || sizecode != src_2_sizecode) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Operand get_size mismatch"}; return false; }
 
 				if (!TryAppendVal(1, (dest << 4) | (sizecode << 2) | (dest_high ? 2 : 0ul) | 0)) return false;
 				if (!TryAppendVal(1, (src_1_high ? 128 : 0ul) | src_1)) return false;
@@ -2014,7 +2016,7 @@ bool AssembleArgs::TryProcessRR_RM(OPCode opcode, bool has_ext_op, u8 ext_op, u6
 				bool src_2_explicit_size;
 				if (!TryParseAddress(args[2], a, b, ptr_base, src_2_sizecode, src_2_explicit_size)) return false;
 
-				if (sizecode != src_1_sizecode || (src_2_explicit_size && sizecode != src_2_sizecode)) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Operand size mismatch"}; return false; }
+				if (sizecode != src_1_sizecode || (src_2_explicit_size && sizecode != src_2_sizecode)) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Operand get_size mismatch"}; return false; }
 
 				if (!TryAppendVal(1, (dest << 4) | (sizecode << 2) | (dest_high ? 2 : 0ul) | 1)) return false;
 				if (!TryAppendVal(1, (src_1_high ? 128 : 0ul) | src_1)) return false;
@@ -2089,7 +2091,7 @@ bool AssembleArgs::TryProcessXCHG(OPCode opcode)
 		bool src_high;
 		if (TryParseCPURegister(args[1], src, b_sizecode, src_high))
 		{
-			if (a_sizecode != b_sizecode) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Operand size missmatch"}; return false; }
+			if (a_sizecode != b_sizecode) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Operand get_size missmatch"}; return false; }
 
 			if (!TryAppendVal(1, (reg << 4) | (a_sizecode << 2) | (reg_high ? 2 : 0ul) | 0)) return false;
 			if (!TryAppendVal(1, (src_high ? 128 : 0ul) | src)) return false;
@@ -2102,7 +2104,7 @@ bool AssembleArgs::TryProcessXCHG(OPCode opcode)
 			bool explicit_size;
 			if (!TryParseAddress(args[1], a, b, ptr_base, b_sizecode, explicit_size)) return false;
 
-			if (explicit_size && a_sizecode != b_sizecode) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Operand size missmatch"}; return false; }
+			if (explicit_size && a_sizecode != b_sizecode) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Operand get_size missmatch"}; return false; }
 
 			if (!TryAppendVal(1, (reg << 4) | (a_sizecode << 2) | (reg_high ? 2 : 0ul) | 1)) return false;
 			if (!TryAppendAddress(a, b, std::move(ptr_base))) return false;
@@ -2122,7 +2124,7 @@ bool AssembleArgs::TryProcessXCHG(OPCode opcode)
 		u64 b_sizecode;
 		if (TryParseCPURegister(args[1], reg, b_sizecode, reg_high))
 		{
-			if (explicit_size && a_sizecode != b_sizecode) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Operand size missmatch"}; return false; }
+			if (explicit_size && a_sizecode != b_sizecode) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Operand get_size missmatch"}; return false; }
 
 			if (!TryAppendVal(1, (reg << 4) | (b_sizecode << 2) | (reg_high ? 2 : 0ul) | 1)) return false;
 			if (!TryAppendAddress(a, b, std::move(ptr_base))) return false;
@@ -2169,7 +2171,7 @@ bool AssembleArgs::TryProcessPOP(OPCode opcode)
 	bool a_high;
 	if (TryParseCPURegister(args[0], reg, a_sizecode, a_high))
 	{
-		if ((Size(a_sizecode) & 14) == 0) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Specified size is not supported"}; return false; }
+		if ((get_size(a_sizecode) & 14) == 0) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Specified get_size is not supported"}; return false; }
 
 		if (!TryAppendVal(1, (reg << 4) | (a_sizecode << 2))) return false;
 	}
@@ -2181,10 +2183,10 @@ bool AssembleArgs::TryProcessPOP(OPCode opcode)
 		bool explicit_size;
 		if (!TryParseAddress(args[0], a, b, ptr_base, a_sizecode, explicit_size)) return false;
 
-		if (!explicit_size) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Could not deduce operand size"}; return false; }
+		if (!explicit_size) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Could not deduce operand get_size"}; return false; }
 
 		// make sure operand size is 2, 4, or 8-bytes
-		if ((Size(a_sizecode) & 14) == 0) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Specified size is not supported"}; return false; }
+		if ((get_size(a_sizecode) & 14) == 0) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Specified get_size is not supported"}; return false; }
 
 		if (!TryAppendVal(1, (a_sizecode << 2) | 1)) return false;
 		if (!TryAppendAddress(a, b, std::move(ptr_base))) return false;
@@ -2213,7 +2215,7 @@ bool AssembleArgs::_TryProcessShift_mid()
 		if (!TryParseImm(args[1], imm, b_sizecode, explicit_size, strict)) return false;
 
 		// we're forcing this to be encoded in 1 byte, so don't allow explicit size or strict specifiers (for the imm we just parsed)
-		if (explicit_size) { res = {AssembleError::UsageError, "line " + tostr(line) + ": A size directive in this context is not allowed"}; return false; }
+		if (explicit_size) { res = {AssembleError::UsageError, "line " + tostr(line) + ": A get_size directive in this context is not allowed"}; return false; }
 		if (strict) { res = {AssembleError::UsageError, "line " + tostr(line) + ": A STRICT specifier in this context is not allowed"}; return false; }
 
 		// mask the shift count to 6 bits (we just need to make sure it can't set the CL flag)
@@ -2249,10 +2251,10 @@ bool AssembleArgs::TryProcessShift(OPCode opcode)
 		bool explicit_size;
 		if (!TryParseAddress(args[0], a, b, ptr_base, a_sizecode, explicit_size)) return false;
 
-		if (!explicit_size) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Could not deduce operand size"}; return false; }
+		if (!explicit_size) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Could not deduce operand get_size"}; return false; }
 
 		// make sure we're using a normal word size
-		if (a_sizecode > 3) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Specified size is not supported"}; return false; }
+		if (a_sizecode > 3) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Specified get_size is not supported"}; return false; }
 
 		if (!TryAppendVal(1, (a_sizecode << 2) | 1)) return false;
 		if (!_TryProcessShift_mid()) return false;
@@ -2282,7 +2284,7 @@ bool AssembleArgs::_TryProcessMOVxX_settings_byte(bool sign, u64 dest, u64 dest_
 	case 0x131: mode = 9; break;
 	case 0x132: mode = 10; break;
 
-	default: res = {AssembleError::UsageError, "line " + tostr(line) + ": Specified size combination is not supported"}; return false;
+	default: res = {AssembleError::UsageError, "line " + tostr(line) + ": Specified get_size combination is not supported"}; return false;
 	}
 
 	return TryAppendByte((u8)((dest << 4) | mode));
@@ -2317,7 +2319,7 @@ bool AssembleArgs::TryProcessMOVxX(OPCode opcode, bool sign)
 		bool explicit_size;
 		if (!TryParseAddress(args[1], a, b, ptr_base, src_sizecode, explicit_size)) return false;
 
-		if (!explicit_size) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Could not deduce operand size"}; return false; }
+		if (!explicit_size) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Could not deduce operand get_size"}; return false; }
 
 		// write the settings byte
 		if (!_TryProcessMOVxX_settings_byte(sign, dest, dest_sizecode, src_sizecode)) return false;
@@ -2343,13 +2345,13 @@ bool AssembleArgs::_TryGetBinaryStringOpSize(u64 &sizecode)
 	if (!TryParseAddress(args[0], a, b, expr, sz_1, expl_1) || !TryParseAddress(args[1], a, b, expr, sz_2, expl_2)) return false;
 
 	// need an explicit size (that is consistent)
-	if (expl_1 && expl_2) { if (sz_1 != sz_2) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Operand size mismatch"}; return false; } sizecode = sz_1; }
+	if (expl_1 && expl_2) { if (sz_1 != sz_2) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Operand get_size mismatch"}; return false; } sizecode = sz_1; }
 	else if (expl_1) sizecode = sz_1;
 	else if (expl_2) sizecode = sz_2;
-	else { res = {AssembleError::UsageError, "line " + tostr(line) + ": Could not deduce operand size"}; return false; }
+	else { res = {AssembleError::UsageError, "line " + tostr(line) + ": Could not deduce operand get_size"}; return false; }
 
 	// make sure sizecode is in range
-	if (sizecode > 3) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Specified operand size is not supported"}; return false; }
+	if (sizecode > 3) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Specified operand get_size is not supported"}; return false; }
 
 	return true;
 }
@@ -2399,8 +2401,8 @@ bool AssembleArgs::TryProcessSTOS_string(OPCode opcode, bool rep)
 	Expr ptr_base;
 	bool explicit_size;
 	if (!TryParseAddress(args[0], a, b, ptr_base, sizecode, explicit_size)) return false;
-	if (!explicit_size) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Could not deduce operand size"}; return false; }
-	if (sizecode > 3) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Specified operand size is not supported"}; return false; }
+	if (!explicit_size) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Could not deduce operand get_size"}; return false; }
+	if (sizecode > 3) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Specified operand get_size is not supported"}; return false; }
 
 	if (!TryAppendByte((u8)opcode)) return false;
 	if (!TryAppendByte((u8)(((rep ? 8 : 7) << 2) | sizecode))) return false;
@@ -2416,8 +2418,8 @@ bool AssembleArgs::TryProcessSCAS_string(OPCode opcode, bool repe, bool repne)
 	Expr ptr_base;
 	bool explicit_size;
 	if (!TryParseAddress(args[0], a, b, ptr_base, sizecode, explicit_size)) return false;
-	if (!explicit_size) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Could not deduce operand size"}; return false; }
-	if (sizecode > 3) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Specified operand size is not supported"}; return false; }
+	if (!explicit_size) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Could not deduce operand get_size"}; return false; }
+	if (sizecode > 3) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Specified operand get_size is not supported"}; return false; }
 
 	if (!TryAppendByte((u8)opcode)) return false;
 	if (!TryAppendByte((u8)(((repne ? 11 : repe ? 10 : 9) << 2) | sizecode))) return false;
@@ -2434,12 +2436,12 @@ bool AssembleArgs::TryProcessPrefixOp(std::string &actual)
 	for (len = 0; len < args[0].size() && !std::isspace(args[0][len]); ++len);
 
 	// extract that as the "actual" instruction to modify - convert to uppercase
-	actual = ToUpper(args[0].substr(0, len));
+	actual = to_upper(args[0].substr(0, len));
 
 	// if we got the whole arg, remove first arg entirely
 	if (len == args[0].size()) args.erase(args.begin());
 	// otherwise, remove what we took and chop off leading white space
-	else args[0] = TrimStart(args[0].substr(len));
+	else args[0] = trim_start(args[0].substr(len));
 
 	return true;
 }
@@ -2530,11 +2532,11 @@ bool AssembleArgs::TryProcessLOCK()
 	if (!TryProcessPrefixOp(actual)) return false;
 
 	// make sure actual is an instruction that can legally be modified by LOCK
-	if (!Contains(valid_lock_instructions, actual)) { res = { AssembleError::UsageError, "line " + tostr(line) + ": LOCK cannot modify the specified instruction" }; return false; }
+	if (!contains(valid_lock_instructions, actual)) { res = { AssembleError::UsageError, "line " + tostr(line) + ": LOCK cannot modify the specified instruction" }; return false; }
 
 	// get the proper routing handler
 	const asm_router *router;
-	if (!TryGetValue(asm_routing_table, actual, router)) { res = { AssembleError::UnknownOp, "line " + tostr(line) + ": Unknown augmented instruction" }; return false; }
+	if (!try_get_value(asm_routing_table, actual, router)) { res = { AssembleError::UnknownOp, "line " + tostr(line) + ": Unknown augmented instruction" }; return false; }
 	
 	// perform the assembly action
 	return (*router)(*this);
@@ -2559,7 +2561,7 @@ bool AssembleArgs::TryProcessBSx(OPCode opcode, bool forward)
 	if (TryParseCPURegister(args[1], src, src_sz, high))
 	{
 		// make sure sizes match
-		if (dest_sz != src_sz) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Operand size mismatch"}; return false; }
+		if (dest_sz != src_sz) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Operand get_size mismatch"}; return false; }
 
 		if (!TryAppendByte((u8)((forward ? 128 : 0) | (dest_sz << 4) | dest))) return false;
 		if (!TryAppendByte((u8)src)) return false;
@@ -2573,7 +2575,7 @@ bool AssembleArgs::TryProcessBSx(OPCode opcode, bool forward)
 		if (!TryParseAddress(args[1], a, b, ptr_base, src_sz, src_explicit)) return false;
 
 		// make sure sizes match
-		if (src_explicit && dest_sz != src_sz) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Operand size mismatch"}; return false; }
+		if (src_explicit && dest_sz != src_sz) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Operand get_size mismatch"}; return false; }
 
 		if (!TryAppendByte((u8)((forward ? 128 : 0) | 64 | (dest_sz << 4) | dest))) return false;
 		if (!TryAppendAddress(a, b, std::move(ptr_base))) return false;
@@ -2604,7 +2606,7 @@ bool AssembleArgs::TryProcessIN(OPCode op)
 	}
 	else if (TryParseImm(args[1], expr, t_sizecode, explicit_size, strict))
 	{
-		if (explicit_size) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Explicit size specifier in this context is not allowed"}; return false; }
+		if (explicit_size) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Explicit get_size specifier in this context is not allowed"}; return false; }
 		if (strict) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Strict specifier in this context is not allowed"}; return false; }
 
 		if (!TryAppendByte((u8)((sizecode << 6) | 0 | 0))) return false;
@@ -2635,7 +2637,7 @@ bool AssembleArgs::TryProcessOUT(OPCode op)
 	}
 	else if (TryParseImm(args[0], expr, t_sizecode, explicit_size, strict))
 	{
-		if (explicit_size) { res = { AssembleError::UsageError, "line " + tostr(line) + ": Explicit size specifier in this context is not allowed" }; return false; }
+		if (explicit_size) { res = { AssembleError::UsageError, "line " + tostr(line) + ": Explicit get_size specifier in this context is not allowed" }; return false; }
 		if (strict) { res = { AssembleError::UsageError, "line " + tostr(line) + ": Strict specifier in this context is not allowed" }; return false; }
 
 		if (!TryAppendByte((u8)((sizecode << 6) | 2 | 0))) return false;
@@ -2670,21 +2672,21 @@ bool AssembleArgs::TryProcessFPUBinaryOp(OPCode opcode, bool integral, bool pop)
 		bool explicit_size;
 		if (!TryParseAddress(args[0], a, b, ptr_base, sizecode, explicit_size)) return false;
 
-		if (!explicit_size) { res = {AssembleError::FormatError, "line " + tostr(line) + ": Could not deduce operand size"}; return false; }
+		if (!explicit_size) { res = {AssembleError::FormatError, "line " + tostr(line) + ": Could not deduce operand get_size"}; return false; }
 
 		// integral
 		if (integral)
 		{
 			if (sizecode == 1) { if (!TryAppendByte(5)) return false; }
 			else if (sizecode == 2) { if (!TryAppendByte(6)) return false; }
-			else { res = {AssembleError::UsageError, "line " + tostr(line) + ": Specified size is not supported"}; return false; }
+			else { res = {AssembleError::UsageError, "line " + tostr(line) + ": Specified get_size is not supported"}; return false; }
 		}
 		// floatint-point
 		else
 		{
 			if (sizecode == 2) { if (!TryAppendByte(3)) return false; }
 			else if (sizecode == 3) { if (!TryAppendByte(4)) return false; }
-			else { res = {AssembleError::UsageError, "line " + tostr(line) + ": Specified size is not supported"}; return false; }
+			else { res = {AssembleError::UsageError, "line " + tostr(line) + ": Specified get_size is not supported"}; return false; }
 		}
 
 		// write the address
@@ -2742,7 +2744,7 @@ bool AssembleArgs::TryProcessFSTLD_WORD(OPCode opcode, u8 mode, u64 _sizecode)
 	if (!TryParseAddress(args[0], a, b, ptr_base, sizecode, explicit_size)) return false;
 
 	// must be the dictated size
-	if (explicit_size && sizecode != _sizecode) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Specified operand size is not supported"}; return false; }
+	if (explicit_size && sizecode != _sizecode) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Specified operand get_size is not supported"}; return false; }
 
 	// write data
 	if (!TryAppendByte((u8)opcode)) return false;
@@ -2773,19 +2775,19 @@ bool AssembleArgs::TryProcessFLD(OPCode opcode, bool integral)
 		bool explicit_size;
 		if (!TryParseAddress(args[0], a, b, ptr_base, sizecode, explicit_size)) return false;
 
-		if (!explicit_size) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Could not deduce operand size"}; return false; }
+		if (!explicit_size) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Could not deduce operand get_size"}; return false; }
 
 		// handle integral cases
 		if (integral)
 		{
-			if (sizecode != 1 && sizecode != 2 && sizecode != 3) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Specified size is not supported"}; return false; }
+			if (sizecode != 1 && sizecode != 2 && sizecode != 3) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Specified get_size is not supported"}; return false; }
 
 			if (!TryAppendVal(1, sizecode + 2)) return false;
 		}
 		// otherwise floating-point
 		else
 		{
-			if (sizecode != 2 && sizecode != 3) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Specified size is not supported"}; return false; }
+			if (sizecode != 2 && sizecode != 3) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Specified get_size is not supported"}; return false; }
 
 			if (!TryAppendVal(1, sizecode - 1)) return false;
 		}
@@ -2821,7 +2823,7 @@ bool AssembleArgs::TryProcessFST(OPCode opcode, bool integral, bool pop, bool tr
 		bool explicit_size;
 		if (!TryParseAddress(args[0], a, b, ptr_base, sizecode, explicit_size)) return false;
 
-		if (!explicit_size) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Could not deduce operand size"}; return false; }
+		if (!explicit_size) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Could not deduce operand get_size"}; return false; }
 
 		// if this is integral (i.e. truncation store)
 		if (integral)
@@ -2831,18 +2833,18 @@ bool AssembleArgs::TryProcessFST(OPCode opcode, bool integral, bool pop, bool tr
 			else if (sizecode == 3)
 			{
 				// there isn't a non-popping 64-bit int store
-				if (!pop) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Specified size is not supported"}; return false; }
+				if (!pop) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Specified get_size is not supported"}; return false; }
 
 				if (!TryAppendVal(1, trunc ? 13 : 10ul)) return false;
 			}
-			else { res = {AssembleError::UsageError, "line " + tostr(line) + ": Specified size is not supported"}; return false; }
+			else { res = {AssembleError::UsageError, "line " + tostr(line) + ": Specified get_size is not supported"}; return false; }
 		}
 		// otherwise is floating-point
 		else
 		{
 			if (sizecode == 2) { if (!TryAppendVal(1, pop ? 3 : 2ul)) return false; }
 			else if (sizecode == 3) { if (!TryAppendVal(1, pop ? 5 : 4ul)) return false; }
-			else { res = {AssembleError::UsageError, "line " + tostr(line) + ": Specified size is not supported"}; return false; }
+			else { res = {AssembleError::UsageError, "line " + tostr(line) + ": Specified get_size is not supported"}; return false; }
 		}
 
 		// and write the address
@@ -2889,13 +2891,13 @@ bool AssembleArgs::TryProcessFCOM(OPCode opcode, bool integral, bool pop, bool p
 			bool explicit_size;
 			if (!TryParseAddress(args[0], a, b, ptr_base, sizecode, explicit_size)) return false;
 
-			if (!explicit_size) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Could not deduce operand size"}; return false; }
+			if (!explicit_size) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Could not deduce operand get_size"}; return false; }
 
 			// handle size cases
 			if (sizecode == 1)
 			{
 				// this mode only allows int
-				if (!integral) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Specified size is not supported"}; return false; }
+				if (!integral) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Specified get_size is not supported"}; return false; }
 
 				if (!TryAppendVal(1, (unordered ? 128 : 0ul) | (pop ? 8 : 7ul))) return false;
 			}
@@ -2906,11 +2908,11 @@ bool AssembleArgs::TryProcessFCOM(OPCode opcode, bool integral, bool pop, bool p
 			else if (sizecode == 3)
 			{
 				// this mode only allows fp
-				if (integral) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Specified size is not supported"}; return false; }
+				if (integral) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Specified get_size is not supported"}; return false; }
 
 				if (!TryAppendVal(1, (unordered ? 128 : 0ul) | (pop ? 6 : 5ul))) return false;
 			}
-			else { res = {AssembleError::UsageError, "line " + tostr(line) + ": Specified size is not supported"}; return false; }
+			else { res = {AssembleError::UsageError, "line " + tostr(line) + ": Specified get_size is not supported"}; return false; }
 
 			// and write the address
 			if (!TryAppendAddress(a, b, std::move(ptr_base))) return false;
@@ -2958,7 +2960,7 @@ bool AssembleArgs::TryExtractVPUMask(std::string &arg, std::unique_ptr<Expr> &ma
 	{
 		// remove the z
 		arg.pop_back();
-		arg = TrimEnd(std::move(arg));
+		arg = trim_end(std::move(arg));
 
 		// ensure validity - must be preceded by }
 		if (arg.size() == 0 || arg.back() != '}') { res = {AssembleError::FormatError, "line " + tostr(line) + ": Zmask declarator encountered without a corresponding mask"}; return false; }
@@ -2978,7 +2980,7 @@ bool AssembleArgs::TryExtractVPUMask(std::string &arg, std::unique_ptr<Expr> &ma
 		// extract the whitemask internals
 		std::string innards = arg.substr(pos + 1, arg.size() - 2 - pos);
 		// pop the whitemask off the arg
-		arg = TrimEnd(arg.substr(0, pos));
+		arg = trim_end(arg.substr(0, pos));
 
 		// parse the mask expression
 		u64 sizecode;
@@ -2987,7 +2989,7 @@ bool AssembleArgs::TryExtractVPUMask(std::string &arg, std::unique_ptr<Expr> &ma
 		if (!TryParseImm(innards, _mask, sizecode, explicit_size, strict)) return false;
 
 		// depending on the vpu register size being used, we're locked into a mask size, so don't allow size directives or strict specifiers
-		if (explicit_size) { res = {AssembleError::UsageError, "line " + tostr(line) + ": A size directive in this context is not allowed"}; return false; }
+		if (explicit_size) { res = {AssembleError::UsageError, "line " + tostr(line) + ": A get_size directive in this context is not allowed"}; return false; }
 		if (strict) { res = {AssembleError::UsageError, "line " + tostr(line) + ": A STRICT specifier in this context is not allowed"}; return false; }
 
 		// we now need to return it as a dynamic object - handle with care
@@ -3041,7 +3043,7 @@ bool AssembleArgs::TryProcessVPUMove(OPCode opcode, u64 elem_sizecode, bool mask
 	u64 dest, dest_sizecode;
 	if (TryParseVPURegister(args[0], dest, dest_sizecode))
 	{
-		u64 elem_count = scalar ? 1 : Size(dest_sizecode) >> elem_sizecode;
+		u64 elem_count = scalar ? 1 : get_size(dest_sizecode) >> elem_sizecode;
 		bool mask_present = VPUMaskPresent(mask.get(), elem_count);
 
 		// if we're in vector mode and the mask is not present, we can kick it up to 64-bit mode (for performance)
@@ -3051,11 +3053,11 @@ bool AssembleArgs::TryProcessVPUMove(OPCode opcode, u64 elem_sizecode, bool mask
 		u64 src, src_sizecode;
 		if (TryParseVPURegister(args[1], src, src_sizecode))
 		{
-			if (dest_sizecode != src_sizecode) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Operand size mismatch"}; return false; }
+			if (dest_sizecode != src_sizecode) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Operand get_size mismatch"}; return false; }
 
 			if (!TryAppendVal(1, (dest << 3) | (aligned ? 4 : 0ul) | (dest_sizecode - 4))) return false;
 			if (!TryAppendVal(1, (mask_present ? 128 : 0ul) | (zmask ? 64 : 0ul) | (scalar ? 32 : 0ul) | (elem_sizecode << 2) | 0)) return false;
-			if (mask_present && !TryAppendExpr(BitsToBytes(elem_count), std::move(*mask))) return false;
+			if (mask_present && !TryAppendExpr(bits_to_bytes(elem_count), std::move(*mask))) return false;
 			if (!TryAppendVal(1, src)) return false;
 		}
 		// vreg, mem
@@ -3066,11 +3068,11 @@ bool AssembleArgs::TryProcessVPUMove(OPCode opcode, u64 elem_sizecode, bool mask
 			bool src_explicit;
 			if (!TryParseAddress(args[1], a, b, ptr_base, src_sizecode, src_explicit)) return false;
 
-			if (src_explicit && src_sizecode != (scalar ? elem_sizecode : dest_sizecode)) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Operand size mismatch"}; return false; }
+			if (src_explicit && src_sizecode != (scalar ? elem_sizecode : dest_sizecode)) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Operand get_size mismatch"}; return false; }
 
 			if (!TryAppendVal(1, (dest << 3) | (aligned ? 4 : 0ul) | (dest_sizecode - 4))) return false;
 			if (!TryAppendVal(1, (mask_present ? 128 : 0ul) | (zmask ? 64 : 0ul) | (scalar ? 32 : 0ul) | (elem_sizecode << 2) | 1)) return false;
-			if (mask_present && !TryAppendExpr(BitsToBytes(elem_count), std::move(*mask))) return false;
+			if (mask_present && !TryAppendExpr(bits_to_bytes(elem_count), std::move(*mask))) return false;
 			if (!TryAppendAddress(a, b, std::move(ptr_base))) return false;
 		}
 		// vreg, imm
@@ -3088,9 +3090,9 @@ bool AssembleArgs::TryProcessVPUMove(OPCode opcode, u64 elem_sizecode, bool mask
 		u64 src, src_sizecode;
 		if (TryParseVPURegister(args[1], src, src_sizecode))
 		{
-			if (dest_explicit && dest_sizecode != (scalar ? elem_sizecode : src_sizecode)) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Operand size mismatch"}; return false; }
+			if (dest_explicit && dest_sizecode != (scalar ? elem_sizecode : src_sizecode)) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Operand get_size mismatch"}; return false; }
 
-			u64 elem_count = scalar ? 1 : Size(src_sizecode) >> elem_sizecode;
+			u64 elem_count = scalar ? 1 : get_size(src_sizecode) >> elem_sizecode;
 			bool mask_present = VPUMaskPresent(mask.get(), elem_count);
 
 			// if we're in vector mode and the mask is not present, we can kick it up to 64-bit mode (for performance)
@@ -3098,7 +3100,7 @@ bool AssembleArgs::TryProcessVPUMove(OPCode opcode, u64 elem_sizecode, bool mask
 
 			if (!TryAppendVal(1, (src << 3) | (aligned ? 4 : 0ul) | (src_sizecode - 4))) return false;
 			if (!TryAppendVal(1, (mask_present ? 128 : 0ul) | (zmask ? 64 : 0ul) | (scalar ? 32 : 0ul) | (elem_sizecode << 2) | 2)) return false;
-			if (mask_present && !TryAppendExpr(BitsToBytes(elem_count), std::move(*mask))) return false;
+			if (mask_present && !TryAppendExpr(bits_to_bytes(elem_count), std::move(*mask))) return false;
 			if (!TryAppendAddress(a, b, std::move(ptr_base))) return false;
 		}
 		// mem, mem/imm
@@ -3127,7 +3129,7 @@ bool AssembleArgs::TryProcessVPUBinary(OPCode opcode, u64 elem_sizecode, bool ma
 	u64 dest, dest_sizecode;
 	if (TryParseVPURegister(args[0], dest, dest_sizecode))
 	{
-		u64 elem_count = scalar ? 1 : Size(dest_sizecode) >> elem_sizecode;
+		u64 elem_count = scalar ? 1 : get_size(dest_sizecode) >> elem_sizecode;
 		bool mask_present = VPUMaskPresent(mask.get(), elem_count);
 
 		// 2 args case
@@ -3137,11 +3139,11 @@ bool AssembleArgs::TryProcessVPUBinary(OPCode opcode, u64 elem_sizecode, bool ma
 			u64 src, src_sizecode;
 			if (TryParseVPURegister(args[1], src, src_sizecode))
 			{
-				if (dest_sizecode != src_sizecode) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Operand size mismatch"}; return false; }
+				if (dest_sizecode != src_sizecode) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Operand get_size mismatch"}; return false; }
 
 				if (!TryAppendVal(1, (dest << 3) | (aligned ? 4 : 0ul) | (dest_sizecode - 4))) return false;
 				if (!TryAppendVal(1, (mask_present ? 128 : 0ul) | (zmask ? 64 : 0ul) | (scalar ? 32 : 0ul) | (elem_sizecode << 2) | 0)) return false;
-				if (mask_present && !TryAppendExpr(BitsToBytes(elem_count), std::move(*mask))) return false;
+				if (mask_present && !TryAppendExpr(bits_to_bytes(elem_count), std::move(*mask))) return false;
 				if (!TryAppendVal(1, dest)) return false;
 				if (!TryAppendVal(1, src)) return false;
 			}
@@ -3153,11 +3155,11 @@ bool AssembleArgs::TryProcessVPUBinary(OPCode opcode, u64 elem_sizecode, bool ma
 				bool src_explicit;
 				if (!TryParseAddress(args[1], a, b, ptr_base, src_sizecode, src_explicit)) return false;
 
-				if (src_explicit && src_sizecode != (scalar ? elem_sizecode : dest_sizecode)) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Operand size mismatch"}; return false; }
+				if (src_explicit && src_sizecode != (scalar ? elem_sizecode : dest_sizecode)) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Operand get_size mismatch"}; return false; }
 
 				if (!TryAppendVal(1, (dest << 3) | (aligned ? 4 : 0ul) | (dest_sizecode - 4))) return false;
 				if (!TryAppendVal(1, (mask_present ? 128 : 0ul) | (zmask ? 64 : 0ul) | (scalar ? 32 : 0ul) | (elem_sizecode << 2) | 1)) return false;
-				if (mask_present && !TryAppendExpr(BitsToBytes(elem_count), std::move(*mask))) return false;
+				if (mask_present && !TryAppendExpr(bits_to_bytes(elem_count), std::move(*mask))) return false;
 				if (!TryAppendVal(1, dest)) return false;
 				if (!TryAppendAddress(a, b, std::move(ptr_base))) return false;
 			}
@@ -3175,11 +3177,11 @@ bool AssembleArgs::TryProcessVPUBinary(OPCode opcode, u64 elem_sizecode, bool ma
 				u64 src2, src2_sizecode;
 				if (TryParseVPURegister(args[2], src2, src2_sizecode))
 				{
-					if (dest_sizecode != src1_sizecode || src1_sizecode != src2_sizecode) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Operand size mismatch"}; return false; }
+					if (dest_sizecode != src1_sizecode || src1_sizecode != src2_sizecode) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Operand get_size mismatch"}; return false; }
 
 					if (!TryAppendVal(1, (dest << 3) | (aligned ? 4 : 0ul) | (dest_sizecode - 4))) return false;
 					if (!TryAppendVal(1, (mask_present ? 128 : 0ul) | (zmask ? 64 : 0ul) | (scalar ? 32 : 0ul) | (elem_sizecode << 2) | 0)) return false;
-					if (mask_present && !TryAppendExpr(BitsToBytes(elem_count), std::move(*mask))) return false;
+					if (mask_present && !TryAppendExpr(bits_to_bytes(elem_count), std::move(*mask))) return false;
 					if (!TryAppendVal(1, src1)) return false;
 					if (!TryAppendVal(1, src2)) return false;
 				}
@@ -3191,11 +3193,11 @@ bool AssembleArgs::TryProcessVPUBinary(OPCode opcode, u64 elem_sizecode, bool ma
 					bool src2_explicit;
 					if (!TryParseAddress(args[2], a, b, ptr_base, src2_sizecode, src2_explicit)) return false;
 
-					if (dest_sizecode != src1_sizecode || (src2_explicit && src2_sizecode != (scalar ? elem_sizecode : dest_sizecode))) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Operand size mismatch"}; return false; }
+					if (dest_sizecode != src1_sizecode || (src2_explicit && src2_sizecode != (scalar ? elem_sizecode : dest_sizecode))) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Operand get_size mismatch"}; return false; }
 
 					if (!TryAppendVal(1, (dest << 3) | (aligned ? 4 : 0ul) | (dest_sizecode - 4))) return false;
 					if (!TryAppendVal(1, (mask_present ? 128 : 0ul) | (zmask ? 64 : 0ul) | (scalar ? 32 : 0ul) | (elem_sizecode << 2) | 1)) return false;
-					if (mask_present && !TryAppendExpr(BitsToBytes(elem_count), std::move(*mask))) return false;
+					if (mask_present && !TryAppendExpr(bits_to_bytes(elem_count), std::move(*mask))) return false;
 					if (!TryAppendVal(1, src1)) return false;
 					if (!TryAppendAddress(a, b, std::move(ptr_base))) return false;
 				}
@@ -3230,18 +3232,18 @@ bool AssembleArgs::TryProcessVPUUnary(OPCode opcode, u64 elem_sizecode, bool mas
 	u64 dest, dest_sizecode;
 	if (TryParseVPURegister(args[0], dest, dest_sizecode))
 	{
-		u64 elem_count = scalar ? 1 : Size(dest_sizecode) >> elem_sizecode;
+		u64 elem_count = scalar ? 1 : get_size(dest_sizecode) >> elem_sizecode;
 		bool mask_present = VPUMaskPresent(mask.get(), elem_count);
 
 		// vreg, vreg
 		u64 src, src_sizecode;
 		if (TryParseVPURegister(args[1], src, src_sizecode))
 		{
-			if (dest_sizecode != src_sizecode) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Operand size mismatch"}; return false; }
+			if (dest_sizecode != src_sizecode) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Operand get_size mismatch"}; return false; }
 
 			if (!TryAppendVal(1, (dest << 3) | (aligned ? 4 : 0ul) | (dest_sizecode - 4))) return false;
 			if (!TryAppendVal(1, (mask_present ? 128 : 0ul) | (zmask ? 64 : 0ul) | (scalar ? 32 : 0ul) | (elem_sizecode << 2) | 0)) return false;
-			if (mask_present && !TryAppendExpr(BitsToBytes(elem_count), std::move(*mask))) return false;
+			if (mask_present && !TryAppendExpr(bits_to_bytes(elem_count), std::move(*mask))) return false;
 			if (!TryAppendVal(1, src)) return false;
 		}
 		// vreg, mem
@@ -3252,11 +3254,11 @@ bool AssembleArgs::TryProcessVPUUnary(OPCode opcode, u64 elem_sizecode, bool mas
 			bool src_explicit;
 			if (!TryParseAddress(args[1], a, b, ptr_base, src_sizecode, src_explicit)) return false;
 
-			if (src_explicit && src_sizecode != (scalar ? elem_sizecode : dest_sizecode)) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Operand size mismatch"}; return false; }
+			if (src_explicit && src_sizecode != (scalar ? elem_sizecode : dest_sizecode)) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Operand get_size mismatch"}; return false; }
 
 			if (!TryAppendVal(1, (dest << 3) | (aligned ? 4 : 0ul) | (dest_sizecode - 4))) return false;
 			if (!TryAppendVal(1, (mask_present ? 128 : 0ul) | (zmask ? 64 : 0ul) | (scalar ? 32 : 0ul) | (elem_sizecode << 2) | 1)) return false;
-			if (mask_present && !TryAppendExpr(BitsToBytes(elem_count), std::move(*mask))) return false;
+			if (mask_present && !TryAppendExpr(bits_to_bytes(elem_count), std::move(*mask))) return false;
 			if (!TryAppendAddress(a, b, std::move(ptr_base))) return false;
 		}
 		// vreg, imm
@@ -3287,7 +3289,7 @@ bool AssembleArgs::TryProcessVPU_FCMP(OPCode opcode, u64 elem_sizecode, bool mas
 	if (!TryParseInstantImm(args.back(), pred, floating, sizecode, explicit_sizecode, strict)) return false;
 
 	// we're forcing this quantity to be of a specific encoding format, so it doesn't make sense to allow specifying size information to the predicate expression
-	if (explicit_sizecode) { res = { AssembleError::UsageError, "line " + tostr(line) + ": A size directive in this context is not allowed" }; return false; }
+	if (explicit_sizecode) { res = { AssembleError::UsageError, "line " + tostr(line) + ": A get_size directive in this context is not allowed" }; return false; }
 	if (strict) { res = {AssembleError::UsageError, "line " + tostr(line) + ": A STRICT specifier in this context is not allowed"}; return false; }
 
 	// must be integral (and in bounds)
@@ -3318,14 +3320,14 @@ bool AssembleArgs::TryProcessVPUCVT_scalar_f2i(OPCode opcode, bool trunc, bool s
 	
 	// account for dest size
 	if (dest_sizecode == 3) mode += 2;
-	else if (dest_sizecode != 2) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Specified destination size not supported"}; return false; }
+	else if (dest_sizecode != 2) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Specified destination get_size not supported"}; return false; }
 
 	// if source is xmm register
 	u64 src, src_sizecode;
 	if (TryParseVPURegister(args[1], src, src_sizecode))
 	{
 		// only xmm registers are supported
-		if (src_sizecode != 4) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Specified source size not supported"}; return false; }
+		if (src_sizecode != 4) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Specified source get_size not supported"}; return false; }
 		// this check /should/ be redundant, but better safe than sorry
 		if (src > 15) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Source register must be xmm0-15"}; return false; }
 
@@ -3342,7 +3344,7 @@ bool AssembleArgs::TryProcessVPUCVT_scalar_f2i(OPCode opcode, bool trunc, bool s
 		if (!TryParseAddress(args[1], a, b, ptr_base, src_sizecode, src_explicit)) return false;
 
 		// make sure the size matches what we're expecting
-		if(src_explicit && src_sizecode != (single ? 2 : 3)) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Specified source size not supported"}; return false; }
+		if(src_explicit && src_sizecode != (single ? 2 : 3)) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Specified source get_size not supported"}; return false; }
 
 		++mode; // account for the memory mode case
 
@@ -3369,7 +3371,7 @@ bool AssembleArgs::TryProcessVPUCVT_scalar_i2f(OPCode opcode, bool single)
 	if (!TryParseVPURegister(args[0], dest, dest_sizecode)) return false;
 
 	// only xmm registers are supported
-	if (dest_sizecode != 4) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Specified destination size not supported"}; return false; }
+	if (dest_sizecode != 4) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Specified destination get_size not supported"}; return false; }
 	// this check /should/ be redundant, but better safe than sorry
 	if (dest > 15) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Destination register must be xmm0-15"}; return false; }
 
@@ -3380,7 +3382,7 @@ bool AssembleArgs::TryProcessVPUCVT_scalar_i2f(OPCode opcode, bool single)
 	{
 		// account for size case
 		if (src_sizecode == 3) mode += 2;
-		else if (src_sizecode != 2) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Specified source size not supported"}; return false; }
+		else if (src_sizecode != 2) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Specified source get_size not supported"}; return false; }
 
 		// write the data
 		if (!TryAppendByte(mode)) return false;
@@ -3395,11 +3397,11 @@ bool AssembleArgs::TryProcessVPUCVT_scalar_i2f(OPCode opcode, bool single)
 		if (!TryParseAddress(args[1], a, b, ptr_base, src_sizecode, src_explicit)) return false;
 
 		// we need to know what format we're converting from
-		if (!src_explicit) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Could not deduce operand size"}; return false; }
+		if (!src_explicit) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Could not deduce operand get_size"}; return false; }
 
 		// account for size case
 		if (src_sizecode == 3) mode += 2;
-		else if (src_sizecode != 2) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Specified source size not supported"}; return false; }
+		else if (src_sizecode != 2) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Specified source get_size not supported"}; return false; }
 
 		++mode; // account for memory mode case
 
@@ -3426,7 +3428,7 @@ bool AssembleArgs::TryProcessVPUCVT_scalar_f2f(OPCode opcode, bool extend)
 	if (!TryParseVPURegister(args[0], dest, dest_sizecode)) return false;
 
 	// only xmm registers are supported
-	if (dest_sizecode != 4) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Specified destination size not supported"}; return false; }
+	if (dest_sizecode != 4) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Specified destination get_size not supported"}; return false; }
 	// this check /should/ be redundant, but better safe than sorry
 	if (dest > 15) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Destination register must be xmm0-15"}; return false; }
 
@@ -3435,7 +3437,7 @@ bool AssembleArgs::TryProcessVPUCVT_scalar_f2f(OPCode opcode, bool extend)
 	if (TryParseVPURegister(args[1], src, src_sizecode))
 	{
 		// only xmm registers are supported
-		if (src_sizecode != 4) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Specified source size not supported"}; return false; }
+		if (src_sizecode != 4) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Specified source get_size not supported"}; return false; }
 		// this check /should/ be redundant, but better safe than sorry
 		if (src > 15) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Source register must be xmm0-15"}; return false; }
 
@@ -3452,7 +3454,7 @@ bool AssembleArgs::TryProcessVPUCVT_scalar_f2f(OPCode opcode, bool extend)
 		if (!TryParseAddress(args[1], a, b, ptr_base, src_sizecode, src_explicit)) return false;
 
 		// make sure the size matches what we're expecting
-		if (src_explicit && src_sizecode != (extend ? 2 : 3)) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Specified source size not supported"}; return false; }
+		if (src_explicit && src_sizecode != (extend ? 2 : 3)) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Specified source get_size not supported"}; return false; }
 
 		++mode; // account for the memory mode case
 
@@ -3473,7 +3475,7 @@ bool AssembleArgs::_TryProcessVPUCVT_packed_formatter_reg(OPCode opcode, u8 mode
 	if (!TryAppendByte((u8)opcode)) return false;
 	if (!TryAppendByte(mode)) return false;
 	if (!TryAppendByte((u8)(dest << 3) | (0) | (mask_present ? 2 : 0) | (zmask ? 1 : 0))) return false;
-	if (mask_present && !TryAppendExpr(BitsToBytes(elem_count), std::move(*mask))) return false;
+	if (mask_present && !TryAppendExpr(bits_to_bytes(elem_count), std::move(*mask))) return false;
 	if (!TryAppendByte((u8)src)) return false;
 
 	return true;
@@ -3485,7 +3487,7 @@ bool AssembleArgs::_TryProcessVPUCVT_packed_formatter_mem(OPCode opcode, u8 mode
 	if (!TryAppendByte((u8)opcode)) return false;
 	if (!TryAppendByte(mode)) return false;
 	if (!TryAppendByte((u8)(dest << 3) | (4) | (mask_present ? 2 : 0) | (zmask ? 1 : 0))) return false;
-	if (mask_present && !TryAppendExpr(BitsToBytes(elem_count), std::move(*mask))) return false;
+	if (mask_present && !TryAppendExpr(bits_to_bytes(elem_count), std::move(*mask))) return false;
 	if (!TryAppendAddress(a, b, std::move(ptr_base))) return false;
 
 	return true;
@@ -3512,7 +3514,7 @@ bool AssembleArgs::TryProcessVPUCVT_packed_f2i(OPCode opcode, bool trunc, bool s
 	if (TryParseVPURegister(args[1], src, src_sizecode))
 	{
 		// validate operand sizes
-		if (dest_sizecode != (single ? src_sizecode : src_sizecode == 4 ? 4 : src_sizecode - 1)) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Specified operand size combination not supported"}; return false; }
+		if (dest_sizecode != (single ? src_sizecode : src_sizecode == 4 ? 4 : src_sizecode - 1)) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Specified operand get_size combination not supported"}; return false; }
 
 		// decode size and get number of elements
 		mode += (u8)src_sizecode - 4;
@@ -3530,7 +3532,7 @@ bool AssembleArgs::TryProcessVPUCVT_packed_f2i(OPCode opcode, bool trunc, bool s
 		if (!TryParseAddress(args[1], a, b, ptr_base, src_sizecode, src_explicit)) return false;
 
 		// validate operand sizes
-		if (src_explicit && dest_sizecode != (single ? src_sizecode : src_sizecode - 1)) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Specified operand size combination not supported"}; return false; }
+		if (src_explicit && dest_sizecode != (single ? src_sizecode : src_sizecode - 1)) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Specified operand get_size combination not supported"}; return false; }
 
 		// decode size and get number of elements
 		u64 elem_count;
@@ -3552,7 +3554,7 @@ bool AssembleArgs::TryProcessVPUCVT_packed_f2i(OPCode opcode, bool trunc, bool s
 			mode += 2;
 			elem_count = 8;
 		}
-		else { res = {AssembleError::UsageError, "line " + tostr(line) + ": Could not deduce operand size"}; return false; }
+		else { res = {AssembleError::UsageError, "line " + tostr(line) + ": Could not deduce operand get_size"}; return false; }
 
 		// write the data
 		if (!_TryProcessVPUCVT_packed_formatter_mem(opcode, mode, elem_count, dest, mask.get(), zmask, a, b, std::move(ptr_base))) return false;
@@ -3581,7 +3583,7 @@ bool AssembleArgs::TryProcessVPUCVT_packed_i2f(OPCode opcode, bool single)
 	if (TryParseVPURegister(args[1], src, src_sizecode))
 	{
 		// validate operand sizes
-		if (src_sizecode != (single ? dest_sizecode : dest_sizecode == 4 ? 4 : dest_sizecode - 1)) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Specified operand size combination not supported"}; return false; }
+		if (src_sizecode != (single ? dest_sizecode : dest_sizecode == 4 ? 4 : dest_sizecode - 1)) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Specified operand get_size combination not supported"}; return false; }
 
 		// decode size and get number of elements
 		mode += (u8)dest_sizecode - 4;
@@ -3599,7 +3601,7 @@ bool AssembleArgs::TryProcessVPUCVT_packed_i2f(OPCode opcode, bool single)
 		if (!TryParseAddress(args[1], a, b, ptr_base, src_sizecode, src_explicit)) return false;
 
 		// validate operand sizes
-		if (src_explicit && src_sizecode != (single ? dest_sizecode : dest_sizecode - 1)) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Specified operand size combination not supported"}; return false; }
+		if (src_explicit && src_sizecode != (single ? dest_sizecode : dest_sizecode - 1)) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Specified operand get_size combination not supported"}; return false; }
 
 		// decode size and get number of elements
 		mode += (u8)dest_sizecode - 4;
@@ -3635,7 +3637,7 @@ bool AssembleArgs::TryProcessVPUCVT_packed_f2f(OPCode opcode, bool extend)
 		if (extend)
 		{
 			// validate operand sizes
-			if (src_sizecode != (dest_sizecode == 4 ? 4 : dest_sizecode - 1)) { res = { AssembleError::UsageError, "line " + tostr(line) + ": Specified operand size combination not supported" }; return false; }
+			if (src_sizecode != (dest_sizecode == 4 ? 4 : dest_sizecode - 1)) { res = { AssembleError::UsageError, "line " + tostr(line) + ": Specified operand get_size combination not supported" }; return false; }
 
 			// decode size and get number of elements
 			mode += (u8)dest_sizecode - 4;
@@ -3644,7 +3646,7 @@ bool AssembleArgs::TryProcessVPUCVT_packed_f2f(OPCode opcode, bool extend)
 		else
 		{
 			// validate operand sizes
-			if (dest_sizecode != (src_sizecode == 4 ? 4 : src_sizecode - 1)) { res = { AssembleError::UsageError, "line " + tostr(line) + ": Specified operand size combination not supported" }; return false; }
+			if (dest_sizecode != (src_sizecode == 4 ? 4 : src_sizecode - 1)) { res = { AssembleError::UsageError, "line " + tostr(line) + ": Specified operand get_size combination not supported" }; return false; }
 
 			// decode size and get number of elements
 			mode += (u8)src_sizecode - 4;
@@ -3666,7 +3668,7 @@ bool AssembleArgs::TryProcessVPUCVT_packed_f2f(OPCode opcode, bool extend)
 		if (extend)
 		{
 			// validate operand sizes
-			if (src_explicit && src_sizecode != dest_sizecode - 1) { res = { AssembleError::UsageError, "line " + tostr(line) + ": Specified operand size combination not supported" }; return false; }
+			if (src_explicit && src_sizecode != dest_sizecode - 1) { res = { AssembleError::UsageError, "line " + tostr(line) + ": Specified operand get_size combination not supported" }; return false; }
 
 			// decode size and get number of elements
 			mode += (u8)dest_sizecode - 4;
@@ -3675,7 +3677,7 @@ bool AssembleArgs::TryProcessVPUCVT_packed_f2f(OPCode opcode, bool extend)
 		else
 		{
 			// validate operand sizes
-			if (src_explicit && dest_sizecode != src_sizecode - 1) { res = { AssembleError::UsageError, "line " + tostr(line) + ": Specified operand size combination not supported" }; return false; }
+			if (src_explicit && dest_sizecode != src_sizecode - 1) { res = { AssembleError::UsageError, "line " + tostr(line) + ": Specified operand get_size combination not supported" }; return false; }
 
 			// we can't tell 2 vs 4 elements since they both use xmm dest - we need explicit source size
 			if (src_explicit)
@@ -3689,7 +3691,7 @@ bool AssembleArgs::TryProcessVPUCVT_packed_f2f(OPCode opcode, bool extend)
 				mode += 2;
 				elem_count = 8;
 			}
-			else { res = { AssembleError::UsageError, "line " + tostr(line) + ": Could not deduce operand size" }; return false; }
+			else { res = { AssembleError::UsageError, "line " + tostr(line) + ": Could not deduce operand get_size" }; return false; }
 		}
 
 		// write the data
@@ -3698,5 +3700,4 @@ bool AssembleArgs::TryProcessVPUCVT_packed_f2f(OPCode opcode, bool extend)
 	else { res = { AssembleError::UsageError, "line " + tostr(line) + ": Expected a VPU register or memory value as second operand" }; return false; }
 
 	return true;
-}
 }

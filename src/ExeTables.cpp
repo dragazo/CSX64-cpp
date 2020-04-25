@@ -2,7 +2,7 @@
 
 namespace CSX64
 {
-	const std::unordered_map<ErrorCode, std::string> ErrorCodeToString
+	const std::unordered_map<ErrorCode, std::string> detail::ErrorCodeToString
 	{
 		{ErrorCode::None, ""},
 		{ErrorCode::OutOfBounds, "Out of Bounds"},

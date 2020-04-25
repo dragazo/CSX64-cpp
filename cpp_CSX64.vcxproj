@@ -21,6 +21,7 @@
   <ItemGroup>
     <ClInclude Include="include\AsmArgs.h" />
     <ClInclude Include="include\AsmTables.h" />
+    <ClInclude Include="include\asm_common.h" />
     <ClInclude Include="include\Assembly.h" />
     <ClInclude Include="include\Computer.h" />
     <ClInclude Include="include\CoreTypes.h" />

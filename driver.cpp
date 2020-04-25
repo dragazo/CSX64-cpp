@@ -9,10 +9,8 @@
 #include <unordered_map>
 #include <filesystem>
 
-#include "include/CoreTypes.h"
 #include "include/Computer.h"
 #include "include/Assembly.h"
-#include "include/Utility.h"
 
 using namespace CSX64;
 
@@ -58,7 +56,7 @@ const char *exe_dir();
 // ---------------------------------
 
 // converts time in nanoseconds to a more convenient human form
-std::string FormatTime(long long ns)
+std::string format_time(long long ns)
 {
 	long long hr, min;
 	long double sec;
@@ -82,7 +80,7 @@ std::string FormatTime(long long ns)
 // The return value to use in the case of error during execution
 const int ExecErrorReturnCode = -1;
 
-const char *HelpMessage =
+const char *const help_msg =
 R"(Usage: csx [OPTION]... [ARG]...
 Assemble, link, or execute CSX64 files.
 
@@ -107,71 +105,78 @@ Assemble, link, or execute CSX64 files.
 Report bugs to: https://github.com/dragazo/CSX64-cpp/issues
 )";
 
-// adds standard symbols to the assembler predefine table
-void AddPredefines()
+const CSX64::AssemblerPredefines &std_predefines()
 {
-	// -- syscall codes -- //
+	static struct _
+	{
+		CSX64::AssemblerPredefines p;
+		_()
+		{
+			// -- syscall codes -- //
 
-	DefineSymbol("sys_exit", (u64)SyscallCode::sys_exit);
+			p.define_u64("sys_exit", (u64)detail::SyscallCode::sys_exit);
 
-	DefineSymbol("sys_read", (u64)SyscallCode::sys_read);
-	DefineSymbol("sys_write", (u64)SyscallCode::sys_write);
-	DefineSymbol("sys_open", (u64)SyscallCode::sys_open);
-	DefineSymbol("sys_close", (u64)SyscallCode::sys_close);
-	DefineSymbol("sys_lseek", (u64)SyscallCode::sys_lseek);
+			p.define_u64("sys_read", (u64)detail::SyscallCode::sys_read);
+			p.define_u64("sys_write", (u64)detail::SyscallCode::sys_write);
+			p.define_u64("sys_open", (u64)detail::SyscallCode::sys_open);
+			p.define_u64("sys_close", (u64)detail::SyscallCode::sys_close);
+			p.define_u64("sys_lseek", (u64)detail::SyscallCode::sys_lseek);
 
-	DefineSymbol("sys_brk", (u64)SyscallCode::sys_brk);
+			p.define_u64("sys_brk", (u64)detail::SyscallCode::sys_brk);
 
-	DefineSymbol("sys_rename", (u64)SyscallCode::sys_rename);
-	DefineSymbol("sys_unlink", (u64)SyscallCode::sys_unlink);
-	DefineSymbol("sys_mkdir", (u64)SyscallCode::sys_mkdir);
-	DefineSymbol("sys_rmdir", (u64)SyscallCode::sys_rmdir);
+			p.define_u64("sys_rename", (u64)detail::SyscallCode::sys_rename);
+			p.define_u64("sys_unlink", (u64)detail::SyscallCode::sys_unlink);
+			p.define_u64("sys_mkdir", (u64)detail::SyscallCode::sys_mkdir);
+			p.define_u64("sys_rmdir", (u64)detail::SyscallCode::sys_rmdir);
 
-	// -- error codes -- //
+			// -- error codes -- //
 
-	DefineSymbol("err_none", (u64)ErrorCode::None);
-	DefineSymbol("err_outofbounds", (u64)ErrorCode::OutOfBounds);
-	DefineSymbol("err_unhandledsyscall", (u64)ErrorCode::UnhandledSyscall);
-	DefineSymbol("err_undefinedbehavior", (u64)ErrorCode::UndefinedBehavior);
-	DefineSymbol("err_arithmeticerror", (u64)ErrorCode::ArithmeticError);
-	DefineSymbol("err_abort", (u64)ErrorCode::Abort);
-	DefineSymbol("err_iofailure", (u64)ErrorCode::IOFailure);
-	DefineSymbol("err_fsdisabled", (u64)ErrorCode::FSDisabled);
-	DefineSymbol("err_accessviolation", (u64)ErrorCode::AccessViolation);
-	DefineSymbol("err_insufficientfds", (u64)ErrorCode::InsufficientFDs);
-	DefineSymbol("err_fdnotinuse", (u64)ErrorCode::FDNotInUse);
-	DefineSymbol("err_notimplemented", (u64)ErrorCode::NotImplemented);
-	DefineSymbol("err_stackoverflow", (u64)ErrorCode::StackOverflow);
-	DefineSymbol("err_fpustackoverflow", (u64)ErrorCode::FPUStackOverflow);
-	DefineSymbol("err_fpustackunderflow", (u64)ErrorCode::FPUStackUnderflow);
-	DefineSymbol("err_fpuerror", (u64)ErrorCode::FPUError);
-	DefineSymbol("err_fpuaccessviolation", (u64)ErrorCode::FPUAccessViolation);
-	DefineSymbol("err_alignmentviolation", (u64)ErrorCode::AlignmentViolation);
-	DefineSymbol("err_unknownop", (u64)ErrorCode::UnknownOp);
-	DefineSymbol("err_filepermissions", (u64)ErrorCode::FilePermissions);
+			p.define_u64("err_none", (u64)ErrorCode::None);
+			p.define_u64("err_outofbounds", (u64)ErrorCode::OutOfBounds);
+			p.define_u64("err_unhandledsyscall", (u64)ErrorCode::UnhandledSyscall);
+			p.define_u64("err_undefinedbehavior", (u64)ErrorCode::UndefinedBehavior);
+			p.define_u64("err_arithmeticerror", (u64)ErrorCode::ArithmeticError);
+			p.define_u64("err_abort", (u64)ErrorCode::Abort);
+			p.define_u64("err_iofailure", (u64)ErrorCode::IOFailure);
+			p.define_u64("err_fsdisabled", (u64)ErrorCode::FSDisabled);
+			p.define_u64("err_accessviolation", (u64)ErrorCode::AccessViolation);
+			p.define_u64("err_insufficientfds", (u64)ErrorCode::InsufficientFDs);
+			p.define_u64("err_fdnotinuse", (u64)ErrorCode::FDNotInUse);
+			p.define_u64("err_notimplemented", (u64)ErrorCode::NotImplemented);
+			p.define_u64("err_stackoverflow", (u64)ErrorCode::StackOverflow);
+			p.define_u64("err_fpustackoverflow", (u64)ErrorCode::FPUStackOverflow);
+			p.define_u64("err_fpustackunderflow", (u64)ErrorCode::FPUStackUnderflow);
+			p.define_u64("err_fpuerror", (u64)ErrorCode::FPUError);
+			p.define_u64("err_fpuaccessviolation", (u64)ErrorCode::FPUAccessViolation);
+			p.define_u64("err_alignmentviolation", (u64)ErrorCode::AlignmentViolation);
+			p.define_u64("err_unknownop", (u64)ErrorCode::UnknownOp);
+			p.define_u64("err_filepermissions", (u64)ErrorCode::FilePermissions);
 
-	// -- file open modes -- //
+			// -- file open modes -- //
 
-	DefineSymbol("O_RDONLY", (u64)OpenFlags::read);
-	DefineSymbol("O_WRONLY", (u64)OpenFlags::write);
-	DefineSymbol("O_RDWR", (u64)OpenFlags::read_write);
+			p.define_u64("O_RDONLY", (u64)detail::OpenFlags::read);
+			p.define_u64("O_WRONLY", (u64)detail::OpenFlags::write);
+			p.define_u64("O_RDWR", (u64)detail::OpenFlags::read_write);
 
-	DefineSymbol("O_CREAT", (u64)OpenFlags::create);
-	DefineSymbol("O_TMPFILE", (u64)OpenFlags::temp);
-	DefineSymbol("O_TRUNC", (u64)OpenFlags::trunc);
+			p.define_u64("O_CREAT", (u64)detail::OpenFlags::create);
+			p.define_u64("O_TMPFILE", (u64)detail::OpenFlags::temp);
+			p.define_u64("O_TRUNC", (u64)detail::OpenFlags::trunc);
 
-	DefineSymbol("O_APPEND", (u64)OpenFlags::append);
+			p.define_u64("O_APPEND", (u64)detail::OpenFlags::append);
 
-	// -- file seek modes -- //
+			// -- file seek modes -- //
 
-	DefineSymbol("SEEK_SET", (u64)SeekMode::set);
-	DefineSymbol("SEEK_CUR", (u64)SeekMode::cur);
-	DefineSymbol("SEEK_END", (u64)SeekMode::end);
+			p.define_u64("SEEK_SET", (u64)detail::SeekMode::set);
+			p.define_u64("SEEK_CUR", (u64)detail::SeekMode::cur);
+			p.define_u64("SEEK_END", (u64)detail::SeekMode::end);
 
-	// -- standard stuff -- //
+			// -- standard stuff -- //
 
-	DefineSymbol("NULL", (u64)0);
-	DefineSymbol("EOF", (u64)0xffffffffffffffff);
+			p.define_u64("NULL", (u64)0);
+			p.define_u64("EOF", (u64)0xffffffffffffffff);
+		}
+	} __;
+	return __.p;
 }
 
 // ------------------ //
@@ -318,7 +323,7 @@ int LoadObjectFileDir(std::list<std::pair<std::string, ObjectFile>> &objs, const
 	for (const auto &entry : fs::directory_iterator(path, err))
 	{
 		std::string f_path = entry.path().string();
-		if (EndsWith(f_path, ".o"))
+		if (detail::ends_with(f_path, ".o"))
 		{
 			auto &obj = objs.emplace_back();
 			obj.first = f_path;
@@ -346,7 +351,7 @@ int Assemble(const std::string &file, ObjectFile &dest)
 	if (!source) { std::cerr << "Failed to open " << file << " for reading\n"; return (int)AsmLnkErrorExt::FailOpen; }
 
 	// assemble the source
-	AssembleResult res = CSX64::Assemble(source, dest);
+	AssembleResult res = CSX64::assemble(source, dest, &std_predefines());
 
 	// if there was an error, show error message
 	if (res.Error != AssembleError::None)
@@ -414,12 +419,12 @@ int Link(Executable &dest, const std::vector<std::string> &files, const std::str
 		// treat ".o" as object file, otherwise as assembly source
 		auto &obj = objs.emplace_back();
 		obj.first = file;
-		ret = EndsWith(file, ".o") ? LoadObjectFile(file, obj.second) : Assemble(file, obj.second);
+		ret = detail::ends_with(file, ".o") ? LoadObjectFile(file, obj.second) : Assemble(file, obj.second);
 		if (ret != 0) return ret;
 	}
 
 	// link the resulting object files into an executable
-	LinkResult res = CSX64::Link(dest, objs, entry_point);
+	LinkResult res = CSX64::link(dest, objs, entry_point);
 
 	// if there was an error, show error message
 	if (res.Error != LinkError::None)
@@ -485,13 +490,13 @@ int RunConsole(const Executable &exe, const std::vector<std::string> &args, bool
 	// if there was an error
 	if (computer.error() != ErrorCode::None)
 	{
-		std::cerr << "\n\nError Encountered: (" << (int)computer.error() << ") " << ErrorCodeToString.at(computer.error()) << '\n';
+		std::cerr << "\n\nError Encountered: (" << (int)computer.error() << ") " << detail::ErrorCodeToString.at(computer.error()) << '\n';
 		return ExecErrorReturnCode;
 	}
 	// otherwise no error
 	else
 	{
-		if (time) std::cout << "\n\nElapsed Time: " << FormatTime(std::chrono::duration_cast<std::chrono::nanoseconds>(stop - start).count()) << '\n';
+		if (time) std::cout << "\n\nElapsed Time: " << format_time(std::chrono::duration_cast<std::chrono::nanoseconds>(stop - start).count()) << '\n';
 		return computer.return_value();
 	}
 }
@@ -503,7 +508,7 @@ int RunConsole(const Executable &exe, const std::vector<std::string> &args, bool
 // -------------------------- //
 
 // holds all the information needed to parse command line options for main().
-struct cmdln_pack
+struct CmdlnPack
 {
 	ProgramAction action = ProgramAction::ExecuteConsole; // requested action
 	std::vector<std::string> pathspec;                    // input paths
@@ -524,30 +529,30 @@ struct cmdln_pack
 	bool parse(int _argc, const char *const *_argv);
 };
 
-bool _help(cmdln_pack&) { std::cout << HelpMessage; return false; }
+bool _help(CmdlnPack&) { std::cout << help_msg; return false; }
 
-bool _assemble(cmdln_pack &p)
+bool _assemble(CmdlnPack &p)
 {
 	if (p.action != ProgramAction::ExecuteConsole) { std::cerr << p.argv[p.i] << ": Already specified mode\n"; return false; }
 	
 	p.action = ProgramAction::Assemble;
 	return true;
 }
-bool _link(cmdln_pack &p)
+bool _link(CmdlnPack &p)
 {
 	if (p.action != ProgramAction::ExecuteConsole) { std::cerr << p.argv[p.i] << ": Already specified mode\n"; return false; }
 	
 	p.action = ProgramAction::Link;
 	return true;
 }
-bool _script(cmdln_pack &p)
+bool _script(CmdlnPack &p)
 {
 	if (p.action != ProgramAction::ExecuteConsole) { std::cerr << p.argv[p.i] << ": Already specified mode\n"; return false; }
 	
 	p.action = ProgramAction::ExecuteConsoleScript;
 	return true;
 }
-bool _multiscript(cmdln_pack &p)
+bool _multiscript(CmdlnPack &p)
 {
 	if (p.action != ProgramAction::ExecuteConsole) { std::cerr << p.argv[p.i] << ": Already specified mode\n"; return false; }
 
@@ -555,7 +560,7 @@ bool _multiscript(cmdln_pack &p)
 	return true;
 }
 
-bool _out(cmdln_pack &p)
+bool _out(CmdlnPack &p)
 {
 	if (p.output != nullptr) { std::cerr << p.argv[p.i] << ": Already specified output path\n"; return false; }
 	if (p.i + 1 >= p.argc) { std::cerr << p.argv[p.i] << ": Expected output path\n"; return false; }
@@ -563,7 +568,7 @@ bool _out(cmdln_pack &p)
 	p.output = p.argv[++p.i];
 	return true;
 }
-bool _entry(cmdln_pack &p)
+bool _entry(CmdlnPack &p)
 {
 	if (p.entry_point != nullptr) { std::cerr << p.argv[p.i] << ": Already specified entry point\n"; return false; }
 	if (p.i + 1 >= p.argc) { std::cerr << p.argv[p.i] << ": Expected entry point\n"; return false; }
@@ -571,7 +576,7 @@ bool _entry(cmdln_pack &p)
 	p.entry_point = p.argv[++p.i];
 	return true;
 }
-bool _rootdir(cmdln_pack &p)
+bool _rootdir(CmdlnPack &p)
 {
 	if (p.rootdir != nullptr) { std::cerr << p.argv[p.i] << ": Already specified root directory\n"; return false; }
 	if (p.i + 1 >= p.argc) { std::cerr << p.argv[p.i] << ": Expected root directory\n"; return false; }
@@ -580,13 +585,13 @@ bool _rootdir(cmdln_pack &p)
 	return true;
 }
 
-bool _fs(cmdln_pack &p) { p.fsf = true; return true; }
-bool _time(cmdln_pack &p) { p.time = true; return true; }
-bool _end(cmdln_pack &p) { p.accepting_options = false; return true; }
-bool _unsafe(cmdln_pack &p) { p.fsf = true; return true; }
+bool _fs(CmdlnPack &p) { p.fsf = true; return true; }
+bool _time(CmdlnPack &p) { p.time = true; return true; }
+bool _end(CmdlnPack &p) { p.accepting_options = false; return true; }
+bool _unsafe(CmdlnPack &p) { p.fsf = true; return true; }
 
 // maps (long) options to their parsing handlers
-const std::unordered_map<std::string, bool(*)(cmdln_pack&)> long_names
+const std::unordered_map<std::string, bool(*)(CmdlnPack&)> long_names
 {
 	{ "--help", _help },
 
@@ -606,7 +611,7 @@ const std::unordered_map<std::string, bool(*)(cmdln_pack&)> long_names
 { "--", _end },
 };
 // maps (short) options to their parsing handlers
-const std::unordered_map<char, bool(*)(cmdln_pack&)> short_names
+const std::unordered_map<char, bool(*)(CmdlnPack&)> short_names
 {
 { 'h', _help },
 
@@ -622,12 +627,12 @@ const std::unordered_map<char, bool(*)(cmdln_pack&)> short_names
 { 't', _time },
 };
 
-bool cmdln_pack::parse(int _argc, const char *const *_argv)
+bool CmdlnPack::parse(int _argc, const char *const *_argv)
 {
 	// set up argc/argv for the parsing pack
 	argc = _argc;
 	argv = _argv;
-
+	
 	// for each arg (store index in this->i for handlers)
 	for (i = 1; i < argc; ++i)
 	{
@@ -670,13 +675,13 @@ bool cmdln_pack::parse(int _argc, const char *const *_argv)
 
 int main(int argc, char *argv[]) try
 {
-	cmdln_pack dat; // command line option parsing pack
+	CmdlnPack dat; // command line option parsing pack
 
 	// parse our command line args - on failure a message is printed to stdout, just return 0.
 	if (!dat.parse(argc, argv)) return 0;
 
 	// ------------------------------------ //
-
+	
 	// perform the action
 	switch (dat.action)
 	{
@@ -686,7 +691,6 @@ int main(int argc, char *argv[]) try
 		if (dat.pathspec.empty()) { std::cerr << "Expected a file to execute\n"; return 0; }
 
 		Executable exe;
-		
 		int res = LoadExecutable(dat.pathspec[0], exe);
 		return res != 0 ? res : RunConsole(exe, dat.pathspec, dat.fsf, dat.time);
 	}
@@ -696,9 +700,7 @@ int main(int argc, char *argv[]) try
 	{
 		if (dat.pathspec.empty()) { std::cerr << "Expected a file to assemble, link, and execute\n"; return 0; }
 
-		AddPredefines();
 		Executable exe;
-		
 		int res = Link(exe, { dat.pathspec[0] }, dat.entry_point ? dat.entry_point : "main", dat.rootdir);
 		return res != 0 ? res : RunConsole(exe, dat.pathspec, dat.fsf, dat.time);
 	}
@@ -708,9 +710,7 @@ int main(int argc, char *argv[]) try
 	{
 		if (dat.pathspec.empty()) { std::cerr << "Expected 1+ files to assemble, link, and execute\n"; return 0; }
 
-		AddPredefines();
 		Executable exe;
-		
 		int res = Link(exe, dat.pathspec, dat.entry_point ? dat.entry_point : "main", dat.rootdir);
 		return res != 0 ? res : RunConsole(exe, { "<script>" }, dat.fsf, dat.time);
 	}
@@ -720,7 +720,6 @@ int main(int argc, char *argv[]) try
 	{
 		if (dat.pathspec.empty()) { std::cerr << "Expected 1+ files to assemble\n"; return 0; }
 
-		AddPredefines();
 		ObjectFile obj;
 
 		// if no explicit output is provided, batch process each pathspec
@@ -754,9 +753,7 @@ int main(int argc, char *argv[]) try
 	{
 		if (dat.pathspec.empty()) { std::cerr << "Linker expected 1+ files to link\n"; return 0; }
 
-		AddPredefines();
 		Executable exe;
-
 		int res = Link(exe, dat.pathspec, dat.entry_point ? dat.entry_point : "main", dat.rootdir);
 		return res != 0 ? res : SaveExecutable(dat.output ? dat.output : "a.out", exe);
 	}

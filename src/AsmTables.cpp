@@ -7,7 +7,7 @@
 #include "../include/Assembly.h"
 #include "../include/AsmArgs.h"
 
-namespace CSX64
+namespace CSX64::detail
 {
 	const char CommentChar = ';';
 	const char LabelDefChar = ':';
@@ -649,7 +649,7 @@ namespace CSX64
 
 	{"FNSTSW", [](AssembleArgs &args)
 		{
-			if (args.args.size() == 1 && ToUpper(args.args[0]) == "AX") return args.TryAppendByte((u8)OPCode::FSTLD_WORD) && args.TryAppendByte(0);
+			if (args.args.size() == 1 && to_upper(args.args[0]) == "AX") return args.TryAppendByte((u8)OPCode::FSTLD_WORD) && args.TryAppendByte(0);
 			else return args.TryProcessFSTLD_WORD(OPCode::FSTLD_WORD, 1, 1);
 		}},
 	{"FSTSW", [](AssembleArgs &args) { return args.TryAppendByte((u8)OPCode::FWAIT) && asm_routing_table.at("FNSTSW")(args); }},
@@ -928,7 +928,7 @@ namespace CSX64
 	// CMPSD (vec) requires disambiguation
 	{"CMPSS", [](AssembleArgs &args) { return args.TryProcessVPU_FCMP(OPCode::VPU_FCMP, 2, false, false, true); }},
 
-	// packed double comparisons
+	// packed f64 comparisons
 	{"CMPEQPD", [](AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 3, true, true, false, true, 0); }},
 	{"CMPLTPD", [](AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 3, true, true, false, true, 1); }},
 	{"CMPLEPD", [](AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 3, true, true, false, true, 2); }},
@@ -996,7 +996,7 @@ namespace CSX64
 	{"CMPGT_OQPS", [](AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 2, true, true, false, true, 30); }},
 	{"CMPTRUE_USPS", [](AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 2, true, true, false, true, 31); }},
 
-	// scalar double comparisons
+	// scalar f64 comparisons
 	{"CMPEQSD", [](AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 3, false, false, true, true, 0); }},
 	{"CMPLTSD", [](AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 3, false, false, true, true, 1); }},
 	{"CMPLESD", [](AssembleArgs &args) { return args.TryProcessVPUBinary(OPCode::VPU_FCMP, 3, false, false, true, true, 2); }},

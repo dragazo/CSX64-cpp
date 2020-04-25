@@ -53,7 +53,7 @@ namespace CSX64
 			for (u64 val : _seglens) if ((sum += val) < val)
 			{
 				clear(); // if we throw an exception, we must leave the exe in the empty state
-				throw std::overflow_error("Total executable length exceeds maximum size");
+				throw std::overflow_error("Total executable length exceeds maximum get_size");
 			}
 		}
 
@@ -93,14 +93,14 @@ namespace CSX64
 		if (!file) throw FileOpenError("Failed to open file for saving Executable");
 
 		// write exe header and CSX64 version number
-		BinWrite(file, header, sizeof(header));
-		write<u64>(file, Version);
+		detail::write_bin(file, header, sizeof(header));
+		detail::write<u64>(file, detail::Version);
 
 		// write the segment lengths
-		for (std::size_t v : _seglens) write<u64>(file, (u64)v);
+		for (std::size_t v : _seglens) detail::write<u64>(file, (u64)v);
 
 		// write the content of the executable
-		BinWrite(file, _content.data(), _content.size());
+		detail::write_bin(file, _content.data(), _content.size());
 
 		// make sure all the writes succeeded
 		if (!file) throw IOError("Failed to write Executable to file");
@@ -126,7 +126,7 @@ namespace CSX64
 		// -- file validation -- //
 
 		// read the header from the file and make sure it matches - match failure is a type error, not a format error.
-		if (!BinRead(file, header_temp, sizeof(header))) goto err;
+		if (!detail::read_bin(file, header_temp, sizeof(header))) goto err;
 		if (std::memcmp(header_temp, header, sizeof(header)))
 		{
 			clear(); // if we throw an exception we must set to the empty state first
@@ -134,8 +134,8 @@ namespace CSX64
 		}
 
 		// read the version number from the file and make sure it matches - match failure is a version error, not a format error.
-		if (!read<u64>(file, Version_temp)) goto err;
-		if (Version_temp != Version)
+		if (!detail::read<u64>(file, Version_temp)) goto err;
+		if (Version_temp != detail::Version)
 		{
 			clear(); // if we throw an exception we must set to the empty state first
 			throw VersionError("Executable was from an incompatible version of CSX64");
@@ -147,7 +147,7 @@ namespace CSX64
 		for (std::size_t &v : _seglens)
 		{
 			u64 t;
-			if (!read<u64>(file, t)) goto err;
+			if (!detail::read<u64>(file, t)) goto err;
 			if constexpr (sizeof(std::size_t) < sizeof(u64)) { if (t != (std::size_t)t) throw MemoryAllocException("Executable is too large"); }
 			v = (std::size_t)t;
 		}
@@ -155,11 +155,11 @@ namespace CSX64
 		// make sure seg lengths don't overflow u64
 		{
 			std::size_t sum = 0;
-			for (std::size_t val : _seglens) if ((sum += val) < val) throw std::overflow_error("Sum of segments overflows max size");
+			for (std::size_t val : _seglens) if ((sum += val) < val) throw std::overflow_error("Sum of segments overflows max get_size");
 		}
 
 		// make sure the file is the correct size
-		if (48 + sum3 < sum3) throw std::overflow_error("File size overflows max size"); // presumably this will never happen, but just in case
+		if (48 + sum3 < sum3) throw std::overflow_error("File get_size overflows max get_size"); // presumably this will never happen, but just in case
 		if (file_size != 48 + sum3) goto err;
 
 		// -- read executable content -- //
@@ -170,7 +170,7 @@ namespace CSX64
 		catch (...) { clear(); throw; }
 
 		// read the content - make sure we got everything
-		if (!BinRead(file, _content.data(), _content.size())) goto err;
+		if (!detail::read_bin(file, _content.data(), _content.size())) goto err;
 
 		return;
 

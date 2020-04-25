@@ -26,26 +26,32 @@
 #include "../include/Executable.h"
 #include "../include/csx_exceptions.h"
 
+using namespace CSX64::detail;
+
 namespace CSX64
 {
 	// -- hole data -- //
 
 	std::ostream &HoleData::WriteTo(std::ostream &writer, const HoleData &hole)
 	{
-		write<u64>(writer, hole.Address);
-		write<u8>(writer, hole.Size);
+		write<u64>(writer, hole.address);
+		write<u8>(writer, hole.size);
 
-		write<u32>(writer, (u32)hole.Line);
+		write<u32>(writer, (u32)hole.line);
 		Expr::WriteTo(writer, hole.expr);
 
 		return writer;
 	}
 	std::istream &HoleData::ReadFrom(std::istream &reader, HoleData &hole)
 	{
-		read<u64>(reader, hole.Address);
-		read<u8>(reader, hole.Size);
+		read<u64>(reader, hole.address);
+		read<u8>(reader, hole.size);
 
-		read<u32>(reader, hole.Line);
+		{
+			u32 t;
+			read<u32>(reader, t);
+			hole.line = (std::size_t)t;
+		}
 		Expr::ReadFrom(reader, hole.expr);
 
 		return reader;
@@ -91,27 +97,27 @@ namespace CSX64
 
 		// -- write obj_header and CSX64 version number -- //
 
-		BinWrite(file, obj_header, sizeof(obj_header));
+		write_bin(file, obj_header, sizeof(obj_header));
 		write<u64>(file, Version);
 
 		// -- write globals -- //
 
 		write<u64>(file, (u64)GlobalSymbols.size());
 		for (const std::string &symbol : GlobalSymbols)
-			BinWrite(file, symbol);
+			write_str(file, symbol);
 		
 		// -- write externals -- //
 
 		write<u64>(file, (u64)ExternalSymbols.size());
 		for (const std::string &symbol : ExternalSymbols)
-			BinWrite(file, symbol);
+			write_str(file, symbol);
 
 		// -- write symbols -- //
 
 		write<u64>(file, (u64)Symbols.size());
 		for(const auto &entry : Symbols)
 		{
-			BinWrite(file, entry.first);
+			write_str(file, entry.first);
 			Expr::WriteTo(file, entry.second);
 		}
 		
@@ -136,13 +142,13 @@ namespace CSX64
 		// -- write segments -- //
 
 		write<u64>(file, (u64)Text.size());
-		BinWrite(file, Text.data(), Text.size());
+		write_bin(file, Text.data(), Text.size());
 
 		write<u64>(file, (u64)Rodata.size());
-		BinWrite(file, Rodata.data(), Rodata.size());
+		write_bin(file, Rodata.data(), Rodata.size());
 
 		write<u64>(file, (u64)Data.size());
-		BinWrite(file, Data.data(), Data.size());
+		write_bin(file, Data.data(), Data.size());
 		
 		write<u64>(file, (u64)BssLen);
 
@@ -172,7 +178,7 @@ namespace CSX64
 		// -- file validation -- //
 
 		// read obj_header and make sure it matches - match failure is type error, not format error.
-		if (!BinRead(file, header_temp, sizeof(obj_header))) goto err;
+		if (!read_bin(file, header_temp, sizeof(obj_header))) goto err;
 		if (std::memcmp(header_temp, obj_header, sizeof(obj_header)))
 		{
 			throw TypeError("File was not a CSX64 executable");
@@ -193,7 +199,7 @@ namespace CSX64
 		GlobalSymbols.reserve((std::size_t)val);
 		for (u64 i = 0; i < val; ++i)
 		{
-			if (!BinRead(file, str)) goto err;
+			if (!read_str(file, str)) goto err;
 			GlobalSymbols.emplace(std::move(str));
 		}
 
@@ -205,7 +211,7 @@ namespace CSX64
 		ExternalSymbols.reserve((std::size_t)val);
 		for (u64 i = 0; i < val; ++i)
 		{
-			if (!BinRead(file, str)) goto err;
+			if (!read_str(file, str)) goto err;
 			ExternalSymbols.emplace(std::move(str));
 		}
 
@@ -217,17 +223,17 @@ namespace CSX64
 		Symbols.reserve((std::size_t)val);
 		for (u64 i = 0; i < val; ++i)
 		{
-			if (!BinRead(file, str)) goto err;
+			if (!read_str(file, str)) goto err;
 			if (!Expr::ReadFrom(file, expr)) goto err;
 			Symbols.emplace(std::move(str), std::move(expr));
 		}
 
 		// -- read alignments -- //
 
-		if (!read<u32>(file, TextAlign) || !IsPowerOf2(TextAlign)) goto err;
-		if (!read<u32>(file, RodataAlign) || !IsPowerOf2(RodataAlign)) goto err;
-		if (!read<u32>(file, DataAlign) || !IsPowerOf2(DataAlign)) goto err;
-		if (!read<u32>(file, BSSAlign) || !IsPowerOf2(BSSAlign)) goto err;
+		if (!read<u32>(file, TextAlign) || !is_pow2(TextAlign)) goto err;
+		if (!read<u32>(file, RodataAlign) || !is_pow2(RodataAlign)) goto err;
+		if (!read<u32>(file, DataAlign) || !is_pow2(DataAlign)) goto err;
+		if (!read<u32>(file, BSSAlign) || !is_pow2(BSSAlign)) goto err;
 
 		// -- read segment holes -- //
 
@@ -267,19 +273,19 @@ namespace CSX64
 		if constexpr (std::numeric_limits<std::size_t>::max() < std::numeric_limits<u64>::max()) { if (val != (std::size_t)val) throw MemoryAllocException("File contents too large"); }
 		Text.clear();
 		Text.resize((std::size_t)val);
-		if (!BinRead(file, Text.data(), (std::size_t)val)) goto err;
+		if (!read_bin(file, Text.data(), (std::size_t)val)) goto err;
 
 		if (!read<u64>(file, val)) goto err;
 		if constexpr (std::numeric_limits<std::size_t>::max() < std::numeric_limits<u64>::max()) { if (val != (std::size_t)val) throw MemoryAllocException("File contents too large"); }
 		Rodata.clear();
 		Rodata.resize((std::size_t)val);
-		if (!BinRead(file, Rodata.data(), (std::size_t)val)) goto err;
+		if (!read_bin(file, Rodata.data(), (std::size_t)val)) goto err;
 
 		if (!read<u64>(file, val)) goto err;
 		if constexpr (std::numeric_limits<std::size_t>::max() < std::numeric_limits<u64>::max()) { if (val != (std::size_t)val) throw MemoryAllocException("File contents too large"); }
 		Data.clear();
 		Data.resize((std::size_t)val);
-		if (!BinRead(file, Data.data(), (std::size_t)val)) goto err;
+		if (!read_bin(file, Data.data(), (std::size_t)val)) goto err;
 
 		if (!read<u64>(file, BssLen)) goto err;
 
@@ -377,46 +383,37 @@ namespace CSX64
 		return true;
 	}
 
-	u64 SmallestUnsignedSizeCode(u64 val)
-	{
-		// filter through till we get a size that will contain it
-		if (val <= 0xff) return 0;
-		else if (val <= 0xffff) return 1;
-		else if (val <= 0xffffffff) return 2;
-		else return 3;
-	}
-
-	void RenameSymbol(ObjectFile &file, std::string from, std::string to)
+	void ObjectFile::RenameSymbol(const std::string &from, const std::string &to)
 	{
 		// make sure "to" doesn't already exist
-		if (ContainsKey(file.Symbols, to) || Contains(file.ExternalSymbols, to))
+		if (contains_key(Symbols, to) || contains(ExternalSymbols, to))
 			throw std::invalid_argument("Attempt to rename symbol \"" + from + "\" to \"" + to + "\" (already exists)");
 		
 		// if it's a symbol defined in this file
 		Expr *expr;
-		if (TryGetValue(file.Symbols, from, expr))
+		if (try_get_value(Symbols, from, expr))
 		{
 			// make sure it hasn't already been evaluated (because it may have already been linked to other expressions)
 			if (expr->IsEvaluated()) throw std::runtime_error("Attempt to rename symbol \"" + from + "\" to \"" + to + "\" (already evaluated)");
 			
 			// rename the symbol
-			file.Symbols.emplace(to, std::move(*expr));
-			file.Symbols.erase(from);
+			Symbols.emplace(to, std::move(*expr));
+			Symbols.erase(from);
 
 			// find and replace in global table (may not be global - that's ok)
-			if (Contains(file.GlobalSymbols, from))
+			if (contains(GlobalSymbols, from))
 			{
 				
-				file.GlobalSymbols.emplace(to);
-				file.GlobalSymbols.erase(from);
+				GlobalSymbols.emplace(to);
+				GlobalSymbols.erase(from);
 			}
 		}
 		// if it's a symbol defined externally
-		else if (Contains(file.ExternalSymbols, from))
+		else if (contains(ExternalSymbols, from))
 		{
 			// replace
-			file.ExternalSymbols.emplace(to);
-			file.ExternalSymbols.erase(from);
+			ExternalSymbols.emplace(to);
+			ExternalSymbols.erase(from);
 		}
 		// otherwise we don't know what it is
 		else throw std::runtime_error("Attempt to rename symbol \"" + from + "\" to \"" + to + "\" (does not exist)");
@@ -424,12 +421,12 @@ namespace CSX64
 		// -- now the easy part -- //
 		
 		// find and replace in symbol table expressions
-		for(auto &entry : file.Symbols) entry.second.Resolve(from, to);
+		for (auto &entry : Symbols) entry.second.Resolve(from, to);
 
 		// find and replace in hole expressions
-		for(auto &entry : file.TextHoles) entry.expr.Resolve(from, to);
-		for (auto &entry : file.RodataHoles) entry.expr.Resolve(from, to);
-		for (auto &entry : file.DataHoles) entry.expr.Resolve(from, to);
+		for (auto &entry : TextHoles) entry.expr.Resolve(from, to);
+		for (auto &entry : RodataHoles) entry.expr.Resolve(from, to);
+		for (auto &entry : DataHoles) entry.expr.Resolve(from, to);
 	}
 	
 	// helper for imm parser
@@ -500,26 +497,17 @@ namespace CSX64
 
 	// -- predefined symbols -- //
 
-	// Stores all the predefined symbols that are not defined by the assembler itself
-	std::unordered_map<std::string, Expr> PredefinedSymbols;
-
-	void DefineSymbol(std::string key, std::string value)
-	{
-		Expr expr;
-		expr.Token(std::move(value));
-		PredefinedSymbols.emplace(std::move(key), std::move(expr));
-	}
-	void DefineSymbol(std::string key, u64 value)
+	void AssemblerPredefines::define_u64(std::string key, u64 value)
 	{
 		Expr expr;
 		expr.IntResult(value);
-		PredefinedSymbols.emplace(std::move(key), std::move(expr));
+		symbols.emplace(std::move(key), std::move(expr));
 	}
-	void DefineSymbol(std::string key, double value)
+	void AssemblerPredefines::define_f64(std::string key, f64 value)
 	{
 		Expr expr;
 		expr.FloatResult(value);
-		PredefinedSymbols.emplace(std::move(key), std::move(expr));
+		symbols.emplace(std::move(key), std::move(expr));
 	}
 
 	// -- patching -- //
@@ -542,22 +530,22 @@ namespace CSX64
 			if (floating)
 			{
 				// only 64-bit and 32-bit are supported
-				switch (data.Size)
+				switch (data.size)
 				{
-				case 8: if (!Write(res, data.Address, 8, val)) { err = "line " + tostr(data.Line) + ": Error writing value"; return PatchError::Error; } break;
-				case 4: if (!Write(res, data.Address, 4, FloatAsUInt32((float)AsDouble(val)))) { err = "line " + tostr(data.Line) + ": Error writing value"; return PatchError::Error; } break;
+				case 8: if (!Write(res, data.address, 8, val)) { err = "line " + tostr(data.line) + ": Error writing value"; return PatchError::Error; } break;
+				case 4: if (!Write(res, data.address, 4, transmute<u32>((f32)transmute<f64>(val)))) { err = "line " + tostr(data.line) + ": Error writing value"; return PatchError::Error; } break;
 
-				default: err = "line " + tostr(data.Line) + ": Attempt to use unsupported floating-point format"; return PatchError::Error;
+				default: err = "line " + tostr(data.line) + ": Attempt to use unsupported floating-point format"; return PatchError::Error;
 				}
 			}
 			// otherwise it's integral
-			else if (!Write(res, data.Address, data.Size, val)) { err = "line " + tostr(data.Line) + ": Error writing value"; return PatchError::Error; }
+			else if (!Write(res, data.address, data.size, val)) { err = "line " + tostr(data.line) + ": Error writing value"; return PatchError::Error; }
 
 			// successfully patched
 			return PatchError::None;
 		}
 		// otherwise it's unevaluated
-		else { err = "line " + tostr(data.Line) + ": Failed to evaluate expression\n-> " + err; return PatchError::Unevaluated; }
+		else { err = "line " + tostr(data.line) + ": Failed to evaluate expression\n-> " + err; return PatchError::Unevaluated; }
 	}
 
 	// -- let the fun begin -- //
@@ -599,7 +587,7 @@ namespace CSX64
 		return true;
 	}
 	
-	AssembleResult Assemble(std::istream &code, ObjectFile &_file_)
+	AssembleResult assemble(std::istream &code, ObjectFile &_file_, const AssemblerPredefines *predefines)
 	{
 		// clear out the destination object file
 		_file_.clear();
@@ -608,19 +596,22 @@ namespace CSX64
 		AssembleArgs args(_file_);
 
 		// add all the predefined symbols
-		args.file.Symbols.insert(PredefinedSymbols.begin(), PredefinedSymbols.end());
+		if (predefines)
+		{
+			args.file.Symbols.insert(predefines->symbols.begin(), predefines->symbols.end());
+		}
 		
 		// -- add a few more that we create -- //
 		
 		args.file.Symbols.insert(std::make_pair("__version__", Expr::CreateInt(Version)));
 
-		args.file.Symbols.insert(std::make_pair("__pinf__", Expr::CreateFloat(std::numeric_limits<double>::infinity())));
-		args.file.Symbols.insert(std::make_pair("__ninf__", Expr::CreateFloat(-std::numeric_limits<double>::infinity())));
-		args.file.Symbols.insert(std::make_pair("__nan__", Expr::CreateFloat(std::numeric_limits<double>::quiet_NaN())));
+		args.file.Symbols.insert(std::make_pair("__pinf__", Expr::CreateFloat(std::numeric_limits<f64>::infinity())));
+		args.file.Symbols.insert(std::make_pair("__ninf__", Expr::CreateFloat(-std::numeric_limits<f64>::infinity())));
+		args.file.Symbols.insert(std::make_pair("__nan__", Expr::CreateFloat(std::numeric_limits<f64>::quiet_NaN())));
 
-		args.file.Symbols.insert(std::make_pair("__fmax__", Expr::CreateFloat(std::numeric_limits<double>::max())));
-		args.file.Symbols.insert(std::make_pair("__fmin__", Expr::CreateFloat(std::numeric_limits<double>::min())));
-		args.file.Symbols.insert(std::make_pair("__fepsilon__", Expr::CreateFloat(std::numeric_limits<double>::denorm_min())));
+		args.file.Symbols.insert(std::make_pair("__fmax__", Expr::CreateFloat(std::numeric_limits<f64>::max())));
+		args.file.Symbols.insert(std::make_pair("__fmin__", Expr::CreateFloat(std::numeric_limits<f64>::min())));
+		args.file.Symbols.insert(std::make_pair("__fepsilon__", Expr::CreateFloat(std::numeric_limits<f64>::denorm_min())));
 
 		args.file.Symbols.insert(std::make_pair("__pi__", Expr::CreateFloat(3.141592653589793238462643383279502884197169399375105820974)));
 		args.file.Symbols.insert(std::make_pair("__e__", Expr::CreateFloat(2.718281828459045235360287471352662497757247093699959574966)));
@@ -681,7 +672,7 @@ namespace CSX64
 				if (!args.op.empty())
 				{
 					// try to get the router
-					if (!TryGetValue(asm_routing_table, ToUpper(args.op), router)) return { AssembleError::UnknownOp, "line " + tostr(args.line) + ": Unknown instruction" };
+					if (!try_get_value(asm_routing_table, to_upper(args.op), router)) return { AssembleError::UnknownOp, "line " + tostr(args.line) + ": Unknown instruction" };
 
 					// perform the assembly action
 					if (!(*router)(args)) return args.res;
@@ -709,7 +700,7 @@ namespace CSX64
 		for(auto &entry : args.file.Symbols)
 		{
 			// if this symbol is non-global
-			if (!Contains(args.file.GlobalSymbols, entry.first))
+			if (!contains(args.file.GlobalSymbols, entry.first))
 			{
 				// if this symbol has already been evaluated
 				if (entry.second.IsEvaluated())
@@ -730,7 +721,7 @@ namespace CSX64
 		if (!args.VerifyIntegrity()) return args.res;
 
 		// rename all the symbols we can shorten (done after verify to ensure there's no verify error messages with the renamed symbols)
-		for (std::size_t i = 0; i < rename_symbols.size(); ++i) RenameSymbol(args.file, std::move(rename_symbols[i]), "^" + tohex(i));
+		for (std::size_t i = 0; i < rename_symbols.size(); ++i) args.file.RenameSymbol(rename_symbols[i], "^" + tohex(i));
 		
 		// validate assembled result (referentially-bound to _file_ argument)
 		args.file._Clean = true;
@@ -738,7 +729,7 @@ namespace CSX64
 		// return no error
 		return {AssembleError::None, ""};
 	}
-	LinkResult Link(Executable &exe, std::list<std::pair<std::string, ObjectFile>> &objs, const std::string &entry_point)
+	LinkResult link(Executable &exe, std::list<std::pair<std::string, ObjectFile>> &objs, const std::string &entry_point)
 	{
 		// parsing locations for evaluation
 		u64 _res;
@@ -760,10 +751,10 @@ namespace CSX64
 		// -- validate _start file -- //
 
 		// _start file must declare an external named "_start"
-		if (!Contains(objs.front().second.ExternalSymbols, (std::string)"_start")) return LinkResult{LinkError::FormatError, "_start file must declare an external named \"_start\""};
+		if (!contains(objs.front().second.ExternalSymbols, (std::string)"_start")) return LinkResult{LinkError::FormatError, "_start file must declare an external named \"_start\""};
 
 		// rename "_start" symbol in _start file to whatever the entry point is (makes _start dirty)
-		try { objs.front().second.make_dirty(); RenameSymbol(objs.front().second, "_start", entry_point); }
+		try { objs.front().second.make_dirty(); objs.front().second.RenameSymbol("_start", entry_point); }
 		catch (...) { return {LinkError::FormatError, "an error occured while renaming \"_start\" in the _start file"}; }
 
 		// -- define things -- //
@@ -804,9 +795,9 @@ namespace CSX64
 			for (const auto &global : obj.second.GlobalSymbols)
 			{
 				// make sure source actually defined this symbol (just in case of corrupted object file)
-				if (!TryGetValue(obj.second.Symbols, global, value)) return LinkResult{LinkError::MissingSymbol, obj.first + ": Global symbol \"" + global + "\" was not defined"};
+				if (!try_get_value(obj.second.Symbols, global, value)) return LinkResult{LinkError::MissingSymbol, obj.first + ": Global symbol \"" + global + "\" was not defined"};
 				// make sure it wasn't already defined
-				if (ContainsKey(global_to_obj, global)) return LinkResult{LinkError::SymbolRedefinition, obj.first + ": Global symbol \"" + global + "\" was defined by " + global_to_obj[global]->first};
+				if (contains_key(global_to_obj, global)) return LinkResult{LinkError::SymbolRedefinition, obj.first + ": Global symbol \"" + global + "\" was defined by " + global_to_obj[global]->first};
 
 				// add to the table
 				global_to_obj.emplace(global, &obj);
@@ -820,7 +811,7 @@ namespace CSX64
 		{
 			// only the verify ignores are a problem (because we'll be defining those)
 			for (const std::string &reserved : VerifyLegalExpressionIgnores)
-				if (ContainsKey(obj.second.Symbols, reserved)) return LinkResult{LinkError::SymbolRedefinition, obj.first + ": defined symbol with name \"" + reserved + "\" (reserved)"};
+				if (contains_key(obj.second.Symbols, reserved)) return LinkResult{LinkError::SymbolRedefinition, obj.first + ": defined symbol with name \"" + reserved + "\" (reserved)"};
 		}
 
 		// start the merge process with the _start file
@@ -855,9 +846,9 @@ namespace CSX64
 			included.emplace(item, std::tuple<u64, u64, u64, u64>(text.size(), rodata.size(), data.size(), bsslen));
 
 			// offset holes to be relative to the start of their total segment (not relative to resulting file)
-			for (HoleData &hole : obj.TextHoles) hole.Address += text.size();
-			for (HoleData &hole : obj.RodataHoles) hole.Address += rodata.size();
-			for (HoleData &hole : obj.DataHoles) hole.Address += data.size();
+			for (HoleData &hole : obj.TextHoles) hole.address += text.size();
+			for (HoleData &hole : obj.RodataHoles) hole.address += rodata.size();
+			for (HoleData &hole : obj.DataHoles) hole.address += data.size();
 
 			// reserve space for segments
 			text.resize(text.size() + obj.Text.size());
@@ -876,10 +867,10 @@ namespace CSX64
 				std::pair<std::string, ObjectFile> **global_source;
 
 				// if this is a global symbol somewhere
-				if (TryGetValue(global_to_obj, external, global_source))
+				if (try_get_value(global_to_obj, external, global_source))
 				{
 					// if the source isn't already included and it isn't already in queue to be included
-					if (!ContainsKey(included, *global_source) && !Contains(include_queue, *global_source))
+					if (!contains_key(included, *global_source) && !contains(include_queue, *global_source))
 					{
 						// add it to the queue
 						include_queue.push_back(*global_source);
@@ -1013,7 +1004,7 @@ namespace CSX64
 				// add externals to local scope //
 
 				// if obj already has a symbol of the same name
-				if (ContainsKey(obj.Symbols, external)) return {LinkError::SymbolRedefinition, entry.first->first + ": defined external symbol \"" + external + "\""};
+				if (contains_key(obj.Symbols, external)) return {LinkError::SymbolRedefinition, entry.first->first + ": defined external symbol \"" + external + "\""};
 				// otherwise define it as a local in obj
 				else obj.Symbols.emplace(external, global_to_obj.at(external)->second.Symbols.at(external));
 			}
@@ -1043,7 +1034,7 @@ namespace CSX64
 		}
 		catch (const std::overflow_error&)
 		{
-			return { LinkError::FormatError, "Sum of segment sizes exceeded maximum size" };
+			return { LinkError::FormatError, "Sum of segment sizes exceeded maximum get_size" };
 		}
 	}
 }
