@@ -1,0 +1,26 @@
+#include <sstream>
+#include <list>
+#include <string>
+#include <utility>
+#include <memory>
+
+#include "asm_test_common.h"
+
+using namespace CSX64;
+
+std::unique_ptr<Computer> asm_lnk(const std::string &code)
+{
+	std::istringstream code_stream{ code };
+	std::list<std::pair<std::string, ObjectFile>> objs;
+	auto &obj_raw = objs.emplace_back();
+	obj_raw.first = "<string>";
+	auto &obj = obj_raw.second;
+	if (auto asm_res = assemble(code_stream, obj); asm_res.Error != AssembleError::None) throw AssembleException("assemble error: " + asm_res.ErrorMsg);
+
+	Executable exe;
+	if (auto lnk_res = link(exe, objs); lnk_res.Error != LinkError::None) throw LinkException("link error: " + lnk_res.ErrorMsg);
+
+	auto p = std::make_unique<Computer>();
+	p->initialize(exe, {});
+	return p;
+}

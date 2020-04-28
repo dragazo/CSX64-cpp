@@ -37,15 +37,15 @@ namespace CSX64
 
     bool Computer::PushRaw(u64 size, u64 val)
     {
-        RSP() -= size;
-        if (RSP() < stack_barrier) { terminate_err(ErrorCode::StackOverflow); return false; }
-        return SetMemRaw(RSP(), size, val);
+        rsp() -= size;
+        if (rsp() < stack_barrier) { terminate_err(ErrorCode::StackOverflow); return false; }
+        return SetMemRaw(rsp(), size, val);
     }
     bool Computer::PopRaw(u64 size, u64 &val)
     {
-        if (RSP() < stack_barrier) { terminate_err(ErrorCode::StackOverflow); return false; }
-        if (!GetMemRaw(RSP(), size, val)) return false;
-        RSP() += size;
+        if (rsp() < stack_barrier) { terminate_err(ErrorCode::StackOverflow); return false; }
+        if (!GetMemRaw(rsp(), size, val)) return false;
+        rsp() += size;
         return true;
     }
 

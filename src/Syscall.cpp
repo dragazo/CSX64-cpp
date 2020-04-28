@@ -13,9 +13,9 @@ namespace CSX64
 {
 	bool Computer::syscall()
 	{
-		switch ((SyscallCode)RAX())
+		switch ((SyscallCode)rax())
 		{
-		case SyscallCode::sys_exit: terminate_ok((int)RBX()); return true;
+		case SyscallCode::sys_exit: terminate_ok((int)rbx()); return false;
 
 		case SyscallCode::sys_read: return Process_sys_read();
 		case SyscallCode::sys_write: return Process_sys_write();
@@ -38,7 +38,7 @@ namespace CSX64
 	bool Computer::Process_sys_read()
 	{
 		// get fd index
-		u64 fd_index = RBX();
+		u64 fd_index = rbx();
 		if (fd_index >= FDCount) { terminate_err(ErrorCode::OutOfBounds); return false; }
 
 		// get fd
@@ -49,14 +49,14 @@ namespace CSX64
 		if (!fd->CanRead()) { terminate_err(ErrorCode::FilePermissions); return false; }
 
 		// make sure we're in bounds
-		if (RCX() >= mem.size() || RDX() >= mem.size() || RCX() + RDX() > mem.size()) { terminate_err(ErrorCode::OutOfBounds); return false; }
+		if (rcx() >= mem.size() || rdx() >= mem.size() || rcx() + rdx() > mem.size()) { terminate_err(ErrorCode::OutOfBounds); return false; }
 		// make sure we're not in the readonly segment
-		if (RCX() < readonly_barrier) { terminate_err(ErrorCode::AccessViolation); return false; }
+		if (rcx() < readonly_barrier) { terminate_err(ErrorCode::AccessViolation); return false; }
 
 		// read from the file
 		try
 		{
-			i64 n = fd->Read(mem.data() + RCX(), (i64)RDX());
+			i64 n = fd->Read(mem.data() + rcx(), (i64)rdx());
 
 			// if we got nothing but the wrapper is interactive
 			if (n == 0 && fd->IsInteractive())
@@ -65,17 +65,17 @@ namespace CSX64
 				return false; // return false to denote that it failed, but don't exit/terminate (essentially a HLT instruction for tick() loop)
 			}
 			// otherwise success - return num chars read from file
-			else RAX() = (u64)n;
+			else rax() = (u64)n;
 		}
 		// errors are failures - return -1
-		catch (...) { RAX() = ~(u64)0; }
+		catch (...) { rax() = ~(u64)0; }
 
 		return true;
 	}
 	bool Computer::Process_sys_write()
 	{
 		// get fd index
-		u64 fd_index = RBX();
+		u64 fd_index = rbx();
 		if (fd_index >= FDCount) { terminate_err(ErrorCode::OutOfBounds); return false; }
 
 		// get fd
@@ -86,11 +86,11 @@ namespace CSX64
 		if (!fd->CanWrite()) { terminate_err(ErrorCode::FilePermissions); return false; }
 
 		// make sure we're in bounds
-		if (RCX() >= mem.size() || RDX() >= mem.size() || RCX() + RDX() > mem.size()) { terminate_err(ErrorCode::OutOfBounds); return false; }
+		if (rcx() >= mem.size() || rdx() >= mem.size() || rcx() + rdx() > mem.size()) { terminate_err(ErrorCode::OutOfBounds); return false; }
 
 		// attempt to write from memory to the file - success = num written, fail = -1
-		try { RAX() = (u64)fd->Write(mem.data() + RCX(), (i64)RDX()) ? RDX() : ~(u64)0; }
-		catch (...) { RAX() = ~(u64)0; }
+		try { rax() = (u64)fd->Write(mem.data() + rcx(), (i64)rdx()) ? rdx() : ~(u64)0; }
+		catch (...) { rax() = ~(u64)0; }
 		
 		return true;
 	}
@@ -103,16 +103,16 @@ namespace CSX64
 		// get an available file descriptor
 		int fd_index = FindAvailableFD();
 		// if we couldn't get one, return -1
-		if (fd_index < 0) { RAX() = ~(u64)0; return true; }
+		if (fd_index < 0) { rax() = ~(u64)0; return true; }
 
 		// get the file descriptor handle
 		std::unique_ptr<IFileWrapper> &fd = FileDescriptors[fd_index];
 
 		// get path
 		std::string path;
-		if (!read_str(RBX(), path)) return false;
+		if (!read_str(rbx(), path)) return false;
 
-		int                raw_flags = (int)RCX();       // flags provided by user
+		int                raw_flags = (int)rcx();       // flags provided by user
 		std::ios::openmode cpp_flags = std::ios::binary; // flags to provide to C++ (always open in binary mode)
 		
 		// alias permissions flags for convenience
@@ -163,22 +163,22 @@ namespace CSX64
 		// open the file
 		auto f = std::make_unique<std::fstream>();
 		try { f->open(path, cpp_flags); }
-		catch (...) { RAX() = ~(u64)0; return true; }
+		catch (...) { rax() = ~(u64)0; return true; }
 
 		// if it didn't open, fail with -1
-		if (!*f) { RAX() = ~(u64)0; return true; }
+		if (!*f) { rax() = ~(u64)0; return true; }
 
 		// store in the file descriptor
 		fd = std::make_unique<BasicFileWrapper>(f.get(), true, false, can_read, can_write, true); // provide the wrapper with the file pointer
 		f.release(); // only if it succeeded should we release the unique_ptr on said file
-		RAX() = fd_index;
+		rax() = fd_index;
 
 		return true;
 	}
 	bool Computer::Process_sys_close()
 	{
 		// get fd index
-		u64 fd_index = RBX();
+		u64 fd_index = rbx();
 		if (fd_index >= FDCount) { terminate_err(ErrorCode::OutOfBounds); return false; }
 
 		// get fd
@@ -186,14 +186,14 @@ namespace CSX64
 
 		// close the file - success = 0, fail = -1
 		fd = nullptr;
-		RAX() = 0;
+		rax() = 0;
 		return true;
 	}
 
 	bool Computer::Process_sys_lseek()
 	{
 		// get fd index
-		u64 fd_index = RBX();
+		u64 fd_index = rbx();
 		if (fd_index >= FDCount) { terminate_err(ErrorCode::OutOfBounds); return false; }
 
 		// get fd
@@ -203,7 +203,7 @@ namespace CSX64
 		// make sure it can seek
 		if (!fd->CanSeek()) { terminate_err(ErrorCode::FilePermissions); return false; }
 
-		int               raw_mode = (int)RDX();
+		int               raw_mode = (int)rdx();
 		std::ios::seekdir cpp_mode;
 
 		// process raw mode
@@ -211,11 +211,11 @@ namespace CSX64
 		else if (raw_mode == (int)SeekMode::cur) cpp_mode = std::ios::cur;
 		else if (raw_mode == (int)SeekMode::end) cpp_mode = std::ios::end;
 		// otherwise unknown seek mode - return -1
-		else { RAX() = ~(u64)0; return true; }
+		else { rax() = ~(u64)0; return true; }
 
 		// attempt the seek
-		try { RAX() = (u64)fd->Seek((i64)RCX(), cpp_mode); }
-		catch (...) { RAX() = ~(u64)0; }
+		try { rax() = (u64)fd->Seek((i64)rcx(), cpp_mode); }
+		catch (...) { rax() = ~(u64)0; }
 		
 		return true;
 	}
@@ -223,11 +223,11 @@ namespace CSX64
 	bool Computer::Process_sys_brk()
 	{
 		// special request of 0 returns current break
-		if (RBX() == 0) RAX() = mem.size();
+		if (rbx() == 0) rax() = mem.size();
 		// if the request is too high or goes below init size, don't do it - return -1
-		else if (RBX() > max_mem_size || RBX() < min_mem_size) { RAX() = ~(u64)0; }
+		else if (rbx() > max_mem_size || rbx() < min_mem_size) { rax() = ~(u64)0; }
 		// otherwise perform the reallocation
-		else RAX() = this->realloc(RBX(), true) ? 0 : ~(u64)0;
+		else rax() = this->realloc(rbx(), true) ? 0 : ~(u64)0;
 
 		return true;
 	}
@@ -239,11 +239,11 @@ namespace CSX64
 
 		// get the paths
 		std::string from, to;
-		if (!read_str(RBX(), from) || !read_str(RCX(), to)) return false;
+		if (!read_str(rbx(), from) || !read_str(rcx(), to)) return false;
 
 		// attempt the move operation - success = 0, fail = -1
-		try { fs::rename(from, to); RAX() = 0; }
-		catch (...) { RAX() = ~(u64)0; }
+		try { fs::rename(from, to); rax() = 0; }
+		catch (...) { rax() = ~(u64)0; }
 
 		return true;
 	}
@@ -254,11 +254,11 @@ namespace CSX64
 
 		// get the path
 		std::string path;
-		if (!read_str(RBX(), path)) return false;
+		if (!read_str(rbx(), path)) return false;
 		
 		// attempt the unlink operation - using remove, but it must not be a directory - success = 0, failure = -1
-		try { RAX() = !fs::is_directory(path) && fs::remove(path) ? (u64)0 : ~(u64)0; }
-		catch (...) { RAX() = ~(u64)0; }
+		try { rax() = !fs::is_directory(path) && fs::remove(path) ? (u64)0 : ~(u64)0; }
+		catch (...) { rax() = ~(u64)0; }
 
 		return true;
 	}
@@ -270,11 +270,11 @@ namespace CSX64
 
 		// get the path
 		std::string path;
-		if (!read_str(RBX(), path)) return false;
+		if (!read_str(rbx(), path)) return false;
 
 		// attempt the mkdir operation - success = 0, failure = -1
-		try { RAX() = fs::create_directory(path) ? (u64)0 : ~(u64)0; }
-		catch (...) { RAX() = ~(u64)0; }
+		try { rax() = fs::create_directory(path) ? (u64)0 : ~(u64)0; }
+		catch (...) { rax() = ~(u64)0; }
 
 		return true;
 	}
@@ -285,11 +285,11 @@ namespace CSX64
 
 		// get the path
 		std::string path;
-		if (!read_str(RBX(), path)) return false;
+		if (!read_str(rbx(), path)) return false;
 
 		// attempt the rmdir - using remove, but it must be a directory - success = 0, failure = -1
-		try { RAX() = fs::is_directory(path) && fs::remove(path) ? (u64)0 : ~(u64)0; }
-		catch (...) { RAX() = ~(u64)0; }
+		try { rax() = fs::is_directory(path) && fs::remove(path) ? (u64)0 : ~(u64)0; }
+		catch (...) { rax() = ~(u64)0; }
 
 		return true;
 	}

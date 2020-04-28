@@ -99,7 +99,7 @@ namespace CSX64::detail
 	};
 
 	// acts as a reference to a bitfield in an integer of type "T"
-	template<typename T, int pos, int len>
+	template<typename T, std::size_t pos, std::size_t len >
 	struct BitfieldWrapper
 	{
 		T &data;
@@ -133,7 +133,7 @@ namespace CSX64::detail
 		constexpr BitfieldWrapper operator>>=(int val) noexcept { *this = *this >> val; return *this; }
 	};
 	// acts a reference to a 1-bit flag in an integer of type "T"
-	template<typename T, int pos>
+	template<typename T, std::size_t pos>
 	struct FlagWrapper
 	{
 		T &data;
@@ -192,7 +192,7 @@ namespace CSX64::detail
 		constexpr BitfieldWrapper<u64, 0, 16> x16() noexcept { return { data }; }
 		constexpr BitfieldWrapper<u64, 0, 8> x8() noexcept { return { data }; }
 		constexpr BitfieldWrapper<u64, 8, 8> x8h() noexcept { return { data }; }
-
+		
 		constexpr u64 x64() const noexcept { return data; }
 		constexpr u32 x32() const noexcept { return (u32)data; }
 		constexpr u16 x16() const noexcept { return (u16)data; }
@@ -253,7 +253,7 @@ namespace CSX64::detail
 	{
 	private:
 
-		alignas(64) unsigned char data[64]; // the raw data block used to represent the entire 64-byte vector register
+		alignas(64) u8 data[64]; // the raw data block used to represent the entire 64-byte vector register
 
 	public: // -- fill utilities -- //
 
@@ -382,13 +382,11 @@ namespace CSX64
 		BasicFileWrapper(std::fstream *file, bool managed, bool interactive, bool canRead, bool canWrite, bool canSeek)
 			: f(file), _managed(managed), _interactive(interactive), _CanRead(canRead), _CanWrite(canWrite), _CanSeek(canSeek)
 		{
-			// the file must not be null
 			if (file == nullptr) throw std::invalid_argument("file cannot be null");
 		}
 
 		virtual ~BasicFileWrapper()
 		{
-			// if we're managing the file, delete it
 			if (_managed) delete f;
 		}
 
@@ -410,12 +408,12 @@ namespace CSX64
 		virtual i64 Read(void *buf, i64 cap) override
 		{
 			if (!CanRead()) throw FileWrapperPermissionsException("FileWrapper not flagged for reading");
-			return (i64)f->read(reinterpret_cast<char*>(buf), (std::streamsize)cap).gcount(); // aliasing ok because casting to char type
+			return (i64)f->read(reinterpret_cast<char*>(buf), (std::streamsize)cap).gcount();
 		}
 		virtual i64 Write(const void *buf, i64 len) override
 		{
 			if (!CanWrite()) throw FileWrapperPermissionsException("FileWrapper not flagged for writing");
-			f->write(reinterpret_cast<const char*>(buf), (std::streamsize)len); // aliasing ok because casting to char type
+			f->write(reinterpret_cast<const char*>(buf), (std::streamsize)len);
 			return len;
 		}
 
@@ -448,16 +446,13 @@ namespace CSX64
 		// constructs a new TerminalInputFileWrapper from the given stream (which cannot be null).
 		// if <managed> is true, the stream is closed and deleted when this object is destroyed.
 		// throws std::invalid_argument if <file> is null.
-		TerminalInputFileWrapper(std::istream *file, bool managed, bool interactive)
-			: f(file), _managed(managed), _interactive(interactive)
+		TerminalInputFileWrapper(std::istream *file, bool managed, bool interactive) : f(file), _managed(managed), _interactive(interactive)
 		{
-			// the file must not be null
 			if (file == nullptr) throw std::invalid_argument("file cannot be null");
 		}
 
 		virtual ~TerminalInputFileWrapper()
 		{
-			// if we're managing the file, delete it
 			if (_managed) delete f;
 		}
 
@@ -529,16 +524,13 @@ namespace CSX64
 		// constructs a new TerminalOutputFileWrapper from the given stream (which cannot be null).
 		// if <managed> is true, the stream is closed and deleted when this object is destroyed.
 		// throws std::invalid_argument if <file> is null.
-		TerminalOutputFileWrapper(std::ostream *file, bool managed, bool interactive)
-			: f(file), _managed(managed), _interactive(interactive)
+		TerminalOutputFileWrapper(std::ostream *file, bool managed, bool interactive) : f(file), _managed(managed), _interactive(interactive)
 		{
-			// the file must not be null
 			if (file == nullptr) throw std::invalid_argument("file cannot be null");
 		}
 
 		virtual ~TerminalOutputFileWrapper()
 		{
-			// if we're managing the file, delete it
 			if (_managed) delete f;
 		}
 
@@ -560,7 +552,7 @@ namespace CSX64
 		virtual i64 Read(void*, i64) override { throw FileWrapperPermissionsException("FileWrapper not flagged for reading"); }
 		virtual i64 Write(const void *buf, i64 len) override
 		{
-			f->write(reinterpret_cast<const char*>(buf), (std::streamsize)len); // alias ok because casting to char type
+			f->write(reinterpret_cast<const char*>(buf), (std::streamsize)len);
 			return len;
 		}
 

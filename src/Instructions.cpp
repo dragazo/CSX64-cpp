@@ -820,8 +820,8 @@ namespace CSX64
         u64 count;
         switch (sizecode)
         {
-        case 3: count = --RCX(); break;
-        case 2: count = --ECX(); break;
+        case 3: count = --rcx(); break;
+        case 2: count = --ecx(); break;
         case 1: count = --CX(); break;
         case 0: terminate_err(ErrorCode::UndefinedBehavior); return false; // 8-bit not allowed
 
@@ -997,15 +997,15 @@ namespace CSX64
             CF() = OF() = DX() != 0;
             break;
         case 2:
-            res = EAX() * a;
-            EDX() = (u32)(res >> 32); EAX() = (u32)res;
-            CF() = OF() = EDX() != 0;
+            res = eax() * a;
+            edx() = (u32)(res >> 32); eax() = (u32)res;
+            CF() = OF() = edx() != 0;
             break;
         case 3:
         {
-            auto _res = (BiggerInts::uint_t<128>)RAX() * (BiggerInts::uint_t<128>)a;
-            RDX() = _res.blocks[1]; RAX() = _res.blocks[0];
-            CF() = OF() = RDX() != 0;
+            auto _res = (BiggerInts::uint_t<128>)rax() * (BiggerInts::uint_t<128>)a;
+            rdx() = _res.blocks[1]; rax() = _res.blocks[0];
+            CF() = OF() = rdx() != 0;
             break;
         }
         } // end switch
@@ -1078,14 +1078,14 @@ namespace CSX64
             CF() = OF() = res != (i16)res;
             break;
         case 2:
-            res = (i32)EAX() * a;
-            EDX() = (u32)(res >> 32); EAX() = (u32)res;
+            res = (i32)eax() * a;
+            edx() = (u32)(res >> 32); eax() = (u32)res;
             CF() = OF() = res != (i32)res;
             break;
         case 3:
         {
-            auto _res = (BiggerInts::int_t<128>)(i64)RAX() * (BiggerInts::int_t<128>)a;
-            RDX() = _res.blocks[1]; RAX() = _res.blocks[0];
+            auto _res = (BiggerInts::int_t<128>)(i64)rax() * (BiggerInts::int_t<128>)a;
+            rdx() = _res.blocks[1]; rax() = _res.blocks[0];
             CF() = OF() = _res != (i64)_res;
             break;
         }
@@ -1204,17 +1204,17 @@ namespace CSX64
             AX() = (u16)quo; DX() = (u16)rem;
             break;
         case 2:
-            full = ((u64)EDX() << 32) | EAX();
+            full = ((u64)edx() << 32) | eax();
             quo = full / a; rem = full % a;
             if (quo != (u32)quo) { terminate_err(ErrorCode::ArithmeticError); return false; }
-            EAX() = (u32)quo; EDX() = (u32)rem;
+            eax() = (u32)quo; edx() = (u32)rem;
             break;
         case 3:
         {
-            BiggerInts::uint_t<128> Full; Full.blocks[1] = RDX(); Full.blocks[0] = RAX();
+            BiggerInts::uint_t<128> Full; Full.blocks[1] = rdx(); Full.blocks[0] = rax();
             auto divmod = BiggerInts::divmod(Full, (BiggerInts::uint_t<128>)a);
             if (divmod.first != (u64)divmod.first) { terminate_err(ErrorCode::ArithmeticError); return false; }
-            RAX() = (u64)divmod.first; RDX() = (u64)divmod.second;
+            rax() = (u64)divmod.first; rdx() = (u64)divmod.second;
             break;
         }
         } // end switch
@@ -1253,17 +1253,17 @@ namespace CSX64
             AX() = (u16)quo; DX() = (u16)rem;
             break;
         case 2:
-            full = ((i64)EDX() << 32) | EAX();
+            full = ((i64)edx() << 32) | eax();
             quo = full / a; rem = full % a;
             if (quo != (i32)quo) { terminate_err(ErrorCode::ArithmeticError); return false; }
-            EAX() = (u32)quo; EDX() = (u32)rem;
+            eax() = (u32)quo; edx() = (u32)rem;
             break;
         case 3:
         {
-            BiggerInts::int_t<128> Full; Full.blocks[1] = RDX(); Full.blocks[0] = RAX();
+            BiggerInts::int_t<128> Full; Full.blocks[1] = rdx(); Full.blocks[0] = rax();
             auto divmod = BiggerInts::divmod(Full, (BiggerInts::int_t<128>)a);
             if (divmod.first != (i64)divmod.first) { terminate_err(ErrorCode::ArithmeticError); return false; }
-            RAX() = (u64)divmod.first; RDX() = (u64)divmod.second;
+            rax() = (u64)divmod.first; rdx() = (u64)divmod.second;
             break;
         }
         } // end switch
@@ -1764,12 +1764,12 @@ namespace CSX64
         switch (ext)
         {
         case 0: DX() = (i16)AX() >= 0 ? 0 : 0xffff; return true;
-        case 1: EDX() = (i32)EAX() >= 0 ? 0 : 0xffffffff; return true;
-        case 2: RDX() = (i64)RAX() >= 0 ? 0 : 0xffffffffffffffff; return true;
+        case 1: edx() = (i32)eax() >= 0 ? 0 : 0xffffffff; return true;
+        case 2: rdx() = (i64)rax() >= 0 ? 0 : 0xffffffffffffffff; return true;
 
         case 3: AX() = (u16)(i8)AL(); return true;
-        case 4: EAX() = (u32)(i16)AX(); return true;
-        case 5: RAX() = (u64)(i32)EAX(); return true;
+        case 4: eax() = (u32)(i16)AX(); return true;
+        case 5: rax() = (u64)(i32)eax(); return true;
 
         default: terminate_err(ErrorCode::UndefinedBehavior); return false;
         }
@@ -2028,10 +2028,10 @@ namespace CSX64
         u64 size = get_size(sizecode);
         u64 temp;
 
-        if (!GetMemRaw(RSI(), size, temp) || !SetMemRaw(RDI(), size, temp)) return false;
+        if (!GetMemRaw(rsi(), size, temp) || !SetMemRaw(rdi(), size, temp)) return false;
 
-        if (DF()) { RSI() -= size; RDI() -= size; }
-        else { RSI() += size; RDI() += size; }
+        if (DF()) { rsi() -= size; rdi() -= size; }
+        else { rsi() += size; rdi() += size; }
 
         return true;
     }
@@ -2040,10 +2040,10 @@ namespace CSX64
         u64 size = get_size(sizecode);
         u64 a, b;
 
-        if (!GetMemRaw(RSI(), size, a) || !GetMemRaw(RDI(), size, b)) return false;
+        if (!GetMemRaw(rsi(), size, a) || !GetMemRaw(rdi(), size, b)) return false;
 
-        if (DF()) { RSI() -= size; RDI() -= size; }
-        else { RSI() += size; RDI() += size; }
+        if (DF()) { rsi() -= size; rdi() -= size; }
+        else { rsi() += size; rdi() += size; }
 
         u64 res = truncate(a - b, sizecode);
 
@@ -2060,10 +2060,10 @@ namespace CSX64
         u64 size = get_size(sizecode);
         u64 temp;
 
-        if (!GetMemRaw(RSI(), size, temp)) return false;
+        if (!GetMemRaw(rsi(), size, temp)) return false;
 
-        if (DF()) RSI() -= size;
-        else RSI() += size;
+        if (DF()) rsi() -= size;
+        else rsi() += size;
 
         CPURegisters[0][sizecode] = temp;
 
@@ -2073,10 +2073,10 @@ namespace CSX64
     {
         u64 size = get_size(sizecode);
 
-        if (!SetMemRaw(RDI(), size, CPURegisters[0][sizecode])) return false;
+        if (!SetMemRaw(rdi(), size, CPURegisters[0][sizecode])) return false;
 
-        if (DF()) RDI() -= size;
-        else RDI() += size;
+        if (DF()) rdi() -= size;
+        else rdi() += size;
 
         return true;
     }
@@ -2086,7 +2086,7 @@ namespace CSX64
         u64 a = CPURegisters[0][sizecode];
         u64 b;
 
-        if (!GetMemRaw(RDI(), size, b)) return false;
+        if (!GetMemRaw(rdi(), size, b)) return false;
 
         u64 res = truncate(a - b, sizecode);
 
@@ -2096,8 +2096,8 @@ namespace CSX64
         AF() = (a & 0xf) < (b & 0xf); // AF is just like CF but only the low nibble
         OF() = negative(a ^ b, sizecode) && negative(a ^ res, sizecode); // overflow if sign(a)!=sign(b) and sign(a)!=sign(res)
 
-        if (DF()) RDI() -= size;
-        else RDI() += size;
+        if (DF()) rdi() -= size;
+        else rdi() += size;
 
         return true;
     }
@@ -2136,17 +2136,17 @@ namespace CSX64
             // if we can do the whole thing in a single tick
             if (OTRF())
             {
-                while (RCX())
+                while (rcx())
                 {
                     if (!_ProcessSTRING_MOVS(sizecode)) return false;
-                    --RCX();
+                    --rcx();
                 }
             }
             // otherwise perform a single iteration (if count is nonzero)
-            else if (RCX())
+            else if (rcx())
             {
                 if (!_ProcessSTRING_MOVS(sizecode)) return false;
-                --RCX();
+                --rcx();
                 RIP() -= 2; // reset RIP to repeat instruction
             }
             break;
@@ -2160,18 +2160,18 @@ namespace CSX64
             // if we can do the whole thing in a single tick
             if (OTRF())
             {
-                while (RCX())
+                while (rcx())
                 {
                     if (!_ProcessSTRING_CMPS(sizecode)) return false;
-                    --RCX();
+                    --rcx();
                     if (!ZF()) break;
                 }
             }
             // otherwise perform a single iteration (if count is nonzero)
-            else if (RCX())
+            else if (rcx())
             {
                 if (!_ProcessSTRING_CMPS(sizecode)) return false;
-                --RCX();
+                --rcx();
                 if (ZF()) RIP() -= 2; // if condition met, reset RIP to repeat instruction
             }
             break;
@@ -2181,18 +2181,18 @@ namespace CSX64
             // if we can do the whole thing in a single tick
             if (OTRF())
             {
-                while (RCX())
+                while (rcx())
                 {
                     if (!_ProcessSTRING_CMPS(sizecode)) return false;
-                    --RCX();
+                    --rcx();
                     if (ZF()) break;
                 }
             }
             // otherwise perform a single iteration (if count is nonzero)
-            else if (RCX())
+            else if (rcx())
             {
                 if (!_ProcessSTRING_CMPS(sizecode)) return false;
-                --RCX();
+                --rcx();
                 if (!ZF()) RIP() -= 2; // if condition met, reset RIP to repeat instruction
             }
             break;
@@ -2205,16 +2205,16 @@ namespace CSX64
 
             if (OTRF())
             {
-                while (RCX())
+                while (rcx())
                 {
                     if (!_ProcessSTRING_LODS(sizecode)) return false;
-                    --RCX();
+                    --rcx();
                 }
             }
-            else if (RCX())
+            else if (rcx())
             {
                 if (!_ProcessSTRING_LODS(sizecode)) return false;
-                --RCX();
+                --rcx();
                 RIP() -= 2; // reset RIP to repeat instruction
             }
             break;
@@ -2227,16 +2227,16 @@ namespace CSX64
             
             if (OTRF())
             {
-                while (RCX())
+                while (rcx())
                 {
                     if (!_ProcessSTRING_STOS(sizecode)) return false;
-                    --RCX();
+                    --rcx();
                 }
             }
-            else if (RCX())
+            else if (rcx())
             {
                 if (!_ProcessSTRING_STOS(sizecode)) return false;
-                --RCX();
+                --rcx();
                 RIP() -= 2; // reset RIP to repeat instruction
             }
             break;
@@ -2250,18 +2250,18 @@ namespace CSX64
             // if we can do the whole thing in a single tick
             if (OTRF())
             {
-                while (RCX())
+                while (rcx())
                 {
                     if (!_ProcessSTRING_SCAS(sizecode)) return false;
-                    --RCX();
+                    --rcx();
                     if (!ZF()) break;
                 }
             }
             // otherwise perform a single iteration (if count is nonzero)
-            else if (RCX())
+            else if (rcx())
             {
                 if (!_ProcessSTRING_SCAS(sizecode)) return false;
-                --RCX();
+                --rcx();
                 if (ZF()) RIP() -= 2; // if condition met, reset RIP to repeat instruction
             }
             break;
@@ -2271,18 +2271,18 @@ namespace CSX64
             // if we can do the whole thing in a single tick
             if (OTRF())
             {
-                while (RCX())
+                while (rcx())
                 {
                     if (!_ProcessSTRING_SCAS(sizecode)) return false;
-                    --RCX();
+                    --rcx();
                     if (ZF()) break;
                 }
             }
             // otherwise perform a single iteration (if count is nonzero)
-            else if (RCX())
+            else if (rcx())
             {
                 if (!_ProcessSTRING_SCAS(sizecode)) return false;
-                --RCX();
+                --rcx();
                 if (!ZF()) RIP() -= 2; // if condition met, reset RIP to repeat instruction
             }
             break;
@@ -3076,7 +3076,7 @@ namespace CSX64
         // zero
         else if (val == 0) { FPU_C3() = true; FPU_C2() = false; FPU_C0() = false; }
         // denormalized
-        else if (IsDenorm(val)) { FPU_C3() = true; FPU_C2() = true; FPU_C0() = false; }
+        else if (is_denormal<fext>(val)) { FPU_C3() = true; FPU_C2() = true; FPU_C0() = false; }
         // normal
         else { FPU_C3() = false; FPU_C2() = true; FPU_C0() = false; }
 

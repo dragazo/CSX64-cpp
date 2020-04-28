@@ -30,6 +30,8 @@ namespace CSX64::detail
 
 	template<typename T> inline constexpr bool is_int = is_uint<T> || is_sint<T>;
 
+	template<typename T> inline constexpr bool is_floating = std::is_same_v<T, f32> || std::is_same_v<T, f64> || std::is_same_v<T, fext>;
+
 	namespace detail
 	{
 		template<typename T, typename U> struct is_restricted_transmutable : std::false_type {};
@@ -84,7 +86,7 @@ namespace CSX64::detail
 	std::istream &read_bin(std::istream &istr, void *p, std::size_t count);
 
 	// reads/writes a binary representation of a string to the stream.
-	std::ostream &write_str(std::ostream &ostr, const std::string &str);
+	std::ostream &write_str(std::ostream &ostr, std::string_view str);
 	std::istream &read_str(std::istream &istr, std::string &str);
 
 	// writes a little-endian value to the stream
@@ -130,30 +132,10 @@ namespace CSX64::detail
 	
 	// -- memory utilities -- //
 
-	/// <summary>
-	/// Writes a value to the array
-	/// </summary>
-	/// <param name="arr">the data to write to</param>
-	/// <param name="pos">the index to begin at</param>
-	/// <param name="size">the size of the value in bytes</param>
-	/// <param name="val">the value to write</param>
-	/// <exception cref="ArgumentException"></exception>
+	// writes a little-endian value of the specified size (bytes) to the array. must be entirely in bounds.
 	bool Write(std::vector<u8> &arr, u64 pos, u64 size, u64 val);
-	/// <summary>
-	/// Reads a value from the array
-	/// </summary>
-	/// <param name="arr">the data to write to</param>
-	/// <param name="pos">the index to begin at</param>
-	/// <param name="size">the size of the value in bytes</param>
-	/// <param name="res">the read value</param>
-	bool Read(const std::vector<u8> &arr, u64 pos, u64 size, u64 &res);
 
-	/// <summary>
-	/// Appends a value to an array of bytes in a list
-	/// </summary>
-	/// <param name="data">the byte array</param>
-	/// <param name="size">the size in bytes of the value to write</param>
-	/// <param name="val">the value to write</param>
+	// appents a little-endian value of the specified size (bytes) to the array.
 	void Append(std::vector<u8> &arr, u64 size, u64 val);
 
 	/// <summary>
@@ -250,16 +232,16 @@ namespace CSX64::detail
 	bool TryParseUInt64(const std::string &str, u64 &val, unsigned int radix = 10);
 	bool TryParseDouble(const std::string &str, f64 &val);
 
-	bool starts_with(const std::string &str, const std::string &val);
+	bool starts_with(std::string_view str, std::string_view val);
 	/// <summary>
 	/// Returns true if the the string is equal to the specified value or begins with it and is followed by white space.
 	/// </summary>
 	/// <param name="str">the string to search in</param>
 	/// <param name="val">the header value to test for</param>
-	bool starts_with_token(const std::string &str, const std::string &val);
+	bool starts_with_token(std::string_view str, std::string_view val);
 
 	// return true if str ends with val
-	bool ends_with(const std::string &str, const std::string &val);
+	bool ends_with(std::string_view str, std::string_view val);
 
 	/// <summary>
 	/// returns a binary dump representation of the data
@@ -346,11 +328,14 @@ namespace CSX64::detail
 	void ExtractDouble(f64 val, f64 &exp, f64 &sig);
 	f64 AssembleDouble(f64 exp, f64 sig);
 
-	/// <summary>
-	/// Returns true if the floating-point value is denormalized (including +-0)
-	/// </summary>
-	/// <param name="val">the value to test</param>
-	inline bool IsDenorm(f64 val) { return (transmute<u64>(val) & 0x7ff0000000000000ul) == 0; }
+	// checks if val is denormal.
+	template<typename T, typename U, std::enable_if_t<std::is_same_v<T, U> && is_floating<T>, int> = 0>
+	inline bool is_denormal(U val)
+	{
+		if constexpr (std::is_same_v<T, f32>) return (transmute<u32>(val) & 0x7f800000u) == 0;
+		else if constexpr (std::is_same_v<T, f64>) return (transmute<u64>(val) & 0x7ff0000000000000u) == 0;
+		else return is_denormal<f64>((f64)val); // TODO: maybe something better can be done for fext, but pretty sure on most systems fext == f64 but are still considered distinct types
+	}
 
 	/// <summary>
 	/// Returns true if the value is zero (int or floating)

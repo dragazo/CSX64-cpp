@@ -103,14 +103,12 @@ namespace CSX64
 		// -- write globals -- //
 
 		write<u64>(file, (u64)GlobalSymbols.size());
-		for (const std::string &symbol : GlobalSymbols)
-			write_str(file, symbol);
+		for (const std::string &symbol : GlobalSymbols) write_str(file, symbol);
 		
 		// -- write externals -- //
 
 		write<u64>(file, (u64)ExternalSymbols.size());
-		for (const std::string &symbol : ExternalSymbols)
-			write_str(file, symbol);
+		for (const std::string &symbol : ExternalSymbols) write_str(file, symbol);
 
 		// -- write symbols -- //
 
@@ -750,12 +748,12 @@ namespace CSX64
 
 		// -- validate _start file -- //
 
-		// _start file must declare an external named "_start"
-		if (!contains(objs.front().second.ExternalSymbols, (std::string)"_start")) return LinkResult{LinkError::FormatError, "_start file must declare an external named \"_start\""};
-
-		// rename "_start" symbol in _start file to whatever the entry point is (makes _start dirty)
-		try { objs.front().second.make_dirty(); objs.front().second.RenameSymbol("_start", entry_point); }
-		catch (...) { return {LinkError::FormatError, "an error occured while renaming \"_start\" in the _start file"}; }
+		// if _start file contains an external named "_start", rename it to the main entry point symbol (this makes _start) dirty
+		if (const std::string _temp = "_start"; contains(objs.front().second.ExternalSymbols, _temp))
+		{
+			try { objs.front().second.make_dirty(); objs.front().second.RenameSymbol(_temp, entry_point); }
+			catch (...) { return { LinkError::FormatError, "an error occured while renaming \"_start\" in the _start file" }; }
+		}
 
 		// -- define things -- //
 

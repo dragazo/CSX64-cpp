@@ -62,7 +62,7 @@ namespace CSX64
 
 		// get the stack pointer
 		u64 stack = size;
-		RBP() = stack; // RBP points to before we start pushing args
+		rbp() = stack; // RBP points to before we start pushing args
 
 		// an array of pointers to command line args in computer memory.
 		// one for each arg, plus a null terminator.
@@ -87,15 +87,15 @@ namespace CSX64
 		for (std::size_t i = 0; i < cmdarg_pointers.size(); ++i) (void)write_mem<u64>(stack + i * 8, cmdarg_pointers[i]);
 
 		// load arg count and arg array pointer to RDI, RSI
-		RDI() = args.size();
-		RSI() = stack;
+		rdi() = args.size();
+		rsi() = stack;
 
 		// initialize RSP
-		RSP() = stack;
+		rsp() = stack;
 
 		// also push args to stack (RTL)
-		(void)push_mem<u64>(RSI());
-		(void)push_mem<u64>(RDI());
+		(void)push_mem<u64>(rsi());
+		(void)push_mem<u64>(rdi());
 
 		#if OPCODE_COUNTS
 		for (u64 i = 0; i < 256; ++i) op_exe_count[i] = 0;
@@ -200,22 +200,22 @@ namespace CSX64
 		ostr << std::hex << std::setfill('0') << std::noboolalpha;
 
 		ostr << '\n';
-		ostr << "RAX: " << std::setw(16) << RAX() << "     CF: " << CF() << "     RFLAGS: " << std::setw(16) << RFLAGS() << '\n';
-		ostr << "RBX: " << std::setw(16) << RBX() << "     PF: " << PF() << "     RIP:    " << std::setw(16) << RIP() << '\n';
-		ostr << "RCX: " << std::setw(16) << RCX() << "     AF: " << AF() << '\n';
-		ostr << "RDX: " << std::setw(16) << RDX() << "     ZF: " << ZF() << "     ST0: " << ST(0) << '\n';
-		ostr << "RSI: " << std::setw(16) << RSI() << "     SF: " << SF() << "     ST1: " << ST(1) << '\n';
-		ostr << "RDI: " << std::setw(16) << RDI() << "     OF: " << OF() << "     ST2: " << ST(2) << '\n';
-		ostr << "RBP: " << std::setw(16) << RBP() << "               ST3: " << ST(3) << '\n';
-		ostr << "RSP: " << std::setw(16) << RSP() << "     b:  " << cc_b() << "     ST4: " << ST(4) << '\n';
-		ostr << "R8:  " << std::setw(16) << R8() << "     be: " << cc_be() << "     ST5: " << ST(5) << '\n';
-		ostr << "R9:  " << std::setw(16) << R9() << "     a:  " << cc_a() << "     ST6: " << ST(6) << '\n';
-		ostr << "R10: " << std::setw(16) << R10() << "     ae: " << cc_ae() << "     ST7: " << ST(7) << '\n';
-		ostr << "R11: " << std::setw(16) << R11() << '\n';
-		ostr << "R12: " << std::setw(16) << R12() << "     l:  " << cc_l() << "     C0: " << FPU_C0() << '\n';
-		ostr << "R13: " << std::setw(16) << R13() << "     le: " << cc_le() << "     C1: " << FPU_C1() << '\n';
-		ostr << "R14: " << std::setw(16) << R14() << "     g:  " << cc_g() << "     C2: " << FPU_C2() << '\n';
-		ostr << "R15: " << std::setw(16) << R15() << "     ge: " << cc_ge() << "     C3: " << FPU_C3() << '\n';
+		ostr << "RAX: " << std::setw(16) << rax() << "     CF: " << CF() << "     RFLAGS: " << std::setw(16) << RFLAGS() << '\n';
+		ostr << "RBX: " << std::setw(16) << rbx() << "     PF: " << PF() << "     RIP:    " << std::setw(16) << RIP() << '\n';
+		ostr << "RCX: " << std::setw(16) << rcx() << "     AF: " << AF() << '\n';
+		ostr << "RDX: " << std::setw(16) << rdx() << "     ZF: " << ZF() << "     ST0: " << ST(0) << '\n';
+		ostr << "RSI: " << std::setw(16) << rsi() << "     SF: " << SF() << "     ST1: " << ST(1) << '\n';
+		ostr << "RDI: " << std::setw(16) << rdi() << "     OF: " << OF() << "     ST2: " << ST(2) << '\n';
+		ostr << "RBP: " << std::setw(16) << rbp() << "               ST3: " << ST(3) << '\n';
+		ostr << "RSP: " << std::setw(16) << rsp() << "     b:  " << cc_b() << "     ST4: " << ST(4) << '\n';
+		ostr << "R8:  " << std::setw(16) << r8() << "     be: " << cc_be() << "     ST5: " << ST(5) << '\n';
+		ostr << "R9:  " << std::setw(16) << r9() << "     a:  " << cc_a() << "     ST6: " << ST(6) << '\n';
+		ostr << "R10: " << std::setw(16) << r10() << "     ae: " << cc_ae() << "     ST7: " << ST(7) << '\n';
+		ostr << "R11: " << std::setw(16) << r11() << '\n';
+		ostr << "R12: " << std::setw(16) << r12() << "     l:  " << cc_l() << "     C0: " << FPU_C0() << '\n';
+		ostr << "R13: " << std::setw(16) << r13() << "     le: " << cc_le() << "     C1: " << FPU_C1() << '\n';
+		ostr << "R14: " << std::setw(16) << r14() << "     g:  " << cc_g() << "     C2: " << FPU_C2() << '\n';
+		ostr << "R15: " << std::setw(16) << r15() << "     ge: " << cc_ge() << "     C3: " << FPU_C3() << '\n';
 
 		return ostr;
 	}

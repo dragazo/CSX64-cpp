@@ -26,7 +26,7 @@ namespace CSX64::detail
 		return istr;
 	}
 
-	std::ostream &write_str(std::ostream &ostr, const std::string &str)
+	std::ostream &write_str(std::ostream &ostr, std::string_view str)
 	{
 		u16 len = (u16)str.size();
 		if (len != str.size()) throw std::invalid_argument("write_str(std::string): string was too long");
@@ -55,18 +55,6 @@ namespace CSX64::detail
 			arr[(std::size_t)pos + i] = (u8)val;
 			val >>= 8;
 		}
-
-		return true;
-	}
-	bool Read(const std::vector<u8> &arr, u64 pos, u64 size, u64 &res)
-	{
-		// make sure we're not exceeding memory bounds
-		if (pos >= arr.size() || pos + size > arr.size()) return false;
-
-		// read the value (little-endian)
-		res = 0;
-		for (std::size_t i = (std::size_t)size; i-- > 0; )
-			res = (res << 8) | arr[(std::size_t)pos + i];
 
 		return true;
 	}
@@ -206,19 +194,19 @@ namespace CSX64::detail
 		return istr && istr.peek() == EOF;
 	}
 
-	bool starts_with(const std::string &str, const std::string &val)
+	bool starts_with(std::string_view str, std::string_view val)
 	{
 		if (str.size() < val.size()) return false; // must be at least long enough to hold it
 		if (val.size() == 0) return true;          // everything starts with empty string
 		
 		return std::memcmp(str.data(), val.data(), val.size()) == 0;
 	}
-	bool starts_with_token(const std::string &str, const std::string &val)
+	bool starts_with_token(std::string_view str, std::string_view val)
 	{
 		return starts_with(str, val) && (str.size() == val.size() || std::isspace((unsigned char)str[val.size()]));
 	}
 	
-	bool ends_with(const std::string &str, const std::string &val)
+	bool ends_with(std::string_view str, std::string_view val)
 	{
 		if (str.size() < val.size()) return false; // must be at least long enough to hold it
 		if (val.size() == 0) return true;          // everything ends with empty string

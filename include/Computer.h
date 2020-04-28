@@ -70,7 +70,7 @@ namespace CSX64
 
 			static u16 ComputeFPUTag(fext val)
 			{
-				if (std::isnan(val) || std::isinf(val) || detail::IsDenorm(val)) return tag_special;
+				if (std::isnan(val) || std::isinf(val) || detail::is_denormal<fext>(val)) return tag_special;
 				else if (val == 0) return tag_zero;
 				else return tag_normal;
 			}
@@ -313,18 +313,18 @@ namespace CSX64
 		template<typename T, typename U, std::enable_if_t<detail::is_int<T> && std::is_same_v<T, U>, int> = 0>
 		[[nodiscard]] bool push_mem(U val)
 		{
-			if (RSP() < stack_barrier) { terminate_err(ErrorCode::StackOverflow); return false; }
-			if (!write_mem<T>(RSP() - sizeof(T), val)) return false;
-			RSP() -= sizeof(T);
+			if (rsp() < stack_barrier) { terminate_err(ErrorCode::StackOverflow); return false; }
+			if (!write_mem<T>(rsp() - sizeof(T), val)) return false;
+			rsp() -= sizeof(T);
 			return true;
 		}
 		// pops a value off the stack. returns true on success. on failure rsp and val are not modified.
 		template<typename T, typename U, std::enable_if_t<detail::is_int<T> && std::is_same_v<T, U>, int> = 0>
 		[[nodiscard]] bool pop_mem(U &val)
 		{
-			if (RSP() < stack_barrier) { terminate_err(ErrorCode::StackOverflow); return false; }
-			if (!read_mem<T>(RSP(), val)) return false;
-			RSP() += sizeof(T);
+			if (rsp() < stack_barrier) { terminate_err(ErrorCode::StackOverflow); return false; }
+			if (!read_mem<T>(rsp(), val)) return false;
+			rsp() += sizeof(T);
 			return true;
 		}
 
@@ -379,39 +379,39 @@ namespace CSX64
 		u32 EIP() const { return (u32)_RIP; }
 		u16 IP() const { return (u16)_RIP; }
 
-		u64 &RAX() { return CPURegisters[0].x64(); }
-		u64 &RBX() { return CPURegisters[1].x64(); }
-		u64 &RCX() { return CPURegisters[2].x64(); }
-		u64 &RDX() { return CPURegisters[3].x64(); }
-		u64 &RSI() { return CPURegisters[4].x64(); }
-		u64 &RDI() { return CPURegisters[5].x64(); }
-		u64 &RBP() { return CPURegisters[6].x64(); }
-		u64 &RSP() { return CPURegisters[7].x64(); }
-		u64 &R8() { return CPURegisters[8].x64(); }
-		u64 &R9() { return CPURegisters[9].x64(); }
-		u64 &R10() { return CPURegisters[10].x64(); }
-		u64 &R11() { return CPURegisters[11].x64(); }
-		u64 &R12() { return CPURegisters[12].x64(); }
-		u64 &R13() { return CPURegisters[13].x64(); }
-		u64 &R14() { return CPURegisters[14].x64(); }
-		u64 &R15() { return CPURegisters[15].x64(); }
+		u64 &rax() { return CPURegisters[0].x64(); }
+		u64 &rbx() { return CPURegisters[1].x64(); }
+		u64 &rcx() { return CPURegisters[2].x64(); }
+		u64 &rdx() { return CPURegisters[3].x64(); }
+		u64 &rsi() { return CPURegisters[4].x64(); }
+		u64 &rdi() { return CPURegisters[5].x64(); }
+		u64 &rbp() { return CPURegisters[6].x64(); }
+		u64 &rsp() { return CPURegisters[7].x64(); }
+		u64 &r8() { return CPURegisters[8].x64(); }
+		u64 &r9() { return CPURegisters[9].x64(); }
+		u64 &r10() { return CPURegisters[10].x64(); }
+		u64 &r11() { return CPURegisters[11].x64(); }
+		u64 &r12() { return CPURegisters[12].x64(); }
+		u64 &r13() { return CPURegisters[13].x64(); }
+		u64 &r14() { return CPURegisters[14].x64(); }
+		u64 &r15() { return CPURegisters[15].x64(); }
 
-		decltype(auto) EAX() { return CPURegisters[0].x32(); }
-		decltype(auto) EBX() { return CPURegisters[1].x32(); }
-		decltype(auto) ECX() { return CPURegisters[2].x32(); }
-		decltype(auto) EDX() { return CPURegisters[3].x32(); }
-		decltype(auto) ESI() { return CPURegisters[4].x32(); }
-		decltype(auto) EDI() { return CPURegisters[5].x32(); }
-		decltype(auto) EBP() { return CPURegisters[6].x32(); }
-		decltype(auto) ESP() { return CPURegisters[7].x32(); }
-		decltype(auto) R8D() { return CPURegisters[8].x32(); }
-		decltype(auto) R9D() { return CPURegisters[9].x32(); }
-		decltype(auto) R10D() { return CPURegisters[10].x32(); }
-		decltype(auto) R11D() { return CPURegisters[11].x32(); }
-		decltype(auto) R12D() { return CPURegisters[12].x32(); }
-		decltype(auto) R13D() { return CPURegisters[13].x32(); }
-		decltype(auto) R14D() { return CPURegisters[14].x32(); }
-		decltype(auto) R15D() { return CPURegisters[15].x32(); }
+		decltype(auto) eax() { return CPURegisters[0].x32(); }
+		decltype(auto) ebx() { return CPURegisters[1].x32(); }
+		decltype(auto) ecx() { return CPURegisters[2].x32(); }
+		decltype(auto) edx() { return CPURegisters[3].x32(); }
+		decltype(auto) esi() { return CPURegisters[4].x32(); }
+		decltype(auto) edi() { return CPURegisters[5].x32(); }
+		decltype(auto) ebp() { return CPURegisters[6].x32(); }
+		decltype(auto) esp() { return CPURegisters[7].x32(); }
+		decltype(auto) r8d() { return CPURegisters[8].x32(); }
+		decltype(auto) r9d() { return CPURegisters[9].x32(); }
+		decltype(auto) r10d() { return CPURegisters[10].x32(); }
+		decltype(auto) r11d() { return CPURegisters[11].x32(); }
+		decltype(auto) r12d() { return CPURegisters[12].x32(); }
+		decltype(auto) r13d() { return CPURegisters[13].x32(); }
+		decltype(auto) r14d() { return CPURegisters[14].x32(); }
+		decltype(auto) r15d() { return CPURegisters[15].x32(); }
 
 		decltype(auto) AX() { return CPURegisters[0].x16(); }
 		decltype(auto) BX() { return CPURegisters[1].x16(); }
@@ -452,39 +452,39 @@ namespace CSX64
 		decltype(auto) CH() { return CPURegisters[2].x8h(); }
 		decltype(auto) DH() { return CPURegisters[3].x8h(); }
 
-		u64 RAX() const { return CPURegisters[0].x64(); }
-		u64 RBX() const { return CPURegisters[1].x64(); }
-		u64 RCX() const { return CPURegisters[2].x64(); }
-		u64 RDX() const { return CPURegisters[3].x64(); }
-		u64 RSI() const { return CPURegisters[4].x64(); }
-		u64 RDI() const { return CPURegisters[5].x64(); }
-		u64 RBP() const { return CPURegisters[6].x64(); }
-		u64 RSP() const { return CPURegisters[7].x64(); }
-		u64 R8() const { return CPURegisters[8].x64(); }
-		u64 R9() const { return CPURegisters[9].x64(); }
-		u64 R10() const { return CPURegisters[10].x64(); }
-		u64 R11() const { return CPURegisters[11].x64(); }
-		u64 R12() const { return CPURegisters[12].x64(); }
-		u64 R13() const { return CPURegisters[13].x64(); }
-		u64 R14() const { return CPURegisters[14].x64(); }
-		u64 R15() const { return CPURegisters[15].x64(); }
+		u64 rax() const { return CPURegisters[0].x64(); }
+		u64 rbx() const { return CPURegisters[1].x64(); }
+		u64 rcx() const { return CPURegisters[2].x64(); }
+		u64 rdx() const { return CPURegisters[3].x64(); }
+		u64 rsi() const { return CPURegisters[4].x64(); }
+		u64 rdi() const { return CPURegisters[5].x64(); }
+		u64 rbp() const { return CPURegisters[6].x64(); }
+		u64 rsp() const { return CPURegisters[7].x64(); }
+		u64 r8() const { return CPURegisters[8].x64(); }
+		u64 r9() const { return CPURegisters[9].x64(); }
+		u64 r10() const { return CPURegisters[10].x64(); }
+		u64 r11() const { return CPURegisters[11].x64(); }
+		u64 r12() const { return CPURegisters[12].x64(); }
+		u64 r13() const { return CPURegisters[13].x64(); }
+		u64 r14() const { return CPURegisters[14].x64(); }
+		u64 r15() const { return CPURegisters[15].x64(); }
 
-		u32 EAX() const { return CPURegisters[0].x32(); }
-		u32 EBX() const { return CPURegisters[1].x32(); }
-		u32 ECX() const { return CPURegisters[2].x32(); }
-		u32 EDX() const { return CPURegisters[3].x32(); }
-		u32 ESI() const { return CPURegisters[4].x32(); }
-		u32 EDI() const { return CPURegisters[5].x32(); }
-		u32 EBP() const { return CPURegisters[6].x32(); }
-		u32 ESP() const { return CPURegisters[7].x32(); }
-		u32 R8D() const { return CPURegisters[8].x32(); }
-		u32 R9D() const { return CPURegisters[9].x32(); }
-		u32 R10D() const { return CPURegisters[10].x32(); }
-		u32 R11D() const { return CPURegisters[11].x32(); }
-		u32 R12D() const { return CPURegisters[12].x32(); }
-		u32 R13D() const { return CPURegisters[13].x32(); }
-		u32 R14D() const { return CPURegisters[14].x32(); }
-		u32 R15D() const { return CPURegisters[15].x32(); }
+		u32 eax() const { return CPURegisters[0].x32(); }
+		u32 ebx() const { return CPURegisters[1].x32(); }
+		u32 ecx() const { return CPURegisters[2].x32(); }
+		u32 edx() const { return CPURegisters[3].x32(); }
+		u32 esi() const { return CPURegisters[4].x32(); }
+		u32 edi() const { return CPURegisters[5].x32(); }
+		u32 ebp() const { return CPURegisters[6].x32(); }
+		u32 esp() const { return CPURegisters[7].x32(); }
+		u32 r8d() const { return CPURegisters[8].x32(); }
+		u32 r9d() const { return CPURegisters[9].x32(); }
+		u32 r10d() const { return CPURegisters[10].x32(); }
+		u32 r11d() const { return CPURegisters[11].x32(); }
+		u32 r12d() const { return CPURegisters[12].x32(); }
+		u32 r13d() const { return CPURegisters[13].x32(); }
+		u32 r14d() const { return CPURegisters[14].x32(); }
+		u32 r15d() const { return CPURegisters[15].x32(); }
 
 		u16 AX() const { return CPURegisters[0].x16(); }
 		u16 BX() const { return CPURegisters[1].x16(); }
