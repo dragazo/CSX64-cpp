@@ -413,22 +413,22 @@ namespace CSX64
 		decltype(auto) r14d() { return CPURegisters[14].x32(); }
 		decltype(auto) r15d() { return CPURegisters[15].x32(); }
 
-		decltype(auto) AX() { return CPURegisters[0].x16(); }
-		decltype(auto) BX() { return CPURegisters[1].x16(); }
-		decltype(auto) CX() { return CPURegisters[2].x16(); }
-		decltype(auto) DX() { return CPURegisters[3].x16(); }
-		decltype(auto) SI() { return CPURegisters[4].x16(); }
-		decltype(auto) DI() { return CPURegisters[5].x16(); }
-		decltype(auto) BP() { return CPURegisters[6].x16(); }
-		decltype(auto) SP() { return CPURegisters[7].x16(); }
-		decltype(auto) R8W() { return CPURegisters[8].x16(); }
-		decltype(auto) R9W() { return CPURegisters[9].x16(); }
-		decltype(auto) R10W() { return CPURegisters[10].x16(); }
-		decltype(auto) R11W() { return CPURegisters[11].x16(); }
-		decltype(auto) R12W() { return CPURegisters[12].x16(); }
-		decltype(auto) R13W() { return CPURegisters[13].x16(); }
-		decltype(auto) R14W() { return CPURegisters[14].x16(); }
-		decltype(auto) R15W() { return CPURegisters[15].x16(); }
+		decltype(auto) ax() { return CPURegisters[0].x16(); }
+		decltype(auto) bx() { return CPURegisters[1].x16(); }
+		decltype(auto) cx() { return CPURegisters[2].x16(); }
+		decltype(auto) dx() { return CPURegisters[3].x16(); }
+		decltype(auto) si() { return CPURegisters[4].x16(); }
+		decltype(auto) di() { return CPURegisters[5].x16(); }
+		decltype(auto) bp() { return CPURegisters[6].x16(); }
+		decltype(auto) sp() { return CPURegisters[7].x16(); }
+		decltype(auto) r8w() { return CPURegisters[8].x16(); }
+		decltype(auto) r9w() { return CPURegisters[9].x16(); }
+		decltype(auto) r10w() { return CPURegisters[10].x16(); }
+		decltype(auto) r11w() { return CPURegisters[11].x16(); }
+		decltype(auto) r12w() { return CPURegisters[12].x16(); }
+		decltype(auto) r13w() { return CPURegisters[13].x16(); }
+		decltype(auto) r14w() { return CPURegisters[14].x16(); }
+		decltype(auto) r15w() { return CPURegisters[15].x16(); }
 
 		decltype(auto) AL() { return CPURegisters[0].x8(); }
 		decltype(auto) BL() { return CPURegisters[1].x8(); }
@@ -486,22 +486,22 @@ namespace CSX64
 		u32 r14d() const { return CPURegisters[14].x32(); }
 		u32 r15d() const { return CPURegisters[15].x32(); }
 
-		u16 AX() const { return CPURegisters[0].x16(); }
-		u16 BX() const { return CPURegisters[1].x16(); }
-		u16 CX() const { return CPURegisters[2].x16(); }
-		u16 DX() const { return CPURegisters[3].x16(); }
-		u16 SI() const { return CPURegisters[4].x16(); }
-		u16 DI() const { return CPURegisters[5].x16(); }
-		u16 BP() const { return CPURegisters[6].x16(); }
-		u16 SP() const { return CPURegisters[7].x16(); }
-		u16 R8W() const { return CPURegisters[8].x16(); }
-		u16 R9W() const { return CPURegisters[9].x16(); }
-		u16 R10W() const { return CPURegisters[10].x16(); }
-		u16 R11W() const { return CPURegisters[11].x16(); }
-		u16 R12W() const { return CPURegisters[12].x16(); }
-		u16 R13W() const { return CPURegisters[13].x16(); }
-		u16 R14W() const { return CPURegisters[14].x16(); }
-		u16 R15W() const { return CPURegisters[15].x16(); }
+		u16 ax() const { return CPURegisters[0].x16(); }
+		u16 bx() const { return CPURegisters[1].x16(); }
+		u16 cx() const { return CPURegisters[2].x16(); }
+		u16 dx() const { return CPURegisters[3].x16(); }
+		u16 si() const { return CPURegisters[4].x16(); }
+		u16 di() const { return CPURegisters[5].x16(); }
+		u16 bp() const { return CPURegisters[6].x16(); }
+		u16 sp() const { return CPURegisters[7].x16(); }
+		u16 r8w() const { return CPURegisters[8].x16(); }
+		u16 r9w() const { return CPURegisters[9].x16(); }
+		u16 r10w() const { return CPURegisters[10].x16(); }
+		u16 r11w() const { return CPURegisters[11].x16(); }
+		u16 r12w() const { return CPURegisters[12].x16(); }
+		u16 r13w() const { return CPURegisters[13].x16(); }
+		u16 r14w() const { return CPURegisters[14].x16(); }
+		u16 r15w() const { return CPURegisters[15].x16(); }
 
 		u8 AL() const { return CPURegisters[0].x8(); }
 		u8 BL() const { return CPURegisters[1].x8(); }

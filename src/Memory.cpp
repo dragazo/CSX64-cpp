@@ -142,14 +142,16 @@ namespace CSX64
         }
 
         // get the imm if applicable - store into res
-        if ((settings & 0x80) != 0 && !GetMemAdv(get_size(sizecode), res)) return false;
+        if ((settings & 0x80) && !GetMemAdv(get_size(sizecode), res)) return false;
 
         // if r1 was used, add that pre-multiplied by the multiplier
-        if ((settings & 2) != 0) res += CPURegisters[regs >> 4][sizecode] << ((settings >> 4) & 3);
+        if (settings & 2) res += CPURegisters[regs >> 4][sizecode] << ((settings >> 4) & 3);
         // if r2 was used, add that
-        if ((settings & 1) != 0) res += CPURegisters[regs & 15][sizecode];
+        if (settings & 1) res += CPURegisters[regs & 15][sizecode];
 
-        // got an address
+        // lastly, we need to make sure n-bit addressing is confined to n bits
+        res = detail::truncate(res, sizecode);
+
         return true;
     }
 }

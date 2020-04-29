@@ -20,13 +20,13 @@ struct assertion_error : std::runtime_error { using std::runtime_error::runtime_
 
 #define ASSERT(expr) { if (!(expr)) throw assertion_error("assertion failed: " __FILE__ ":" TOSTR(__LINE__) "\n\t" #expr "\n\tevaluated to false"); }
 
-#define ASSERT_OP(actual, expected, op) { auto v1 = (actual); auto v2 = (expected); if (!(v1 op v2)) throw assertion_error("assertion failed: " __FILE__ ":" TOSTR(__LINE__) "\n\t" #actual " " #op " " #expected "\n\tevaluated to false\n\tleft:  " + sstostr(v2) + "\n\tright: " + sstostr(v1)); }
-#define ASSERT_EQ(actual, expected) ASSERT_OP(actual, expected, ==)
-#define ASSERT_NEQ(actual, expected) ASSERT_OP(actual, expected, !=)
-#define ASSERT_L(actual, expected) ASSERT_OP(actual, expected, <)
-#define ASSERT_LE(actual, expected) ASSERT_OP(actual, expected, <=)
-#define ASSERT_G(actual, expected) ASSERT_OP(actual, expected, >)
-#define ASSERT_GE(actual, expected) ASSERT_OP(actual, expected, >=)
+#define ASSERT_OP(e1, e2, op) { auto v1 = (e1); auto v2 = (e2); if (!(v1 op v2)) throw assertion_error("assertion failed: " __FILE__ ":" TOSTR(__LINE__) "\n\t" #e1 " " #op " " #e2 "\n\tevaluated to false\n\tleft:  " + sstostr(v1) + "\n\tright: " + sstostr(v2)); }
+#define ASSERT_EQ(e1, e2) ASSERT_OP(e1, e2, ==)
+#define ASSERT_NEQ(e1, e2) ASSERT_OP(e1, e2, !=)
+#define ASSERT_L(e1, e2) ASSERT_OP(e1, e2, <)
+#define ASSERT_LE(e1, e2) ASSERT_OP(e1, e2, <=)
+#define ASSERT_G(e1, e2) ASSERT_OP(e1, e2, >)
+#define ASSERT_GE(e1, e2) ASSERT_OP(e1, e2, >=)
 
 #define ASSERT_THROWS(expr, ex) { int temp_state_name = 0; try { (expr); temp_state_name = 1; } catch (const ex&) {} catch (...) { temp_state_name = 2; } \
 	switch (temp_state_name) { \

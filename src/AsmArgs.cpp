@@ -5,6 +5,7 @@
 #include <fstream>
 #include <cstdlib>
 #include <algorithm>
+#include <utility>
 
 #include "../include/AsmTables.h"
 #include "../include/AsmArgs.h"
@@ -1034,6 +1035,8 @@ bool AssembleArgs::TryParseVPURegister(const std::string &token, u64 &reg, u64 &
 
 bool AssembleArgs::TryGetRegMult(const std::string &label, Expr &hole, u64 &mult_res)
 {
+	using std::swap;
+
 	mult_res = 0; // mult starts at zero (for logic below)
 
 	std::vector<Expr*> path;
@@ -1064,7 +1067,7 @@ bool AssembleArgs::TryGetRegMult(const std::string &label, Expr &hole, u64 &mult
 		}
 
 		// start 2 above (just above regular mult code)
-		for (int i = 2; i < (int)list.size();)
+		for (std::size_t i = 2; i < list.size();)
 		{
 			switch (list[i]->OP)
 			{
@@ -1072,77 +1075,69 @@ bool AssembleArgs::TryGetRegMult(const std::string &label, Expr &hole, u64 &mult
 
 			case Expr::OPs::Mul:
 			{
-				// toward leads to register, mult leads to mult value
-				Expr *toward = list[i - 1], *mult = list[i]->Left.get() == list[i - 1] ? list[i]->Right.get() : list[i]->Left.get();
+				Expr *const top = list[i];
 
-				// if pos is add/sub, we need to distribute
-				if (toward->OP == Expr::OPs::Add || toward->OP == Expr::OPs::Sub)
+				const bool first_left = list[i]->Left.get() == list[i - 1];
+				const bool second_left = list[i - 1]->Left.get() == list[i - 2];
+
+				std::unique_ptr<Expr> &first = first_left ? top->Left : top->Right;
+				std::unique_ptr<Expr> &mult = first_left ? top->Right : top->Left;
+
+				std::unique_ptr<Expr> &second = second_left ? first->Left : first->Right;
+				std::unique_ptr<Expr> &arg = second_left ? first->Right : first->Left;
+
+				// if +/-, we need to distribute
+				if (first->OP == Expr::OPs::Add || first->OP == Expr::OPs::Sub)
 				{
-					// swap operators with toward
-					list[i]->OP = toward->OP;
-					toward->OP = Expr::OPs::Mul;
+					// change top node to distibution
+					swap(top->OP, first->OP);
 
-					// create the distribution node
-					std::unique_ptr<Expr> temp = std::make_unique<Expr>();
+					// create the exterior distibution node
+					auto temp = std::make_unique<Expr>();
 					temp->OP = Expr::OPs::Mul;
-					temp->Left = std::make_unique<Expr>(*mult);
-
-					// compute right and transfer mult to toward
-					if (toward->Left.get() == list[i - 2]) { temp->Right = std::move(toward->Right); toward->Right = std::make_unique<Expr>(*mult); }
-					else { temp->Right = std::move(toward->Left); toward->Left = std::make_unique<Expr>(*mult); }
+					temp->Left = std::make_unique<Expr>(*mult); // we need 2 of these, so make a copy
+					temp->Right = std::move(arg);
 
 					// add it in
-					if (list[i]->Left.get() == mult) list[i]->Left = std::move(temp); else list[i]->Right = std::move(temp);
+					arg = std::move(mult);
+					mult = std::move(temp);
+
+					// ensure everything stays on same side of +/- (technically only necessary for -)
+					if (first_left ^ second_left) swap(mult, first);
 				}
-				// if pos is mul, we need to combine with pre-existing mult code
-				else if (toward->OP == Expr::OPs::Mul)
+				// if *, we need to combine
+				else if (first->OP == Expr::OPs::Mul)
 				{
 					// create the combination node
-					std::unique_ptr<Expr> temp = std::make_unique<Expr>();
+					auto temp = std::make_unique<Expr>();
 					temp->OP = Expr::OPs::Mul;
-					temp->Left = std::make_unique<Expr>(*mult);
-					temp->Right = toward->Left.get() == list[i - 2] ? std::move(toward->Right) : std::move(toward->Left);
+					temp->Left = std::move(mult);
+					temp->Right = std::move(arg);
 
 					// add it in
-					if (list[i]->Left.get() == mult)
-					{
-						list[i]->Left = std::move(temp); // replace mult with combination
-						list[i]->Right = std::make_unique<Expr>(*list[i - 2]); // bump up toward
-					}
-					else
-					{
-						list[i]->Right = std::move(temp);
-						list[i]->Left = std::make_unique<Expr>(*list[i - 2]);
-					}
+					mult = std::move(temp);
+					first = std::move(second);
 
 					// remove the skipped list[i - 1]
 					list.erase(list.begin() + (i - 1));
 				}
-				// if pos is neg, we need to put the negative on the mult
-				else if (toward->OP == Expr::OPs::Neg)
+				// if neg, we need to put the negative on the mult instead
+				else if (first->OP == Expr::OPs::Neg)
 				{
 					// create the combination node
-					std::unique_ptr<Expr> temp = std::make_unique<Expr>();
+					auto temp = std::make_unique<Expr>();
 					temp->OP = Expr::OPs::Neg;
-					temp->Left = std::make_unique<Expr>(*mult);
+					temp->Left = std::move(mult);
 
 					// add it in
-					if (list[i]->Left.get() == mult)
-					{
-						list[i]->Left = std::move(temp); // replace mult with combination
-						list[i]->Right = std::make_unique<Expr>(*list[i - 2]); // bump up toward
-					}
-					else
-					{
-						list[i]->Right = std::move(temp);
-						list[i]->Left = std::make_unique<Expr>(*list[i - 2]);
-					}
+					mult = std::move(temp);
+					first = std::move(second);
 
 					// remove the skipped list[i - 1]
 					list.erase(list.begin() + (i - 1));
 				}
 				// otherwise something horrible happened (this should never happen, but is left in for sanity-checking and future-proofing)
-				else throw std::runtime_error("Unknown address simplification step: OP = " + tostr((unsigned)toward->OP));
+				else throw std::runtime_error("Unknown address simplification step: OP = " + tostr((unsigned)first->OP));
 
 				--i; // decrement i to follow the multiplication all the way down the rabbit hole
 				if (i < 2) i = 2; // but if it gets under the starting point, reset it

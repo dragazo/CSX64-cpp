@@ -822,7 +822,7 @@ namespace CSX64
         {
         case 3: count = --rcx(); break;
         case 2: count = --ecx(); break;
-        case 1: count = --CX(); break;
+        case 1: count = --cx(); break;
         case 0: terminate_err(ErrorCode::UndefinedBehavior); return false; // 8-bit not allowed
 
         default: return true; // this can't happen but compiler is stupid
@@ -988,13 +988,13 @@ namespace CSX64
         {
         case 0:
             res = AL() * a;
-            AX() = (u16)res;
+            ax() = (u16)res;
             CF() = OF() = AH() != 0;
             break;
         case 1:
-            res = AX() * a;
-            DX() = (u16)(res >> 16); AX() = (u16)res;
-            CF() = OF() = DX() != 0;
+            res = ax() * a;
+            dx() = (u16)(res >> 16); ax() = (u16)res;
+            CF() = OF() = dx() != 0;
             break;
         case 2:
             res = eax() * a;
@@ -1069,12 +1069,12 @@ namespace CSX64
         {
         case 0:
             res = (i8)AL() * a;
-            AX() = (u16)res;
+            ax() = (u16)res;
             CF() = OF() = res != (i8)res;
             break;
         case 1:
-            res = (i16)AX() * a;
-            DX() = (u16)(res >> 16); AX() = (u16)res;
+            res = (i16)ax() * a;
+            dx() = (u16)(res >> 16); ax() = (u16)res;
             CF() = OF() = res != (i16)res;
             break;
         case 2:
@@ -1192,16 +1192,16 @@ namespace CSX64
         switch ((s >> 2) & 3)
         {
         case 0:
-            full = AX();
+            full = ax();
             quo = full / a; rem = full % a;
             if (quo != (u8)quo) { terminate_err(ErrorCode::ArithmeticError); return false; }
             AL() = (u8)quo; AH() = (u8)rem;
             break;
         case 1:
-            full = ((u64)DX() << 16) | AX();
+            full = ((u64)dx() << 16) | ax();
             quo = full / a; rem = full % a;
             if (quo != (u16)quo) { terminate_err(ErrorCode::ArithmeticError); return false; }
-            AX() = (u16)quo; DX() = (u16)rem;
+            ax() = (u16)quo; dx() = (u16)rem;
             break;
         case 2:
             full = ((u64)edx() << 32) | eax();
@@ -1241,16 +1241,16 @@ namespace CSX64
         switch ((s >> 2) & 3)
         {
         case 0:
-            full = (i16)AX();
+            full = (i16)ax();
             quo = full / a; rem = full % a;
             if (quo != (i8)quo) { terminate_err(ErrorCode::ArithmeticError); return false; }
             AL() = (u8)quo; AH() = (u8)rem;
             break;
         case 1:
-            full = ((i32)DX() << 16) | AX();
+            full = ((i32)dx() << 16) | ax();
             quo = full / a; rem = full % a;
             if (quo != (i16)quo) { terminate_err(ErrorCode::ArithmeticError); return false; }
-            AX() = (u16)quo; DX() = (u16)rem;
+            ax() = (u16)quo; dx() = (u16)rem;
             break;
         case 2:
             full = ((i64)edx() << 32) | eax();
@@ -1763,12 +1763,12 @@ namespace CSX64
 
         switch (ext)
         {
-        case 0: DX() = (i16)AX() >= 0 ? 0 : 0xffff; return true;
+        case 0: dx() = (i16)ax() >= 0 ? 0 : 0xffff; return true;
         case 1: edx() = (i32)eax() >= 0 ? 0 : 0xffffffff; return true;
         case 2: rdx() = (i64)rax() >= 0 ? 0 : 0xffffffffffffffff; return true;
 
-        case 3: AX() = (u16)(i8)AL(); return true;
-        case 4: eax() = (u32)(i16)AX(); return true;
+        case 3: ax() = (u16)(i8)AL(); return true;
+        case 4: eax() = (u32)(i16)ax(); return true;
         case 5: rax() = (u64)(i32)eax(); return true;
 
         default: terminate_err(ErrorCode::UndefinedBehavior); return false;
@@ -1927,7 +1927,7 @@ namespace CSX64
         case 0:
             if ((AL() & 0x0f) > 9 || AF())
             {
-                AX() += 0x106;
+                ax() += 0x106;
                 AF() = true;
                 CF() = true;
             }
@@ -1945,7 +1945,7 @@ namespace CSX64
         case 1:
             if ((AL() & 0x0f) > 9 || AF())
             {
-                AX() -= 6;
+                ax() -= 6;
                 --AH();
                 AF() = true;
                 CF() = true;
@@ -2391,7 +2391,7 @@ namespace CSX64
         u16 port;
         if (!GetMemAdv<u8>(s)) return false;
 
-        if (s & 1) port = (u16)DX();
+        if (s & 1) port = (u16)dx();
         else
         {
             u8 t;
@@ -2545,7 +2545,7 @@ namespace CSX64
         // handle FSTSW AX case specially (doesn't have an address)
         if (s == 0)
         {
-            AX() = FPU_status;
+            ax() = FPU_status;
             return true;
         }
         else if (!GetAddressAdv(m)) return false;
