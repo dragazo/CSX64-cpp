@@ -56,7 +56,7 @@ nop
 	ticks = p->tick(2000);
 	ASSERT_EQ(ticks, 0);
 }
-void mov_tests()
+void mov_imm_tests()
 {
 	auto p = asm_lnk(R"(
 segment .text
@@ -248,39 +248,58 @@ mov ecx, 0
 hlt
 lea rcx, [rax + rbx]
 lea rdx, [1*rbx + 1*rax]
-lea rsi, [rax + 2*rbx]
+lea rsi, zmmword ptr [rax + 2*rbx]
 lea rdi, [rax + 4*rbx]
 lea r8, [rax + 8*rbx]
-lea r9, [rax + rbx + 100]
+lea r9, word ptr [rax + rbx + 100]
 lea r10, [rax + 2*rbx + 120]
-lea r11, [2*rax + rbx - 130]
+lea r11, qword ptr [2*rax + rbx - 130]
 lea r12, [rax + 4*rbx + 0]
 lea r13, [8*rax + 1*rbx - 143]
 hlt
 lea rcx, [2*rax - rax + rbx]
 lea rdx, [rax*3 + 20]
-lea rsi, [5*rbx + 20]
+lea rsi, zmmword ptr [5*rbx + 20]
 lea rdi, [rax*9 - 10]
 hlt
 lea rcx, [r14 + r15]
-lea edx, [r14 + r15]
+lea edx, ymmword ptr [r14 + r15]
 lea si, [r14 + r15]
 lea rdi, [r14d + r15d + r15d]
 lea r8d, [r14d + r15d + r15d]
-lea r9w, [r14d + r15d + r15d]
+lea r9w, xmmword ptr [r14d + r15d + r15d]
 lea r10, [r14w + 2*r15w*2]
 lea r11d, [r14w + 2*r15w*2]
-lea r12w, [r14w + 2*r15w*2]
+lea r12w, word ptr [r14w + 2*r15w*2]
 hlt
-lea rcx, [3*(2*r15 + r15)]
-lea edx, [3*(2*r15 + r15)]
-lea si, [3*(2*r15 + r15)]
+lea rcx, [3   *(2 *r15 + r15)]
+lea edx, [3*    (2*r15 + r15)   ]
+lea si, ymmword ptr [   3*(2*r15 + r15)]
 lea rdi, [3*-(2*-r14d - --++-+-+r14d)]
 lea r8d, [3*-(2*-r14d - --++-+-+r14d)]
-lea r9w, [3*-(2*-r14d - --++-+-+r14d)]
+lea r9w, qword ptr [3*-(2*-r14d - --++-+-+r14d)]
 lea r10, [3*-(2*-eax - --++-+-+eax) - 1*1*3*1*1*eax*1*1*3*1*1 + r14w + 8*r15w]
-lea r11d, [3*-(2*-eax - --++-+-+eax) - 1*1*3*1*1*eax*1*1*3*1*1 + r14w + 8*r15w]
-lea r12w, [3*-(2*-eax - --++-+-+eax) - 1*1*3*1*1*eax*1*1*3*1*1 + r14w + 8*r15w]
+lea r11d, byte ptr [3*-(2 *- eax - --++ -+- +eax) - 1*1*3*1*1*eax*1*1*3*1*1 + r14w + 8*r15w]
+lea r12w, [3*-(2*-eax- --++-+-+eax) - 1*1*3*1*1*eax*1*1*3*1*1 + r14w + 8*r15w]
+hlt
+lea rcx, xmmword ptr [(rax + 212) * 2]
+lea rdx, [(rax - 222) * 2]
+lea rsi, [(22+rax)*4]
+lea rdi, dword ptr [(29 -rax) * -4]
+lea r8, [  8 * (     rax + 21)]
+lea r9, [8 * (rax - 20)]
+lea r10, [2 * (7 + rax)]
+lea r11, byte ptr [-  2 * (7 - rax)]
+hlt
+lea rcx, [rax]
+lea rdx, [rbx]
+lea rsi, [1*rax]
+lea rdi, [rbx*1]
+hlt
+lea rcx, [-423]
+lea rdx, [qword -423  ]
+lea rsi, [ dword - 423]
+lea rdi, [word    -423    ]
 hlt
 mov eax, 0
 mov ebx, 0
@@ -350,13 +369,45 @@ times 24 nop
 
 	ASSERT(p->running());
 	ticks = p->tick(20000);
+	ASSERT_EQ(ticks, 8);
+	ASSERT_EQ(p->rcx(), 1248u);
+	ASSERT_EQ(p->rdx(), 380u);
+	ASSERT_EQ(p->rsi(), 1736u);
+	ASSERT_EQ(p->rdi(), 1532u);
+	ASSERT_EQ(p->r8(), 3464u);
+	ASSERT_EQ(p->r9(), 3136u);
+	ASSERT_EQ(p->r10(), 838u);
+	ASSERT_EQ(p->r11(), 810u);
+
+	ASSERT(p->running());
+	ticks = p->tick(20000);
+	ASSERT_EQ(ticks, 4);
+	ASSERT_EQ(p->rcx(), 412);
+	ASSERT_EQ(p->rdx(), 323);
+	ASSERT_EQ(p->rsi(), 412);
+	ASSERT_EQ(p->rdi(), 323);
+
+	ASSERT(p->running());
+	ticks = p->tick(20000);
+	ASSERT_EQ(ticks, 4);
+	ASSERT_EQ(p->rcx(), 0xfffffffffffffe59u);
+	ASSERT_EQ(p->rdx(), 0xfffffffffffffe59u);
+	ASSERT_EQ(p->rsi(), 0x00000000fffffe59u);
+	ASSERT_EQ(p->rdi(), 0x000000000000fe59u);
+
+	ASSERT(p->running());
+	ticks = p->tick(20000);
 	ASSERT_EQ(ticks, 2);
 	ASSERT(!p->running());
 	ASSERT_EQ(p->error(), ErrorCode::None);
 	ASSERT_EQ(p->return_value(), 0);
 
 	asm_lnk("segment .text\nlea rax, [rax + rbx]");
+	asm_lnk("segment .text\nlea rax, [eax + ebx]");
+	asm_lnk("segment .text\nlea rax, [ax + bx]");
 	ASSERT_THROWS(asm_lnk("segment .text\nlea rax, [rax + rbx + rcx]"), AssembleException);
+	ASSERT_THROWS(asm_lnk("segment .text\nlea rax, [eax + ebx + ecx]"), AssembleException);
+	ASSERT_THROWS(asm_lnk("segment .text\nlea rax, [ax + bx +rcx]"), AssembleException);
 
 	asm_lnk("segment .text\nlea rax, [2*rax + 1*rbx]");
 	asm_lnk("segment .text\nlea rax, [1*rax + 2*rbx]");
@@ -389,11 +440,57 @@ times 24 nop
 	ASSERT_THROWS(asm_lnk("segment .text\nlea ax, [ah + bl]"), AssembleException);
 	ASSERT_THROWS(asm_lnk("segment .text\nlea ax, [al + bh]"), AssembleException);
 	ASSERT_THROWS(asm_lnk("segment .text\nlea ax, [ah + bh]"), AssembleException);
+	ASSERT_THROWS(asm_lnk("segment .text\nlea ax, [rax * rbx]"), AssembleException);
+	ASSERT_THROWS(asm_lnk("segment .text\nlea ax, [eax * ebx]"), AssembleException);
+	ASSERT_THROWS(asm_lnk("segment .text\nlea ax, [ax * bx]"), AssembleException);
+
+	asm_lnk("segment .text\nlea rax, [rax * 2]");
+	asm_lnk("segment .text\nlea rax, [2 * rax]");
+	ASSERT_THROWS(asm_lnk("segment .text\nlea rax, [2.0 * rax]"), AssembleException);
+	ASSERT_THROWS(asm_lnk("segment .text\nlea rax, [rax * 2.0]"), AssembleException);
+
+	asm_lnk("segment .text\nlea rax, [qword rax]");
+	asm_lnk("segment .text\nlea rax, [dword eax]");
+	asm_lnk("segment .text\nlea rax, [word ax]");
+	ASSERT_THROWS(asm_lnk("segment .text\nlea rax, [qword eax]"), AssembleException);
+	ASSERT_THROWS(asm_lnk("segment .text\nlea rax, [qword ax]"), AssembleException);
+	ASSERT_THROWS(asm_lnk("segment .text\nlea rax, [qword al]"), AssembleException);
+	ASSERT_THROWS(asm_lnk("segment .text\nlea rax, [qword ah]"), AssembleException);
+	ASSERT_THROWS(asm_lnk("segment .text\nlea rax, [dword rax]"), AssembleException);
+	ASSERT_THROWS(asm_lnk("segment .text\nlea rax, [dword ax]"), AssembleException);
+	ASSERT_THROWS(asm_lnk("segment .text\nlea rax, [dword al]"), AssembleException);
+	ASSERT_THROWS(asm_lnk("segment .text\nlea rax, [dword ah]"), AssembleException);
+	ASSERT_THROWS(asm_lnk("segment .text\nlea rax, [word rax]"), AssembleException);
+	ASSERT_THROWS(asm_lnk("segment .text\nlea rax, [word eax]"), AssembleException);
+	ASSERT_THROWS(asm_lnk("segment .text\nlea rax, [word al]"), AssembleException);
+	ASSERT_THROWS(asm_lnk("segment .text\nlea rax, [word ah]"), AssembleException);
+	ASSERT_THROWS(asm_lnk("segment .text\nlea rax, [byte rax]"), AssembleException);
+	ASSERT_THROWS(asm_lnk("segment .text\nlea rax, [byte rax]"), AssembleException);
+	ASSERT_THROWS(asm_lnk("segment .text\nlea rax, [byte ax]"), AssembleException);
+	ASSERT_THROWS(asm_lnk("segment .text\nlea rax, [byte al]"), AssembleException);
+	ASSERT_THROWS(asm_lnk("segment .text\nlea rax, [byte ah]"), AssembleException);
+
+	asm_lnk("segment .text\nlea rax, [0]");
+	asm_lnk("segment .text\nlea rax, [qword 0]");
+	asm_lnk("segment .text\nlea rax, [dword 0]");
+	asm_lnk("segment .text\nlea rax, [word 0]");
+	ASSERT_THROWS(asm_lnk("segment .text\nlea rax, [byte 0]"), AssembleException);
+	ASSERT_THROWS(asm_lnk("segment .text\nlea rax, []"), AssembleException);
+	ASSERT_THROWS(asm_lnk("segment .text\nlea rax, [qword]"), AssembleException);
+	ASSERT_THROWS(asm_lnk("segment .text\nlea rax, [dword]"), AssembleException);
+	ASSERT_THROWS(asm_lnk("segment .text\nlea rax, [word]"), AssembleException);
+	ASSERT_THROWS(asm_lnk("segment .text\nlea rax, [byte]"), AssembleException);
+
+	asm_lnk("segment .text\nlea rax, [rax + rbx]");
+	ASSERT_THROWS(asm_lnk("segment .text\nlea rax, [rax * rbx]"), AssembleException);
+	ASSERT_THROWS(asm_lnk("segment .text\nlea rax, [rax / rbx]"), AssembleException);
+	ASSERT_THROWS(asm_lnk("segment .text\nlea rax, [rax / 2]"), AssembleException);
+	ASSERT_THROWS(asm_lnk("segment .text\nlea rax, [2 / rbx]"), AssembleException);
 }
 
 void asm_tests()
 {
 	RUN_TEST(nop_tests);
-	RUN_TEST(mov_tests);
+	RUN_TEST(mov_imm_tests);
 	RUN_TEST(lea_tests);
 }

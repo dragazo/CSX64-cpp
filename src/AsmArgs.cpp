@@ -1048,6 +1048,7 @@ bool AssembleArgs::TryGetRegMult(const std::string &label, Expr &hole, u64 &mult
 	while (hole.FindPath(label, path, true))
 	{
 		// move path into list
+		list.clear();
 		while (path.size() > 0)
 		{
 			list.push_back(path.back());
@@ -1057,10 +1058,13 @@ bool AssembleArgs::TryGetRegMult(const std::string &label, Expr &hole, u64 &mult
 		// if it doesn't have a mult section
 		if (list.size() == 1 || (list.size() > 1 && list[1]->OP != Expr::OPs::Mul))
 		{
-			// add in a multiplier of 1
+			// move out of the base expression (faster than new token due to owning string)
+			auto temp = std::make_unique<Expr>(std::move(*list[0]));
+
+			// change it to be (1 * itself)
 			list[0]->OP = Expr::OPs::Mul;
 			list[0]->Left = Expr::NewInt(1);
-			list[0]->Right = Expr::NewToken(*list[0]->Token());
+			list[0]->Right = std::move(temp);
 
 			// insert new register location as beginning of path
 			list.insert(list.begin(), list[0]->Right.get());
@@ -1151,7 +1155,7 @@ bool AssembleArgs::TryGetRegMult(const std::string &label, Expr &hole, u64 &mult
 
 		// -- finally done with all the algebra -- //
 
-		// extract mult code fragment
+		// extract merged mult code fragment
 		u64 val;
 		bool floating;
 		if (!(list[1]->Left.get() == list[0] ? list[1]->Right : list[1]->Left)->Evaluate(file.Symbols, val, floating, err))
@@ -1162,7 +1166,7 @@ bool AssembleArgs::TryGetRegMult(const std::string &label, Expr &hole, u64 &mult
 		if (floating) { res = {AssembleError::FormatError, "line " + tostr(line) + ": Register multiplier may not be floating-point"}; return false; }
 
 		// look through from top to bottom
-		for (int i = (int)list.size() - 1; i >= 2; --i)
+		for (std::size_t i = list.size() - 1; i >= 2; --i)
 		{
 			// if this will negate the register
 			if (list[i]->OP == Expr::OPs::Neg || (list[i]->OP == Expr::OPs::Sub && list[i]->Right.get() == list[i - 1]))
@@ -1175,8 +1179,8 @@ bool AssembleArgs::TryGetRegMult(const std::string &label, Expr &hole, u64 &mult
 		// remove the register section from the expression (replace with integral 0)
 		list[1]->IntResult(0);
 
-		mult_res += val; // add extracted mult to total mult
-		list.clear(); // clear list for next pass
+		// add extracted mult to total mult
+		mult_res += val;
 	}
 
 	// register successfully parsed
