@@ -60,20 +60,20 @@ void mov_imm_tests()
 {
 	auto p = asm_lnk(R"(
 segment .text
-mov rax, 0x93f7a810f45e0e3c
+mov rax, -7784568640113865156
 mov rbx, 0x12de639fcd11a4cb
 mov rcx, 0x046579a453add4b8
-mov rdx, 0xfd221d7ea00b6846
+mov rdx, 0o1764420727724002664106
 mov rsi, 0xf1c89e98daa39a38
 mov rdi, 0xbdb00d43f2aaff23
-mov rbp, 0x949316d6a85099a0
+mov rbp, -7740818_22331708_3_744
 mov rsp, 0xa228b0bd6d86600e
 mov r8, 0x076899314a3e420b
-mov r9, 0x05cc3887b130b66e
+mov r9, 417771020883113582
 mov r10, 0x781b5ce0538f3fd0
 mov r11, 0x2569467b20f81cb8
 mov r12, 0xc0a9ed7647a335c4
-mov r13, 0xf1570b21a8d728b5
+mov r13, 0o17052_7_0_262065_065_624_265
 mov r14, 0x65902d29eac939fb
 mov r15, 0xec7aa569a6155ab1
 hlt
@@ -81,17 +81,17 @@ mov eax, 0x7d22cbb4
 mov ebx, 0xbecb162e
 mov ecx, 0xae23158e
 mov edx, 0x0ddfe51b
-mov esi, 0xa773170f
+mov esi, 0o24_734_613_417
 mov edi, 0xa71a36d7
 mov ebp, 0xd130b0c0
-mov esp, 0x83b280d4
+mov esp, 2209513684
 mov r8d, 0xa53b7121
 mov r9d, 0x74c9e6d0
 mov r10d, 0x58b7c4e7
-mov r11d, 0xcabefe91
+mov r11d, 0b11001010101111101111111010010001
 mov r12d, 0xaa92e8b4
 mov r13d, 0x86bbdbc1
-mov r14d, 0x79f4e348
+mov r14d, 0b_0111_1001_1111_0100_1110_0011_0100_1000
 mov r15d, 0xc023567e
 hlt
 mov ax, 0xcb04
@@ -99,7 +99,7 @@ mov bx, 0x43f4
 mov cx, 0x6493
 mov dx, 0xacd9
 mov si, 0xf019
-mov di, 0x7d26
+mov di, 32_038
 mov bp, 0x60f1
 mov sp, 0x6476
 mov r8w, 0x3329
@@ -235,6 +235,1004 @@ times 256 nop
 	ASSERT(!p->running());
 	ASSERT_EQ(p->error(), ErrorCode::None);
 	ASSERT_EQ(p->return_value(), 0xfe630756);
+}
+void expr_tests()
+{
+	auto p = asm_lnk(R"(#!shebang test
+segment .text
+; test symbol definition and linkage
+t1: equ 721
+mov rax, t1
+mov rbx, t1 + 12
+mov rcx, t1 +5
+mov rdx, t1+  7
+mov rsi, t1+54
+mov rdi,  t1 + 12.0
+mov r8d,  t1 + 12.0
+mov r9,   t1 +5.0
+mov r10d, t1 +5.0
+mov r11,  t1+  7.0
+mov r12d, t1+  7.0
+mov r13,  t1+54.0
+mov r14d, t1+54.0
+hlt
+mov rax, 4 * 7
+mov rbx, 3 * -5
+mov rcx, -2 * 3
+mov rdx, -4 * -71
+mov rsi, 5 * 9.5
+mov rdi, -5 * 9.5
+mov r8, 65.125 * 11
+mov r9, 65.125 * -11
+mov r10, 12.5 * 6.25
+hlt
+mov rax, 80 / 4
+mov rbx, -96 / 7
+mov rcx, 86 / -5
+mov rdx, -46 / -22
+mov rsi, 21 / 22
+mov rdi, -21 / 22
+mov r8, 540 / 7.0
+mov r9, -50 / 5.4
+mov r10, 524.1 / 11
+mov r11, 532.2 / -3
+mov r12, 120.5 / 15.75
+hlt
+mov rax, 80 % 4
+mov rbx, -96 % 7
+mov rcx, 86 % -5
+mov rdx, -46 % -22
+mov rsi, 21 % 22
+mov rdi, -21 % 22
+mov r8, 15 % 7
+hlt
+mov rax, 80 +/ 4
+mov rbx, -96 +/ 7
+mov rcx, 86 +/ -5
+mov rdx, -46 +/ -22
+mov rsi, 21 +/ 22
+mov rdi, -21 +/ 22
+mov r8, 15 +/ 7
+hlt
+mov rax, 80 +% 4
+mov rbx, -96 +% 7
+mov rcx, 86 +% -5
+mov rdx, -46 +% -22
+mov rsi, 21 +% 22
+mov rdi, -21 +% 22
+mov r8, 15 +% 7
+hlt
+mov rax, 3 + 8
+mov rbx, -3 + 8
+mov rcx, 3 + -8
+mov rdx, -3 + -8
+mov rsi, 9.0625 + 3
+mov rdi, 9.0625 + -3
+mov r8, 5 + 10.5
+mov r9, -5 + 10.5
+mov r10, 12.125 + 0.5
+hlt
+mov rax, 7 - 55
+mov rbx, -7 - 5
+mov rcx, 76 - -5
+mov rdx, -7 - -1
+mov rsi, 12._5__ - 1.5
+mov rdi, 1_2_.25_ - -1.5
+mov r8, 5 - 10.5
+mov r9, -5 - 10.5
+mov r10, 12._1_25 - 0.5
+hlt
+mov rax, 56 << 0
+mov rbx, 57 << 1
+mov rcx, 58 << 2
+mov rdx, 3 << 3
+mov rsi, -332 << 32
+mov rdi, -101 << 63
+mov r8, -103 << 64 ; overshifting saturates for size agnosticism
+mov r9, -105 << 65
+mov r10, 17 << -1 ; shift count interpreted as unsigned
+mov r11, 0 << 7
+hlt
+mov rax, 56 >> 0
+mov rbx, 57 >> 1
+mov rcx, 58 >> 2
+mov rdx, 3 >> 3
+mov rsi, -332 >> 32
+mov rdi, 101 >> 63
+mov r8, -103 >> 64 ; overshifting saturates for size agnosticism
+mov r9, 105 >> 65
+mov r10, 17 >> -1 ; shift count interpreted as unsigned
+mov r11, -14 >> -1 ; shift count interpreted as unsigned
+mov r12, 0 >> 7
+hlt
+mov rax, 56 +>> 0
+mov rbx, 57 +>> 1
+mov rcx, 58 +>> 2
+mov rdx, 3 +>> 3
+mov rsi, -332 +>> 32
+mov rdi, 101 +>> 63
+mov r8, -103 +>> 64 ; overshifting saturates for size agnosticism
+mov r9, 105 +>> 65
+mov r10, 17 +>> -1 ; shift count interpreted as unsigned
+mov r11, -14 +>> -1 ; shift count interpreted as unsigned
+mov r12, 0 +>> 7
+hlt
+mov rax, 3 < 2
+mov rbx, 3 < 3
+mov rcx, 3 < 4
+mov rdx, -1 < -1
+mov rsi, -1 < 0
+mov rdi, -1 < 1
+mov r8, 3.0 < 2
+mov r9, 3 < 3.0
+mov r10, 3.0 < 4.0
+mov r11, -1.0 < -1
+mov r12, -1 < 0.0
+mov r13, -1.0 < 1.0
+hlt
+mov rax, 3 <= 2
+mov rbx, 3 <= 3
+mov rcx, 3 <= 4
+mov rdx, -1 <= -1
+mov rsi, -1 <= 0
+mov rdi, -1 <= 1
+mov r8, 3.0 <= 2
+mov r9, 3 <= 3.0
+mov r10, 3.0 <= 4.0
+mov r11, -1.0 <= -1
+mov r12, -1 <= 0.0
+mov r13, -1.0 <= 1.0
+hlt
+mov rax, 3 > 2
+mov rbx, 3 > 3
+mov rcx, 3 > 4
+mov rdx, -1 > -1
+mov rsi, -1 > 0
+mov rdi, -1 > 1
+mov r8, 3.0 > 2
+mov r9, 3 > 3.0
+mov r10, 3.0 > 4.0
+mov r11, -1.0 > -1
+mov r12, -1 > 0.0
+mov r13, -1.0 > 1.0
+hlt
+mov rax, 3 >= 2
+mov rbx, 3 >= 3
+mov rcx, 3 >= 4
+mov rdx, -1 >= -1
+mov rsi, -1 >= 0
+mov rdi, -1 >= 1
+mov r8, 3.0 >= 2
+mov r9, 3 >= 3.0
+mov r10, 3.0 >= 4.0
+mov r11, -1.0 >= -1
+mov r12, -1 >= 0.0
+mov r13, -1.0 >= 1.0
+hlt
+mov rax, 3 +< 2
+mov rbx, 3 +< 3
+mov rcx, 3 +< 4
+mov rdx, -1 +< -1
+mov rsi, -1 +< 0
+mov rdi, -1 +< 1
+hlt
+mov rax, 3 +<= 2
+mov rbx, 3 +<= 3
+mov rcx, 3 +<= 4
+mov rdx, -1 +<= -1
+mov rsi, -1 +<= 0
+mov rdi, -1 +<= 1
+hlt
+mov rax, 3 +> 2
+mov rbx, 3 +> 3
+mov rcx, 3 +> 4
+mov rdx, -1 +> -1
+mov rsi, -1 +> 0
+mov rdi, -1 +> 1
+hlt
+mov rax, 3 +>= 2
+mov rbx, 3 +>= 3
+mov rcx, 3 +>= 4
+mov rdx, -1 +>= -1
+mov rsi, -1 +>= 0
+mov rdi, -1 +>= 1
+hlt
+mov rax, 3 == 2
+mov rbx, 3 == 3
+mov rcx, 3 == 4
+mov rdx, -1 == -1
+mov rsi, -1 == 0
+mov rdi, -1 == 1
+mov r8, 3.0 == 2
+mov r9, 3 == 3.0
+mov r10, 3.0 == 4.0
+mov r11, -1.0 == -1
+mov r12, -1 == 0.0
+mov r13, -1.0 == 1.0
+hlt
+mov rax, 3 != 2
+mov rbx, 3 != 3
+mov rcx, 3 != 4
+mov rdx, -1 != -1
+mov rsi, -1 != 0
+mov rdi, -1 != 1
+mov r8, 3.0 != 2
+mov r9, 3 != 3.0
+mov r10, 3.0 != 4.0
+mov r11, -1.0 != -1
+mov r12, -1 != 0.0
+mov r13, -1.0 != 1.0
+hlt
+mov rax, 0x12De639fCd11a4cb | 0xf1c89e98dAa39A38
+mov rbx, 0xf1c89e98daa39A38 | 0x12de639fcd11a4Cb
+mov rcx, 0x12De639fcd11a4cb | 0
+mov rdx, 0xf1c89e98daa39a38 | -1
+hlt
+mov rax, 0x12De639fCd11a4cb & 0xf1c89e98dAa39A38
+mov rbx, 0xf1c89e98daa39A38 & 0x12de639fcd11a4Cb
+mov rcx, 0x12De639fcd11a4cb & 0
+mov rdx, 0xf1c89e98daa39a38 & -1
+hlt
+mov rax, 0x12De639fCd11a4cb ^ 0xf1c89e98dAa39A38
+mov rbx, 0xf1c89e98daa39A38 ^ 0x12de639fcd11a4Cb
+mov rcx, 0x12De639fcd11a4cb ^ 0
+mov rdx, 0xf1c89e98daa39a38 ^ -1
+hlt
+mov rax, 0 && 0
+mov rbx, 0 && 2
+mov rcx, 1 && 0
+mov rdx, 2 && -1
+hlt
+mov rax, 0 || 0
+mov rbx, 0 || 2
+mov rcx, 1 || 0
+mov rdx, 2 || -1
+hlt
+mov rax, -453
+mov rbx, --453
+mov rcx, -17.4
+mov rdx, --17.4
+mov rsi, -0
+mov rdi, --0
+hlt
+mov rax, ~453
+mov rbx, ~~453
+mov rcx, ~-243
+mov rdx, ~~-243
+mov rsi, ~0
+mov rdi, ~~0
+hlt
+mov rax, !453
+mov rbx, !!453
+mov rcx, !-243
+mov rdx, !!-243
+mov rsi, !0
+mov rdi, !!0
+hlt
+mov rax, $int(45)
+mov rbx, $int(-45)
+mov rcx, $int(45.3)
+mov rdx, $int(45.8)
+mov rsi, $int(-45.3)
+mov rdi, $int(-45.8)
+hlt
+mov rax, $float(45.3)
+mov rbx, $float(-45.8)
+mov rcx, $float(45)
+mov rdx, $float(-45)
+mov rsi, $float(0)
+hlt
+mov rax, $floor(35)
+mov rbx, $floor(-3322)
+mov rcx, $floor(7.32)
+mov rdx, $floor(-7.32)
+mov rsi, $floor(9.99)
+mov rdi, $floor(-9.99)
+mov r8, $floor(5.5)
+mov r9, $floor(-5.5)
+hlt
+mov rax, $ceil(35)
+mov rbx, $ceil(-3322)
+mov rcx, $ceil(7.32)
+mov rdx, $ceil(-7.32)
+mov rsi, $ceil(9.99)
+mov rdi, $ceil(-9.99)
+mov r8, $ceil(5.5)
+mov r9, $ceil(-5.5)
+hlt
+mov rax, $round(35)
+mov rbx, $round(-3322)
+mov rcx, $round(7.32)
+mov rdx, $round(-7.32)
+mov rsi, $round(9.99)
+mov rdi, $round(-9.99)
+mov r8, $round(5.5)
+mov r9, $round(-5.5)
+hlt
+mov rax, $trunc(35)
+mov rbx, $trunc(-3322)
+mov rcx, $trunc(7.32)
+mov rdx, $trunc(-7.32)
+mov rsi, $trunc(9.99)
+mov rdi, $trunc(-9.99)
+mov r8, $trunc(5.5)
+mov r9, $trunc(-5.5)
+hlt
+mov rax, $repr64(3.14)
+mov rbx, $round($repr64(3.14))
+mov rcx, $repr32(3.14)
+mov rdx, $round($repr32(3.14))
+hlt
+mov rax, $float64(0x4005be76c8b43958)
+mov ebx, $float64(0x4005be76c8b43958)
+mov rcx, $float32(0x401de3b6)
+mov edx, $float32(0x401de3b6)
+hlt
+mov rax, $prec64(9.02101)
+mov ebx, $prec64(9.02101)
+mov rcx, $prec32(9.01501)
+mov edx, $prec32(9.01501)
+mov rsi, $prec64(8.71321)
+mov edi, $prec64(8.71321)
+mov r8, $prec32(8.71321)
+mov r9d, $prec32(8.71321)
+mov r10, $prec32(8.2499999)
+mov r11d, $prec32(8.2499999)
+mov r12, $prec32($float64(0x501ffffff94a0359)) ; this test shows how u64->f64->f32->f64->u64 is insufficient
+mov r13d, $prec32($float64(0x501ffffff94a0359))
+hlt
+mov rax, 0 ? 23 : 54
+mov rbx, 1 ? 23 : 54
+mov rcx, 0 ? 23.534 : 53
+mov rdx, -22 ? 23.534 : 53
+mov rsi, 0 ? 2 : 54.666
+mov rdi, -1 ? 2 : 54.666
+mov r8, 0 ? 23.21 : 54.775
+mov r9, 834 ? 23.21 : 54.775
+hlt
+mov eax, 0
+mov ebx, -432
+syscall
+times 22 nop
+)");
+	ASSERT(p);
+	u64 ticks;
+	//0x12de639fcd11a4cb
+	//0xf1c89e98daa39a38
+	ASSERT(p->running());
+	ticks = p->tick(20000);
+	ASSERT_EQ(ticks, 13);
+	ASSERT_EQ(p->rax(), 721);
+	ASSERT_EQ(p->rbx(), 733);
+	ASSERT_EQ(p->rcx(), 726);
+	ASSERT_EQ(p->rdx(), 728);
+	ASSERT_EQ(p->rsi(), 775);
+	ASSERT_EQ(p->rdi(), 0x4086e80000000000u);
+	ASSERT_EQ(p->r8(), 0x0000000044374000u);
+	ASSERT_EQ(p->r9(), 0x4086b00000000000u);
+	ASSERT_EQ(p->r10(), 0x0000000044358000u);
+	ASSERT_EQ(p->r11(), 0x4086c00000000000u);
+	ASSERT_EQ(p->r12(), 0x0000000044360000u);
+	ASSERT_EQ(p->r13(), 0x4088380000000000u);
+	ASSERT_EQ(p->r14(), 0x000000004441c000u);
+
+	ASSERT(p->running());
+	ticks = p->tick(20000);
+	ASSERT_EQ(ticks, 9);
+	ASSERT_EQ(p->rax(), 28);
+	ASSERT_EQ(p->rbx(), -15);
+	ASSERT_EQ(p->rcx(), -6);
+	ASSERT_EQ(p->rdx(), 284);
+	ASSERT_EQ(p->rsi(), 0x4047c00000000000u);
+	ASSERT_EQ(p->rdi(), 0xc047c00000000000u);
+	ASSERT_EQ(p->r8(), 0x4086630000000000u);
+	ASSERT_EQ(p->r9(), 0xc086630000000000u);
+	ASSERT_EQ(p->r10(), 0x4053880000000000u);
+
+	ASSERT(p->running());
+	ticks = p->tick(20000);
+	ASSERT_EQ(ticks, 11);
+	ASSERT_EQ(p->rax(), 20);
+	ASSERT_EQ(p->rbx(), -13);
+	ASSERT_EQ(p->rcx(), -17);
+	ASSERT_EQ(p->rdx(), 2);
+	ASSERT_EQ(p->rsi(), 0);
+	ASSERT_EQ(p->rdi(), 0);
+	ASSERT_EQ(p->r8(), 0x4053492492492492u);
+	ASSERT_EQ(p->r9(), 0xc02284bda12f684cu);
+	ASSERT_EQ(p->r10(), 0x4047d29e4129e413u);
+	ASSERT_EQ(p->r11(), 0xc0662ccccccccccdu);
+	ASSERT_EQ(p->r12(), 0x401e9a69a69a69a7u);
+
+	ASSERT(p->running());
+	ticks = p->tick(20000);
+	ASSERT_EQ(ticks, 7);
+	ASSERT_EQ(p->rax(), 0);
+	ASSERT_EQ(p->rbx(), -5);
+	ASSERT_EQ(p->rcx(), 1);
+	ASSERT_EQ(p->rdx(), -2);
+	ASSERT_EQ(p->rsi(), 21);
+	ASSERT_EQ(p->rdi(), -21);
+	ASSERT_EQ(p->r8(), 1);
+
+	ASSERT(p->running());
+	ticks = p->tick(20000);
+	ASSERT_EQ(ticks, 7);
+	ASSERT_EQ(p->rax(), 20);
+	ASSERT_EQ(p->rbx(), 2635249153387078788);
+	ASSERT_EQ(p->rcx(), 0);
+	ASSERT_EQ(p->rdx(), 0);
+	ASSERT_EQ(p->rsi(), 0);
+	ASSERT_EQ(p->rdi(), 838488366986797799);
+	ASSERT_EQ(p->r8(), 2);
+
+	ASSERT(p->running());
+	ticks = p->tick(20000);
+	ASSERT_EQ(ticks, 7);
+	ASSERT_EQ(p->rax(), 0);
+	ASSERT_EQ(p->rbx(), 4);
+	ASSERT_EQ(p->rcx(), 86);
+	ASSERT_EQ(p->rdx(), -46);
+	ASSERT_EQ(p->rsi(), 21);
+	ASSERT_EQ(p->rdi(), 17);
+	ASSERT_EQ(p->r8(), 1);
+
+	ASSERT(p->running());
+	ticks = p->tick(20000);
+	ASSERT_EQ(ticks, 9);
+	ASSERT_EQ(p->rax(), 11);
+	ASSERT_EQ(p->rbx(), 5);
+	ASSERT_EQ(p->rcx(), -5);
+	ASSERT_EQ(p->rdx(), -11);
+	ASSERT_EQ(p->rsi(), 0x4028200000000000u);
+	ASSERT_EQ(p->rdi(), 0x4018400000000000u);
+	ASSERT_EQ(p->r8(), 0x402f000000000000u);
+	ASSERT_EQ(p->r9(), 0x4016000000000000u);
+	ASSERT_EQ(p->r10(), 0x4029400000000000u);
+
+	ASSERT(p->running());
+	ticks = p->tick(20000);
+	ASSERT_EQ(ticks, 9);
+	ASSERT_EQ(p->rax(), -48);
+	ASSERT_EQ(p->rbx(), -12);
+	ASSERT_EQ(p->rcx(), 81);
+	ASSERT_EQ(p->rdx(), -6);
+	ASSERT_EQ(p->rsi(), 0x4026000000000000u);
+	ASSERT_EQ(p->rdi(), 0x402b800000000000u);
+	ASSERT_EQ(p->r8(), 0xc016000000000000u);
+	ASSERT_EQ(p->r9(), 0xc02f000000000000u);
+	ASSERT_EQ(p->r10(), 0x4027400000000000u);
+
+	ASSERT(p->running());
+	ticks = p->tick(20000);
+	ASSERT_EQ(ticks, 10);
+	ASSERT_EQ(p->rax(), 56);
+	ASSERT_EQ(p->rbx(), 114);
+	ASSERT_EQ(p->rcx(), 232);
+	ASSERT_EQ(p->rdx(), 24);
+	ASSERT_EQ(p->rsi(), -1425929142272);
+	ASSERT_EQ(p->rdi(), 0x8000000000000000u);
+	ASSERT_EQ(p->r8(), 0);
+	ASSERT_EQ(p->r9(), 0);
+	ASSERT_EQ(p->r10(), 0);
+	ASSERT_EQ(p->r11(), 0);
+
+	ASSERT(p->running());
+	ticks = p->tick(20000);
+	ASSERT_EQ(ticks, 11);
+	ASSERT_EQ(p->rax(), 56);
+	ASSERT_EQ(p->rbx(), 28);
+	ASSERT_EQ(p->rcx(), 14);
+	ASSERT_EQ(p->rdx(), 0);
+	ASSERT_EQ(p->rsi(), -1);
+	ASSERT_EQ(p->rdi(), 0);
+	ASSERT_EQ(p->r8(), -1);
+	ASSERT_EQ(p->r9(), 0);
+	ASSERT_EQ(p->r10(), 0);
+	ASSERT_EQ(p->r11(), -1);
+	ASSERT_EQ(p->r12(), 0);
+
+	ASSERT(p->running());
+	ticks = p->tick(20000);
+	ASSERT_EQ(ticks, 11);
+	ASSERT_EQ(p->rax(), 56);
+	ASSERT_EQ(p->rbx(), 28);
+	ASSERT_EQ(p->rcx(), 14);
+	ASSERT_EQ(p->rdx(), 0);
+	ASSERT_EQ(p->rsi(), 0xffffffffu);
+	ASSERT_EQ(p->rdi(), 0);
+	ASSERT_EQ(p->r8(), 0);
+	ASSERT_EQ(p->r9(), 0);
+	ASSERT_EQ(p->r10(), 0);
+	ASSERT_EQ(p->r11(), 0);
+	ASSERT_EQ(p->r12(), 0);
+
+	ASSERT(p->running());
+	ticks = p->tick(20000);
+	ASSERT_EQ(ticks, 12);
+	ASSERT_EQ(p->rax(), 0);
+	ASSERT_EQ(p->rbx(), 0);
+	ASSERT_EQ(p->rcx(), 1);
+	ASSERT_EQ(p->rdx(), 0);
+	ASSERT_EQ(p->rsi(), 1);
+	ASSERT_EQ(p->rdi(), 1);
+	ASSERT_EQ(p->r8(), 0);
+	ASSERT_EQ(p->r9(), 0);
+	ASSERT_EQ(p->r10(), 1);
+	ASSERT_EQ(p->r11(), 0);
+	ASSERT_EQ(p->r12(), 1);
+	ASSERT_EQ(p->r13(), 1);
+
+	ASSERT(p->running());
+	ticks = p->tick(20000);
+	ASSERT_EQ(ticks, 12);
+	ASSERT_EQ(p->rax(), 0);
+	ASSERT_EQ(p->rbx(), 1);
+	ASSERT_EQ(p->rcx(), 1);
+	ASSERT_EQ(p->rdx(), 1);
+	ASSERT_EQ(p->rsi(), 1);
+	ASSERT_EQ(p->rdi(), 1);
+	ASSERT_EQ(p->r8(), 0);
+	ASSERT_EQ(p->r9(), 1);
+	ASSERT_EQ(p->r10(), 1);
+	ASSERT_EQ(p->r11(), 1);
+	ASSERT_EQ(p->r12(), 1);
+	ASSERT_EQ(p->r13(), 1);
+
+	ASSERT(p->running());
+	ticks = p->tick(20000);
+	ASSERT_EQ(ticks, 12);
+	ASSERT_EQ(p->rax(), 1);
+	ASSERT_EQ(p->rbx(), 0);
+	ASSERT_EQ(p->rcx(), 0);
+	ASSERT_EQ(p->rdx(), 0);
+	ASSERT_EQ(p->rsi(), 0);
+	ASSERT_EQ(p->rdi(), 0);
+	ASSERT_EQ(p->r8(), 1);
+	ASSERT_EQ(p->r9(), 0);
+	ASSERT_EQ(p->r10(), 0);
+	ASSERT_EQ(p->r11(), 0);
+	ASSERT_EQ(p->r12(), 0);
+	ASSERT_EQ(p->r13(), 0);
+
+	ASSERT(p->running());
+	ticks = p->tick(20000);
+	ASSERT_EQ(ticks, 12);
+	ASSERT_EQ(p->rax(), 1);
+	ASSERT_EQ(p->rbx(), 1);
+	ASSERT_EQ(p->rcx(), 0);
+	ASSERT_EQ(p->rdx(), 1);
+	ASSERT_EQ(p->rsi(), 0);
+	ASSERT_EQ(p->rdi(), 0);
+	ASSERT_EQ(p->r8(), 1);
+	ASSERT_EQ(p->r9(), 1);
+	ASSERT_EQ(p->r10(), 0);
+	ASSERT_EQ(p->r11(), 1);
+	ASSERT_EQ(p->r12(), 0);
+	ASSERT_EQ(p->r13(), 0);
+
+	ASSERT(p->running());
+	ticks = p->tick(20000);
+	ASSERT_EQ(ticks, 6);
+	ASSERT_EQ(p->rax(), 0);
+	ASSERT_EQ(p->rbx(), 0);
+	ASSERT_EQ(p->rcx(), 1);
+	ASSERT_EQ(p->rdx(), 0);
+	ASSERT_EQ(p->rsi(), 0);
+	ASSERT_EQ(p->rdi(), 0);
+
+	ASSERT(p->running());
+	ticks = p->tick(20000);
+	ASSERT_EQ(ticks, 6);
+	ASSERT_EQ(p->rax(), 0);
+	ASSERT_EQ(p->rbx(), 1);
+	ASSERT_EQ(p->rcx(), 1);
+	ASSERT_EQ(p->rdx(), 1);
+	ASSERT_EQ(p->rsi(), 0);
+	ASSERT_EQ(p->rdi(), 0);
+
+	ASSERT(p->running());
+	ticks = p->tick(20000);
+	ASSERT_EQ(ticks, 6);
+	ASSERT_EQ(p->rax(), 1);
+	ASSERT_EQ(p->rbx(), 0);
+	ASSERT_EQ(p->rcx(), 0);
+	ASSERT_EQ(p->rdx(), 0);
+	ASSERT_EQ(p->rsi(), 1);
+	ASSERT_EQ(p->rdi(), 1);
+
+	ASSERT(p->running());
+	ticks = p->tick(20000);
+	ASSERT_EQ(ticks, 6);
+	ASSERT_EQ(p->rax(), 1);
+	ASSERT_EQ(p->rbx(), 1);
+	ASSERT_EQ(p->rcx(), 0);
+	ASSERT_EQ(p->rdx(), 1);
+	ASSERT_EQ(p->rsi(), 1);
+	ASSERT_EQ(p->rdi(), 1);
+
+	ASSERT(p->running());
+	ticks = p->tick(20000);
+	ASSERT_EQ(ticks, 12);
+	ASSERT_EQ(p->rax(), 0);
+	ASSERT_EQ(p->rbx(), 1);
+	ASSERT_EQ(p->rcx(), 0);
+	ASSERT_EQ(p->rdx(), 1);
+	ASSERT_EQ(p->rsi(), 0);
+	ASSERT_EQ(p->rdi(), 0);
+	ASSERT_EQ(p->r8(), 0);
+	ASSERT_EQ(p->r9(), 1);
+	ASSERT_EQ(p->r10(), 0);
+	ASSERT_EQ(p->r11(), 1);
+	ASSERT_EQ(p->r12(), 0);
+	ASSERT_EQ(p->r13(), 0);
+
+	ASSERT(p->running());
+	ticks = p->tick(20000);
+	ASSERT_EQ(ticks, 12);
+	ASSERT_EQ(p->rax(), 1);
+	ASSERT_EQ(p->rbx(), 0);
+	ASSERT_EQ(p->rcx(), 1);
+	ASSERT_EQ(p->rdx(), 0);
+	ASSERT_EQ(p->rsi(), 1);
+	ASSERT_EQ(p->rdi(), 1);
+	ASSERT_EQ(p->r8(), 1);
+	ASSERT_EQ(p->r9(), 0);
+	ASSERT_EQ(p->r10(), 1);
+	ASSERT_EQ(p->r11(), 0);
+	ASSERT_EQ(p->r12(), 1);
+	ASSERT_EQ(p->r13(), 1);
+
+	ASSERT(p->running());
+	ticks = p->tick(20000);
+	ASSERT_EQ(ticks, 4);
+	ASSERT_EQ(p->rax(), 0xF3DEFF9FDFB3BEFBu);
+	ASSERT_EQ(p->rbx(), 0xF3DEFF9FDFB3BEFBu);
+	ASSERT_EQ(p->rcx(), 0x12De639fcd11a4cbu);
+	ASSERT_EQ(p->rdx(), 0xffffffffffffffffu);
+
+	ASSERT(p->running());
+	ticks = p->tick(20000);
+	ASSERT_EQ(ticks, 4);
+	ASSERT_EQ(p->rax(), 0x10C80298C8018008u);
+	ASSERT_EQ(p->rbx(), 0x10C80298C8018008u);
+	ASSERT_EQ(p->rcx(), 0);
+	ASSERT_EQ(p->rdx(), 0xf1c89e98daa39a38);
+
+	ASSERT(p->running());
+	ticks = p->tick(20000);
+	ASSERT_EQ(ticks, 4);
+	ASSERT_EQ(p->rax(), 0xE316FD0717B23EF3u);
+	ASSERT_EQ(p->rbx(), 0xE316FD0717B23EF3u);
+	ASSERT_EQ(p->rcx(), 0x12De639fcd11a4cbu);
+	ASSERT_EQ(p->rdx(), 0x0E376167255C65C7u);
+
+	ASSERT(p->running());
+	ticks = p->tick(20000);
+	ASSERT_EQ(ticks, 4);
+	ASSERT_EQ(p->rax(), 0);
+	ASSERT_EQ(p->rbx(), 0);
+	ASSERT_EQ(p->rcx(), 0);
+	ASSERT_EQ(p->rdx(), 1);
+
+	ASSERT(p->running());
+	ticks = p->tick(20000);
+	ASSERT_EQ(ticks, 4);
+	ASSERT_EQ(p->rax(), 0);
+	ASSERT_EQ(p->rbx(), 1);
+	ASSERT_EQ(p->rcx(), 1);
+	ASSERT_EQ(p->rdx(), 1);
+
+	ASSERT(p->running());
+	ticks = p->tick(20000);
+	ASSERT_EQ(ticks, 6);
+	ASSERT_EQ(p->rax(), -453);
+	ASSERT_EQ(p->rbx(), 453);
+	ASSERT_EQ(p->rcx(), 0xc031666666666666u);
+	ASSERT_EQ(p->rdx(), 0x4031666666666666u);
+	ASSERT_EQ(p->rsi(), 0);
+	ASSERT_EQ(p->rdi(), 0);
+
+	ASSERT(p->running());
+	ticks = p->tick(20000);
+	ASSERT_EQ(ticks, 6);
+	ASSERT_EQ(p->rax(), 0xFFFFFFFFFFFFFE3Au);
+	ASSERT_EQ(p->rbx(), 453);
+	ASSERT_EQ(p->rcx(), 242);
+	ASSERT_EQ(p->rdx(), -243);
+	ASSERT_EQ(p->rsi(), 0xffffffffffffffffu);
+	ASSERT_EQ(p->rdi(), 0);
+
+	ASSERT(p->running());
+	ticks = p->tick(20000);
+	ASSERT_EQ(ticks, 6);
+	ASSERT_EQ(p->rax(), 0);
+	ASSERT_EQ(p->rbx(), 1);
+	ASSERT_EQ(p->rcx(), 0);
+	ASSERT_EQ(p->rdx(), 1);
+	ASSERT_EQ(p->rsi(), 1);
+	ASSERT_EQ(p->rdi(), 0);
+
+	ASSERT(p->running());
+	ticks = p->tick(20000);
+	ASSERT_EQ(ticks, 6);
+	ASSERT_EQ(p->rax(), 45);
+	ASSERT_EQ(p->rbx(), -45);
+	ASSERT_EQ(p->rcx(), 45);
+	ASSERT_EQ(p->rdx(), 45);
+	ASSERT_EQ(p->rsi(), -45);
+	ASSERT_EQ(p->rdi(), -45);
+
+	ASSERT(p->running());
+	ticks = p->tick(20000);
+	ASSERT_EQ(ticks, 5);
+	ASSERT_EQ(p->rax(), 0x4046a66666666666u);
+	ASSERT_EQ(p->rbx(), 0xc046e66666666666u);
+	ASSERT_EQ(p->rcx(), 0x4046800000000000u);
+	ASSERT_EQ(p->rdx(), 0xc046800000000000u);
+	ASSERT_EQ(p->rsi(), 0x0000000000000000u);
+
+	ASSERT(p->running());
+	ticks = p->tick(20000);
+	ASSERT_EQ(ticks, 8);
+	ASSERT_EQ(p->rax(), 35);
+	ASSERT_EQ(p->rbx(), -3322);
+	ASSERT_EQ(p->rcx(), 0x401c000000000000u);
+	ASSERT_EQ(p->rdx(), 0xc020000000000000u);
+	ASSERT_EQ(p->rsi(), 0x4022000000000000u);
+	ASSERT_EQ(p->rdi(), 0xc024000000000000u);
+	ASSERT_EQ(p->r8(), 0x4014000000000000u);
+	ASSERT_EQ(p->r9(), 0xc018000000000000u);
+
+	ASSERT(p->running());
+	ticks = p->tick(20000);
+	ASSERT_EQ(ticks, 8);
+	ASSERT_EQ(p->rax(), 35);
+	ASSERT_EQ(p->rbx(), -3322);
+	ASSERT_EQ(p->rcx(), 0x4020000000000000u);
+	ASSERT_EQ(p->rdx(), 0xc01c000000000000u);
+	ASSERT_EQ(p->rsi(), 0x4024000000000000u);
+	ASSERT_EQ(p->rdi(), 0xc022000000000000u);
+	ASSERT_EQ(p->r8(), 0x4018000000000000u);
+	ASSERT_EQ(p->r9(), 0xc014000000000000u);
+
+	ASSERT(p->running());
+	ticks = p->tick(20000);
+	ASSERT_EQ(ticks, 8);
+	ASSERT_EQ(p->rax(), 35);
+	ASSERT_EQ(p->rbx(), -3322);
+	ASSERT_EQ(p->rcx(), 0x401c000000000000u);
+	ASSERT_EQ(p->rdx(), 0xc01c000000000000u);
+	ASSERT_EQ(p->rsi(), 0x4024000000000000u);
+	ASSERT_EQ(p->rdi(), 0xc024000000000000u);
+	ASSERT_EQ(p->r8(), 0x4018000000000000u);
+	ASSERT_EQ(p->r9(), 0xc018000000000000u);
+
+	ASSERT(p->running());
+	ticks = p->tick(20000);
+	ASSERT_EQ(ticks, 8);
+	ASSERT_EQ(p->rax(), 35);
+	ASSERT_EQ(p->rbx(), -3322);
+	ASSERT_EQ(p->rcx(), 0x401c000000000000u);
+	ASSERT_EQ(p->rdx(), 0xc01c000000000000u);
+	ASSERT_EQ(p->rsi(), 0x4022000000000000u);
+	ASSERT_EQ(p->rdi(), 0xc022000000000000u);
+	ASSERT_EQ(p->r8(), 0x4014000000000000u);
+	ASSERT_EQ(p->r9(), 0xc014000000000000u);
+
+	ASSERT(p->running());
+	ticks = p->tick(20000);
+	ASSERT_EQ(ticks, 4);
+	ASSERT_EQ(p->rax(), 0x40091eb851eb851fu);
+	ASSERT_EQ(p->rbx(), 0x40091eb851eb851fu);
+	ASSERT_EQ(p->rcx(), 0x000000004048f5c3u);
+	ASSERT_EQ(p->rdx(), 0x000000004048f5c3u);
+
+	ASSERT(p->running());
+	ticks = p->tick(20000);
+	ASSERT_EQ(ticks, 4);
+	ASSERT_EQ(p->rax(), 0x4005be76c8b43958u);
+	ASSERT_EQ(p->rbx(), 0x00000000402df3b6u);
+	ASSERT_EQ(p->rcx(), 0x4003bc76c0000000u);
+	ASSERT_EQ(p->rdx(), 0x401de3b6);
+	
+	ASSERT(p->running());
+	ticks = p->tick(20000);
+	ASSERT_EQ(ticks, 12);
+	ASSERT_EQ(p->rax(), 0x40220ac1d29dc726u);
+	ASSERT_EQ(p->rbx(), 0x000000004110560fu);
+	ASSERT_EQ(p->rcx(), 0x402207af60000000u);
+	ASSERT_EQ(p->rdx(), 0x0000000041103d7bu);
+	ASSERT_EQ(p->rsi(), 0x40216d29dc725c3eu);
+	ASSERT_EQ(p->rdi(), 0x00000000410b694fu);
+	ASSERT_EQ(p->r8(), 0x40216d29e0000000u);
+	ASSERT_EQ(p->r9(), 0x00000000410b694fu);
+	ASSERT_EQ(p->r10(), 0x4020800000000000u);
+	ASSERT_EQ(p->r11(), 0x0000000041040000u);
+	ASSERT_EQ(p->r12(), 0x5020000000000000u);
+	ASSERT_EQ(p->r13(), 0x000000007f800000u);
+	
+	ASSERT(p->running());
+	ticks = p->tick(20000);
+	ASSERT_EQ(ticks, 8);
+	ASSERT_EQ(p->rax(), 54);
+	ASSERT_EQ(p->rbx(), 23);
+	ASSERT_EQ(p->rcx(), 53);
+	ASSERT_EQ(p->rdx(), 0x403788b439581062u);
+	ASSERT_EQ(p->rsi(), 0x404b553f7ced9168u);
+	ASSERT_EQ(p->rdi(), 2);
+	ASSERT_EQ(p->r8(), 0x404b633333333333u);
+	ASSERT_EQ(p->r9(), 0x403735c28f5c28f6u);
+
+	ASSERT(p->running());
+	ticks = p->tick(20000);
+	ASSERT_EQ(ticks, 2);
+	ASSERT(!p->running());
+	ASSERT_EQ(p->error(), ErrorCode::None);
+	ASSERT_EQ(p->return_value(), -432);
+
+	asm_lnk("t1: equ 0 / 1");
+	ASSERT_THROWS(asm_lnk("t1: equ 0 / 0"), AssembleException);
+	ASSERT_THROWS(asm_lnk("t1: equ 1 / 0"), AssembleException);
+
+	asm_lnk("t1: equ 0 % 1");
+	asm_lnk("t1: equ 3 % 5");
+	ASSERT_THROWS(asm_lnk("t1: equ 0 % 0"), AssembleException);
+	ASSERT_THROWS(asm_lnk("t1: equ 1 % 0"), AssembleException);
+	ASSERT_THROWS(asm_lnk("t1: equ 3.0 % 5"), AssembleException);
+	ASSERT_THROWS(asm_lnk("t1: equ 3 % 5.0"), AssembleException);
+	ASSERT_THROWS(asm_lnk("t1: equ 3.0 % 5.0"), AssembleException);
+
+	asm_lnk("t1: equ 0 +/ 1");
+	asm_lnk("t1: equ 3 +/ 5");
+	ASSERT_THROWS(asm_lnk("t1: equ 0 +/ 0"), AssembleException);
+	ASSERT_THROWS(asm_lnk("t1: equ 1 +/ 0"), AssembleException);
+	ASSERT_THROWS(asm_lnk("t1: equ 3.0 +/ 5"), AssembleException);
+	ASSERT_THROWS(asm_lnk("t1: equ 3 +/ 5.0"), AssembleException);
+	ASSERT_THROWS(asm_lnk("t1: equ 3.0 +/ 5.0"), AssembleException);
+
+	asm_lnk("t1: equ 0 +% 1");
+	asm_lnk("t1: equ 3 +% 5");
+	ASSERT_THROWS(asm_lnk("t1: equ 0 +% 0"), AssembleException);
+	ASSERT_THROWS(asm_lnk("t1: equ 1 +% 0"), AssembleException);
+	ASSERT_THROWS(asm_lnk("t1: equ 3.0 +% 5"), AssembleException);
+	ASSERT_THROWS(asm_lnk("t1: equ 3 +% 5.0"), AssembleException);
+	ASSERT_THROWS(asm_lnk("t1: equ 3.0 +% 5.0"), AssembleException);
+
+	// equ directive specifically is size-agnostic (nothing to do with expr)
+	asm_lnk("t1: equ 0");
+	ASSERT_THROWS(asm_lnk("t1: equ qword 0"), AssembleException);
+	ASSERT_THROWS(asm_lnk("t1: equ dword 0"), AssembleException);
+	ASSERT_THROWS(asm_lnk("t1: equ word 0"), AssembleException);
+	ASSERT_THROWS(asm_lnk("t1: equ byte 0"), AssembleException);
+
+	asm_lnk("t1: equ 0.0");
+	ASSERT_THROWS(asm_lnk("t1: equ qword 0.0"), AssembleException);
+	ASSERT_THROWS(asm_lnk("t1: equ dword 0.0"), AssembleException);
+	ASSERT_THROWS(asm_lnk("t1: equ word 0.0"), AssembleException);
+	ASSERT_THROWS(asm_lnk("t1: equ byte 0.0"), AssembleException);
+
+	asm_lnk("t1: equ 0");
+	asm_lnk("t1: equ 0x0");
+	asm_lnk("t1: equ 0o0");
+	asm_lnk("t1: equ 0b0");
+	ASSERT_THROWS(asm_lnk("t1: equ 00"), AssembleException);
+	ASSERT_THROWS(asm_lnk("t1: equ -00"), AssembleException);
+	ASSERT_THROWS(asm_lnk("t1: equ 01"), AssembleException);
+	ASSERT_THROWS(asm_lnk("t1: equ -01"), AssembleException);
+	ASSERT_THROWS(asm_lnk("t1: equ 0x"), AssembleException);
+	ASSERT_THROWS(asm_lnk("t1: equ 0o"), AssembleException);
+	ASSERT_THROWS(asm_lnk("t1: equ 0b"), AssembleException);
+	ASSERT_THROWS(asm_lnk("t1: equ 0_0"), AssembleException);
+	ASSERT_THROWS(asm_lnk("t1: equ 00_"), AssembleException);
+	ASSERT_THROWS(asm_lnk("t1: equ 0_0_"), AssembleException);
+	ASSERT_THROWS(asm_lnk("t1: equ 0x_"), AssembleException);
+	ASSERT_THROWS(asm_lnk("t1: equ 0o_"), AssembleException);
+	ASSERT_THROWS(asm_lnk("t1: equ 0b_"), AssembleException);
+
+	asm_lnk("t1: equ 0");
+	ASSERT_THROWS(asm_lnk("t1: equ 0a"), AssembleException);
+	ASSERT_THROWS(asm_lnk("t1: equ 0xx"), AssembleException);
+	ASSERT_THROWS(asm_lnk("t1: equ 0ox"), AssembleException);
+	ASSERT_THROWS(asm_lnk("t1: equ 0bx"), AssembleException);
+
+	asm_lnk("t1: equ 0.0");
+	ASSERT_THROWS(asm_lnk("t1: equ 0.0a"), AssembleException);
+
+	asm_lnk("t1: equ 2 << 3");
+	ASSERT_THROWS(asm_lnk("t1: equ 2 << 3.0"), AssembleException);
+	ASSERT_THROWS(asm_lnk("t1: equ 2.0 << 3"), AssembleException);
+	ASSERT_THROWS(asm_lnk("t1: equ 2.0 << 3.0"), AssembleException);
+
+	asm_lnk("t1: equ 2 >> 3");
+	ASSERT_THROWS(asm_lnk("t1: equ 2 >> 3.0"), AssembleException);
+	ASSERT_THROWS(asm_lnk("t1: equ 2.0 >> 3"), AssembleException);
+	ASSERT_THROWS(asm_lnk("t1: equ 2.0 >> 3.0"), AssembleException);
+
+	asm_lnk("t1: equ 2 +>> 3");
+	ASSERT_THROWS(asm_lnk("t1: equ 2 +>> 3.0"), AssembleException);
+	ASSERT_THROWS(asm_lnk("t1: equ 2.0 +>> 3"), AssembleException);
+	ASSERT_THROWS(asm_lnk("t1: equ 2.0 +>> 3.0"), AssembleException);
+
+	asm_lnk("t1: equ 1 +< 2");
+	ASSERT_THROWS(asm_lnk("t1: equ 1.0 +< 2"), AssembleException);
+	ASSERT_THROWS(asm_lnk("t1: equ 1 +< 2.0"), AssembleException);
+	ASSERT_THROWS(asm_lnk("t1: equ 1.0 +< 2.0"), AssembleException);
+
+	asm_lnk("t1: equ 1 +<= 2");
+	ASSERT_THROWS(asm_lnk("t1: equ 1.0 +<= 2"), AssembleException);
+	ASSERT_THROWS(asm_lnk("t1: equ 1 +<= 2.0"), AssembleException);
+	ASSERT_THROWS(asm_lnk("t1: equ 1.0 +<= 2.0"), AssembleException);
+
+	asm_lnk("t1: equ 1 +> 2");
+	ASSERT_THROWS(asm_lnk("t1: equ 1.0 +> 2"), AssembleException);
+	ASSERT_THROWS(asm_lnk("t1: equ 1 +> 2.0"), AssembleException);
+	ASSERT_THROWS(asm_lnk("t1: equ 1.0 +> 2.0"), AssembleException);
+
+	asm_lnk("t1: equ 1 +>= 2");
+	ASSERT_THROWS(asm_lnk("t1: equ 1.0 +>= 2"), AssembleException);
+	ASSERT_THROWS(asm_lnk("t1: equ 1 +>= 2.0"), AssembleException);
+	ASSERT_THROWS(asm_lnk("t1: equ 1.0 +>= 2.0"), AssembleException);
+
+	asm_lnk("t1: equ 1 & 3");
+	ASSERT_THROWS(asm_lnk("t1: equ 1.0 & 3"), AssembleException);
+	ASSERT_THROWS(asm_lnk("t1: equ 1 & 3.0"), AssembleException);
+	ASSERT_THROWS(asm_lnk("t1: equ 1.0 & 3.0"), AssembleException);
+
+	asm_lnk("t1: equ 1 | 3");
+	ASSERT_THROWS(asm_lnk("t1: equ 1.0 | 3"), AssembleException);
+	ASSERT_THROWS(asm_lnk("t1: equ 1 | 3.0"), AssembleException);
+	ASSERT_THROWS(asm_lnk("t1: equ 1.0 | 3.0"), AssembleException);
+
+	asm_lnk("t1: equ 1 ^ 3");
+	ASSERT_THROWS(asm_lnk("t1: equ 1.0 ^ 3"), AssembleException);
+	ASSERT_THROWS(asm_lnk("t1: equ 1 ^ 3.0"), AssembleException);
+	ASSERT_THROWS(asm_lnk("t1: equ 1.0 ^ 3.0"), AssembleException);
+
+	asm_lnk("t1: equ 1 && 3");
+	ASSERT_THROWS(asm_lnk("t1: equ 1.0 && 3"), AssembleException);
+	ASSERT_THROWS(asm_lnk("t1: equ 1 && 3.0"), AssembleException);
+	ASSERT_THROWS(asm_lnk("t1: equ 1.0 && 3.0"), AssembleException);
+
+	asm_lnk("t1: equ 1 || 3");
+	ASSERT_THROWS(asm_lnk("t1: equ 1.0 || 3"), AssembleException);
+	ASSERT_THROWS(asm_lnk("t1: equ 1 || 3.0"), AssembleException);
+	ASSERT_THROWS(asm_lnk("t1: equ 1.0 || 3.0"), AssembleException);
+
+	asm_lnk("t1: equ ~23");
+	ASSERT_THROWS(asm_lnk("t1: equ ~23.0"), AssembleException);
+
+	asm_lnk("t1: equ !0");
+	ASSERT_THROWS(asm_lnk("t1: equ !0.0"), AssembleException);
+
+	asm_lnk("t1: equ $repr64(0.0)");
+	ASSERT_THROWS(asm_lnk("t1: equ $repr64(0)"), AssembleException);
+
+	asm_lnk("t1: equ $repr32(0.0)");
+	ASSERT_THROWS(asm_lnk("t1: equ $repr32(0)"), AssembleException);
+	
+	asm_lnk("t1: equ $float64(0)");
+	ASSERT_THROWS(asm_lnk("t1: equ $float64(0.0)"), AssembleException);
+
+	asm_lnk("t1: equ $float32(0)");
+	ASSERT_THROWS(asm_lnk("t1: equ $float32(0.0)"), AssembleException);
+	ASSERT_THROWS(asm_lnk("t1: equ $float32(-1)"), AssembleException);
+
+	asm_lnk("t1: equ $prec64(1.0)");
+	ASSERT_THROWS(asm_lnk("t1: equ $prec64(1)"), AssembleException);
+
+	asm_lnk("t1: equ $prec32(1.0)");
+	ASSERT_THROWS(asm_lnk("t1: equ $prec32(1)"), AssembleException);
+
+	asm_lnk("t1: equ 0 ? 1 : 0");
+	asm_lnk("t1: equ 1 ? 1 : 0");
+	ASSERT_THROWS(asm_lnk("t1: equ 0.0 ? 1 : 0"), AssembleException);
+	ASSERT_THROWS(asm_lnk("t1: equ 1.0 ? 1 : 0"), AssembleException);
+}
+void symbol_linkage_tests()
+{
+	asm_lnk("t1: equ t2\nt2: equ 0");
+	ASSERT_THROWS(asm_lnk("t1: equ t2\nt2: equ t1"), AssembleException);
 }
 void lea_tests()
 {
@@ -492,5 +1490,7 @@ void asm_tests()
 {
 	RUN_TEST(nop_tests);
 	RUN_TEST(mov_imm_tests);
+	RUN_TEST(expr_tests);
+	RUN_TEST(symbol_linkage_tests);
 	RUN_TEST(lea_tests);
 }

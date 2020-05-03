@@ -22,22 +22,28 @@ namespace CSX64::detail
 	{
 		{Expr::OPs::Mul, 5},
 
+	{ Expr::OPs::SDiv, 5 },
+	{ Expr::OPs::SMod, 5 },
+
 	{Expr::OPs::UDiv, 5},
 	{Expr::OPs::UMod, 5},
-
-	{Expr::OPs::SDiv, 5},
-	{Expr::OPs::SMod, 5},
 
 	{Expr::OPs::Add, 6},
 	{Expr::OPs::Sub, 6},
 
-	{Expr::OPs::SL, 7},
-	{Expr::OPs::SR, 7},
+	{Expr::OPs::SHL, 7},
+	{Expr::OPs::SHR, 7},
+	{Expr::OPs::SAR, 7},
 
-	{Expr::OPs::Less, 9},
-	{Expr::OPs::LessE, 9},
-	{Expr::OPs::Great, 9},
-	{Expr::OPs::GreatE, 9},
+	{Expr::OPs::SLess, 9},
+	{Expr::OPs::SLessE, 9},
+	{Expr::OPs::SGreat, 9},
+	{Expr::OPs::SGreatE, 9},
+
+	{ Expr::OPs::ULess, 9 },
+	{ Expr::OPs::ULessE, 9 },
+	{ Expr::OPs::UGreat, 9 },
+	{ Expr::OPs::UGreatE, 9 },
 
 	{Expr::OPs::Eq, 10},
 	{Expr::OPs::Neq, 10},
@@ -45,10 +51,10 @@ namespace CSX64::detail
 	{Expr::OPs::BitAnd, 11},
 	{Expr::OPs::BitXor, 12},
 	{Expr::OPs::BitOr, 13},
+
 	{Expr::OPs::LogAnd, 14},
 	{Expr::OPs::LogOr, 15},
 
-	{Expr::OPs::NullCoalesce, 99},
 	{Expr::OPs::Pair, 100},
 	{Expr::OPs::Condition, 100}
 	};
@@ -93,13 +99,6 @@ namespace CSX64::detail
 	{
 		"#t", "#r", "#d", "#b",
 		"#T", "#R", "#D", "#B",
-
-		"__heap__",
-	};
-
-	const std::unordered_set<std::string> VerifyLegalExpressionIgnores
-	{
-		"__heap__"
 	};
 
 	const std::unordered_set<std::string> AdditionalReservedSymbols

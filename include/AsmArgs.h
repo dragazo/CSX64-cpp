@@ -82,15 +82,6 @@ namespace CSX64::detail
 		bool TryAppendVal(u64 size, u64 val);
 		bool TryAppendByte(u8 val);
 
-		// gets the compact imm prefix for a 64-bit bit quantity (val).
-		static u8 GetCompactImmPrefix(u64 val);
-
-		// attempts to append a compact imm to the current segment.
-		// expr     - the value to append in the compact imm format.
-		// sizecode - if strict is true, this is the size to use, otherwise is the default size if expr cannot be immediately evaluated.
-		// strict   - denotes if sizecode MUST be obeyed - inhibits further compactness optimizations.
-		bool TryAppendCompactImm(Expr &&expr, u64 sizecode, bool strict);
-
 		// private
 		bool TryAppendExpr(u64 size, Expr &&expr, std::vector<HoleData> &holes, std::vector<u8> &segment);
 		bool TryAppendExpr(u64 size, Expr &&expr);

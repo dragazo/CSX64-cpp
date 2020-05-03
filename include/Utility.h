@@ -229,7 +229,7 @@ namespace CSX64::detail
 	/// <param name="str">the string to parse</param>
 	/// <param name="val">the resulting value</param>
 	/// <param name="radix">the radix to use (must be 2-36)</param>
-	bool TryParseUInt64(const std::string &str, u64 &val, unsigned int radix = 10);
+	bool TryParseUInt64(std::string_view str, u64 &val, u64 radix = 10);
 	bool TryParseDouble(const std::string &str, f64 &val);
 
 	bool starts_with(std::string_view str, std::string_view val);

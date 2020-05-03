@@ -31,8 +31,6 @@ namespace CSX64::detail
 	// a set of all the ids to use for ptrdiff logic
 	extern const std::unordered_set<std::string> PtrdiffIDs;
 
-	extern const std::unordered_set<std::string> VerifyLegalExpressionIgnores;
-
 	extern const std::unordered_set<std::string> AdditionalReservedSymbols;
 
 	// Maps CPU register names (all caps) to tuples of (id, sizecode, high)

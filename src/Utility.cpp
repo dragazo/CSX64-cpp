@@ -149,13 +149,13 @@ namespace CSX64::detail
 	/// <param name="str">the string to parse</param>
 	/// <param name="val">the resulting value</param>
 	/// <param name="radix">the radix to use (must be 2-36)</param>
-	bool TryParseUInt64(const std::string &str, u64 &val, unsigned int radix)
+	bool TryParseUInt64(std::string_view str, u64 &val, u64 radix)
 	{
 		// ensure radix is in range
 		if (radix < 2 || radix > 36) throw std::runtime_error("radix must be in range 2-36");
-
-		val = 0;          // initialize to zero
-		unsigned int add; // amount to add
+		
+		val = 0; // initialize to zero
+		u64 add; // amount to add
 
 		// fail on null or empty
 		if (str.empty()) return false;

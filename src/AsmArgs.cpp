@@ -123,15 +123,22 @@ bool AssembleArgs::TryExtractLineHeader(std::string &rawline)
 	if (rep_expr)
 	{
 		// make sure the repeat count is an instant imm (critical expression)
-		u64 val;
-		bool floating;
-		if (!rep_expr->Evaluate(file.Symbols, val, floating, err)) { res = { AssembleError::UsageError, "line " + tostr(line) + ": TIMES prefix requires a critical expression\n-> " + err }; return false; }
+		Expr::Result r = rep_expr->Evaluate(file.Symbols, err);
+		if (!r.evaluated())
+		{
+			res = { AssembleError::UsageError, "line " + tostr(line) + ": TIMES prefix requires a critical expression\n-> " + err };
+			return false;
+		}
 
 		// if using a TIMES prefix and the imm is floating, that's an error
-		if (rep_code == 1 && floating) { res = { AssembleError::UsageError, "line " + tostr(line) + ": TIMES prefix requires an integral expression" }; return false; }
+		if (rep_code == 1 && r.floating)
+		{
+			res = { AssembleError::UsageError, "line " + tostr(line) + ": TIMES prefix requires an integral expression" };
+			return false;
+		}
 
 		// use the evaluated expression as the times count (account for TIMES vs IF prefix logic)
-		times = rep_code == 2 ? !IsZero(val, floating) ? 1 : 0 : (i64)val;
+		times = rep_code == 2 ? !IsZero(r.val, r.floating) ? 1 : 0 : (i64)r.val;
 	}
 
 	// -- finalize -- //
@@ -255,7 +262,7 @@ bool AssembleArgs::IsValidName(const std::string &token, std::string &err)
 	// first char is underscore or letter
 	if (token[0] != '_' && !std::isalpha(token[0])) { err = "Symbol contained an illegal character"; return false; }
 	// all other chars may additionally be numbers or periods
-	for (int i = 1; i < (int)token.size(); ++i)
+	for (std::size_t i = 1; i < token.size(); ++i)
 		if (token[i] != '_' && token[i] != '.' && !std::isalnum(token[i])) { err = "Symbol contained an illegal character"; return false; }
 
 	return true;
@@ -314,44 +321,6 @@ bool AssembleArgs::TryAppendByte(u8 val)
 		// others are not
 	default: res = {AssembleError::FormatError, "line " + tostr(line) + ": Cannot write in this segment"}; return false;
 	}
-}
-
-u8 AssembleArgs::GetCompactImmPrefix(u64 val)
-{
-	if ((val & (u64)0xffffffffffffff00) == 0) return (u8)0x00;
-	if ((~val & (u64)0xffffffffffffff00) == 0) return (u8)0x10;
-	
-	if ((val & (u64)0xffffffffffff0000) == 0) return (u8)0x01;
-	if ((~val & (u64)0xffffffffffff0000) == 0) return (u8)0x11;
-
-	if ((val & (u64)0xffffffff00000000) == 0) return (u8)0x02;
-	if ((~val & (u64)0xffffffff00000000) == 0) return (u8)0x12;
-
-	return (u8)0x03;
-}
-
-bool AssembleArgs::TryAppendCompactImm(Expr &&expr, u64 sizecode, bool strict)
-{
-	u64 val;
-	bool floating;
-	std::string err;
-
-	// if we can evaluate it immediately
-	if (expr.Evaluate(file.Symbols, val, floating, err))
-	{
-		// get the prefix byte - taking into account strict flag and potentially-default sizecode
-		u8 prefix = strict ? (u8)(sizecode) : GetCompactImmPrefix(val);
-
-		// write the prefix byte and its appropriately-sized compact imm
-		return TryAppendByte(prefix) && TryAppendVal(get_size(prefix & 3), val);
-	}
-	// otherwise it'll need to be a dynamic hole
-	else
-	{
-		
-	}
-
-	throw std::runtime_error("append compact imm not currently implemented");
 }
 
 bool AssembleArgs::TryAppendExpr(u64 size, Expr &&expr, std::vector<HoleData> &holes, std::vector<u8> &segment)
@@ -613,14 +582,13 @@ bool AssembleArgs::TryExtractExpr(const std::string &str, const std::size_t str_
 						if (_strict) { res = {AssembleError::UsageError, "line " + tostr(line) + ": A STRICT specifier in this context is not allowed"}; return false; }
 
 						// additionally, expressions used in binary/string literals are critical expressions
-						u64 _val;
-						bool _floating;
-						if (!_expr.Evaluate(file.Symbols, _val, _floating, err)) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Expressions to binary literals are critical expressions\n-> " + err}; return false; }
+						Expr::Result r = _expr.Evaluate(file.Symbols, err);
+						if (!r.evaluated()) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Expressions to binary literals are critical expressions\n-> " + err}; return false; }
 
 						// bounds check it since it's a compile time constant
-						if (_val > 0xff) { res = {AssembleError::UsageError, "line " + tostr(line) + ": (byte) expression to binary literal exceeded 255"}; return false; }
+						if (r.val > 0xff) { res = {AssembleError::UsageError, "line " + tostr(line) + ": (byte) expression to binary literal exceeded 255"}; return false; }
 
-						literal_value.push_back((u8)_val);
+						literal_value.push_back((u8)r.val);
 					}
 					// otherwise we failed to parse it
 					else { res = {AssembleError::FormatError, "line " + tostr(line) + ": Failed to parse operand as a string or imm: " + arg + "\n-> " + res.ErrorMsg}; return false; }
@@ -667,7 +635,9 @@ bool AssembleArgs::TryExtractExpr(const std::string &str, const std::size_t str_
 			term_leaf->Token(val);
 
 			// it either needs to be evaluatable or a valid label name
-			if (!term_leaf->Evaluatable(file.Symbols) && !IsValidName(val, err)) { res = {AssembleError::FormatError, "line " + tostr(line) + ": Failed to resolve token as a valid imm or symbol name: " + val + "\n-> " + err}; return false; }
+			Expr::Result r = term_leaf->Evaluate(file.Symbols, err);
+			if (r.invalid()) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Failed to parse expression: " + val + "\n-> " + err}; return false; }
+			if (!r.evaluated() && !IsValidName(val, err)) { res = {AssembleError::FormatError, "line " + tostr(line) + ": Failed to resolve token as a valid imm or symbol name: " + val + "\n-> " + err}; return false; }
 		}
 
 		// -- append subtree to main tree --
@@ -815,6 +785,10 @@ bool AssembleArgs::TryParseImm(const std::string &token, Expr &expr, u64 &sizeco
 	// make sure the entire rest of the string was consumed
 	if (end != token.size()) { res = {AssembleError::FormatError, "line " + tostr(line) + ": Failed to parse as an expression: " + token.substr(pos)}; return false; }
 
+	std::string err;
+	Expr::Result r = ptr->Evaluate(file.Symbols, err);
+	if (r.invalid()) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Invalid expression: " + token.substr(pos) + "\n\t-> " + err}; return false; }
+
 	// migrate parsed expression from by-pointer to by-value
 	expr = std::move(*ptr);
 
@@ -826,7 +800,12 @@ bool AssembleArgs::TryParseInstantImm(const std::string &token, u64 &val, bool &
 
 	Expr hole;
 	if (!TryParseImm(token, hole, sizecode, explicit_size, strict)) return false;
-	if (!hole.Evaluate(file.Symbols, val, floating, err)) { res = {AssembleError::ArgError, "line " + tostr(line) + ": Failed to evaluate instant imm: " + token + "\n-> " + err}; return false; }
+
+	Expr::Result r = hole.Evaluate(file.Symbols, err);
+	if (!r.evaluated()) { res = {AssembleError::ArgError, "line " + tostr(line) + ": Failed to evaluate instant imm: " + token + "\n-> " + err}; return false; }
+
+	val = r.val;
+	floating = r.floating;
 
 	return true;
 }
@@ -1156,14 +1135,18 @@ bool AssembleArgs::TryGetRegMult(const std::string &label, Expr &hole, u64 &mult
 		// -- finally done with all the algebra -- //
 
 		// extract merged mult code fragment
-		u64 val;
-		bool floating;
-		if (!(list[1]->Left.get() == list[0] ? list[1]->Right : list[1]->Left)->Evaluate(file.Symbols, val, floating, err))
+		Expr::Result r = (list[1]->Left.get() == list[0] ? list[1]->Right : list[1]->Left)->Evaluate(file.Symbols, err);
+		if (!r.evaluated())
 		{
-			res = {AssembleError::FormatError, "line " + tostr(line) + ": Failed to evaluate register multiplier as an instant imm\n-> " + err}; return false;
+			res = {AssembleError::FormatError, "line " + tostr(line) + ": Failed to evaluate register multiplier as an instant imm\n-> " + err};
+			return false;
 		}
 		// make sure it's not floating-point
-		if (floating) { res = {AssembleError::FormatError, "line " + tostr(line) + ": Register multiplier may not be floating-point"}; return false; }
+		if (r.floating)
+		{
+			res = { AssembleError::FormatError, "line " + tostr(line) + ": Register multiplier may not be floating-point" };
+			return false;
+		}
 
 		// look through from top to bottom
 		for (std::size_t i = list.size() - 1; i >= 2; --i)
@@ -1172,7 +1155,7 @@ bool AssembleArgs::TryGetRegMult(const std::string &label, Expr &hole, u64 &mult
 			if (list[i]->OP == Expr::OPs::Neg || (list[i]->OP == Expr::OPs::Sub && list[i]->Right.get() == list[i - 1]))
 			{
 				// negate found partial mult
-				val = ~val + 1;
+				r.val = ~r.val + 1;
 			}
 		}
 
@@ -1180,7 +1163,7 @@ bool AssembleArgs::TryGetRegMult(const std::string &label, Expr &hole, u64 &mult
 		list[1]->IntResult(0);
 
 		// add extracted mult to total mult
-		mult_res += val;
+		mult_res += r.val;
 	}
 
 	// register successfully parsed
@@ -1286,10 +1269,9 @@ bool AssembleArgs::TryParseAddress(std::string token, u64 &a, u64 &b, Expr &ptr_
 	else if (sz == 0) { res = {AssembleError::FormatError, "line " + tostr(line) + ": 8-bit addressing is not allowed"}; return false; }
 
 	// if we can evaluate the hole to zero, there is no hole (null it)
-	u64 _temp;
-	bool _btemp;
+	Expr::Result r = ptr_base.Evaluate(file.Symbols, utoken);
 	bool ptr_base_present = true; // marker for if ptr_base is needed
-	if (ptr_base.Evaluate(file.Symbols, _temp, _btemp, utoken) && _temp == 0) ptr_base_present = false;
+	if (r.evaluated() && r.val == 0) ptr_base_present = false;
 
 	// [1: imm][1:][2: mult_1][2: size][1: r1][1: r2]   ([4: r1][4: r2])   ([size: imm])
 
@@ -1310,7 +1292,6 @@ bool AssembleArgs::VerifyLegalExpression(Expr &expr)
 		const std::string &tok = *expr.Token();
 		if (contains_key(file.Symbols, tok) || contains(file.ExternalSymbols, tok)
 			|| contains_value(SegOffsets, tok) || contains_value(SegOrigins, tok)
-			|| contains(VerifyLegalExpressionIgnores, tok)
 			|| starts_with(tok, BinaryLiteralSymbolPrefix))
 			return true;
 		// otherwise we don't know what it is
@@ -1522,17 +1503,16 @@ bool AssembleArgs::TryProcessStaticAssert()
 	if (strict) { res = {AssembleError::UsageError, "line " + tostr(line) + ": A STRICT specifier in this context is not allowed"}; return false; }
 
 	// it must be a critical expression - get its value
-	u64 val;
-	bool floating;
 	std::string err;
-	if (!expr.Evaluate(file.Symbols, val, floating, err)) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Expected a critical expression\n-> " + err}; return false; }
+	Expr::Result r = expr.Evaluate(file.Symbols, err);
+	if (!r.evaluated()) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Expected a critical expression\n-> " + err}; return false; }
 
 	// get the assertion message
 	std::string msg;
 	if (args.size() == 2 && !TryExtractStringChars(args[1], msg, err)) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Second (optional) argument was not a string\n-> " + err}; return false; }
 
 	// if the assertion failed, assembly fails
-	if (IsZero(val, floating)) { res = { AssembleError::Assertion, "line " + tostr(line) + ": Assertion failed" + (args.size() == 2 ? " - " : "") + msg }; return false; }
+	if (IsZero(r.val, r.floating)) { res = { AssembleError::Assertion, "line " + tostr(line) + ": Assertion failed" + (args.size() == 2 ? " - " : "") + msg }; return false; }
 
 	return true;
 }
@@ -3005,20 +2985,19 @@ bool AssembleArgs::VPUMaskPresent(Expr *mask, u64 elem_count)
 	if (mask == nullptr) return false;
 
 	// if we can't evaluate it, it's present
-	u64 val;
-	bool _f;
-	if (!mask->Evaluate(file.Symbols, val, _f, err)) return true;
+	Expr::Result r = mask->Evaluate(file.Symbols, err);
+	if (!r.evaluated()) return true;
 
 	// otherwise, if the mask value isn't all 1's over the relevant region, it's present
 	switch (elem_count)
 	{
-	case 1: return (val & 1) != 1;
-	case 2: return (val & 3) != 3;
-	case 4: return (val & 0xf) != 0xf;
-	case 8: return (u8)val != 0xff;
-	case 16: return (u16)val != 0xffff;
-	case 32: return (u32)val != 0xffffffff;
-	case 64: return (u64)val != 0xffffffffffffffff;
+	case 1: return (r.val & 1) != 1;
+	case 2: return (r.val & 3) != 3;
+	case 4: return (r.val & 0xf) != 0xf;
+	case 8: return (u8)r.val != 0xff;
+	case 16: return (u16)r.val != 0xffff;
+	case 32: return (u32)r.val != 0xffffffff;
+	case 64: return (u64)r.val != 0xffffffffffffffff;
 
 	default: throw std::invalid_argument("elem_count was invalid. got: " + tostr(elem_count));
 	}

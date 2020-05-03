@@ -23,13 +23,14 @@ namespace CSX64::detail
 			// binary ops
 
 			Mul,
-			UDiv, UMod,
 			SDiv, SMod,
+			UDiv, UMod,
 			Add, Sub,
 
-			SL, SR,
+			SHL, SHR, SAR,
 
-			Less, LessE, Great, GreatE,
+			SLess, SLessE, SGreat, SGreatE,
+			ULess, ULessE, UGreat, UGreatE,
 			Eq, Neq,
 
 			BitAnd, BitXor, BitOr,
@@ -52,7 +53,21 @@ namespace CSX64::detail
 			// special
 
 			Condition, Pair,
-			NullCoalesce
+		};
+		struct Result
+		{
+			u64 val;
+			bool floating;
+			enum class Type
+			{
+				Evaluated,
+				Incomplete,
+				Invalid,
+			} type;
+
+			constexpr bool evaluated() const noexcept { return type == Type::Evaluated; }
+			constexpr bool incomplete() const noexcept { return type == Type::Incomplete; }
+			constexpr bool invalid() const noexcept { return type == Type::Invalid; }
 		};
 
 		// maps expr op values to a human-readable form
@@ -69,7 +84,7 @@ namespace CSX64::detail
 		void CacheResult(u64 result, bool floating);
 
 		// helper function for Evaluate()
-		bool _Evaluate(std::unordered_map<std::string, Expr> &symbols, u64 &res, bool &floating, std::string &err, std::vector<std::string> &visited);
+		Result _Evaluate(std::unordered_map<std::string, Expr> &symbols, std::string &err, std::vector<std::string> &visited);
 
 		// helper function for the FindPath() variants
 		bool _FindPath(const std::string &value, std::vector<Expr*> &path, bool upper);
@@ -105,12 +120,10 @@ namespace CSX64::detail
 		const std::string *Token() const& { return _Token.empty() ? nullptr : &_Token; }
 		const std::string *Token() && = delete;
 		// assigns this node the specified token to be evaluated - may not be an empty string
-		template<typename T>
-		void Token(T &&val)
+		void Token(std::string val)
 		{
-			_Token = std::forward<T>(val);
-			if (_Token.empty()) throw std::invalid_argument("Expr token cannot be empty string");
-
+			if (val.empty()) throw std::invalid_argument("Expr token cannot be empty string");
+			_Token = std::move(val);
 			OP = OPs::None;
 			Left = nullptr;
 			Right = nullptr;
@@ -133,12 +146,7 @@ namespace CSX64::detail
 		/// <param name="res">the resulting value upon success</param>
 		/// <param name="floating">flag denoting result is floating-point</param>
 		/// <param name="err">error emitted upon failure</param>
-		bool Evaluate(std::unordered_map<std::string, Expr> &symbols, u64 &res, bool &floating, std::string &err);
-		/// <summary>
-		/// Returns true if the expression is evaluatable
-		/// </summary>
-		/// <param name="symbols">the symbols table for lookup</param>
-		bool Evaluatable(std::unordered_map<std::string, Expr> &symbols);
+		Result Evaluate(std::unordered_map<std::string, Expr> &symbols, std::string &err);
 
 		/// <summary>
 		/// Finds the path to the specified value in the expression tree. Returns true on success. This version reuses the stack object by first clearing its contents.

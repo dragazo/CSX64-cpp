@@ -10,28 +10,36 @@ namespace CSX64::detail
 	{
 		{Expr::OPs::Mul, "*"},
 		
-		{Expr::OPs::UDiv, "/"},
-		{Expr::OPs::UMod, "%"},
+		{Expr::OPs::SDiv, "/"},
+		{Expr::OPs::SMod, "%"},
 
-		{Expr::OPs::SDiv, "//"},
-		{Expr::OPs::SMod, "%%"},
+		{Expr::OPs::UDiv, "+/"},
+		{Expr::OPs::UMod, "+%"},
 
 		{Expr::OPs::Add, "+"},
 		{Expr::OPs::Sub, "-"},
 
-		{Expr::OPs::SL, "<<"},
-		{Expr::OPs::SR, ">>"},
+		{Expr::OPs::SHL, "<<"},
+		{Expr::OPs::SHR, "+>>"},
+		{Expr::OPs::SAR, ">>"},
 
-		{Expr::OPs::Less, "<"},
-		{Expr::OPs::LessE, "<="},
-		{Expr::OPs::Great, ">"},
-		{Expr::OPs::GreatE, ">="},
+		{Expr::OPs::SLess, "<"},
+		{Expr::OPs::SLessE, "<="},
+		{Expr::OPs::SGreat, ">"},
+		{Expr::OPs::SGreatE, ">="},
+
+		{Expr::OPs::SLess, "+<"},
+		{Expr::OPs::SLessE, "+<="},
+		{Expr::OPs::SGreat, "+>"},
+		{Expr::OPs::SGreatE, "+>="},
+
 		{Expr::OPs::Eq, "=="},
 		{Expr::OPs::Neq, "!="},
 
 		{Expr::OPs::BitAnd, "&"},
-		{Expr::OPs::BitOr, "|"},
 		{Expr::OPs::BitXor, "^"},
+		{Expr::OPs::BitOr, "|"},
+
 		{Expr::OPs::LogAnd, "&&"},
 		{Expr::OPs::LogOr, "||"},
 
@@ -58,7 +66,6 @@ namespace CSX64::detail
 
 		{Expr::OPs::Condition, "?"},
 		{Expr::OPs::Pair, ":"},
-		{Expr::OPs::NullCoalesce, "??"},
 	};
 
 	// ------------------------------
@@ -125,466 +132,831 @@ namespace CSX64::detail
 		_Floating = floating;
 	}
 
-	bool Expr::_Evaluate(std::unordered_map<std::string, Expr> &symbols, u64 &res, bool &floating, std::string &err, std::vector<std::string> &visited)
+	Expr::Result Expr::_Evaluate(std::unordered_map<std::string, Expr> &symbols, std::string &err, std::vector<std::string> &visited)
 	{
-		Expr *expr;
-		const std::string *tok;
+		u64 res = 0;
+		bool floating = false;
 
-		res = 0; // initialize out params
-		floating = false;
-
-		u64 L, R, Aux; // parsing locations for left and right subtrees
-		bool LF, RF, AuxF;
-
-		bool ret = true; // return value
-
-		// switch through op
 		switch (OP)
 		{
 		case OPs::None: // -- value -- //
-			tok = Token();
-
+		{
 			// if this has already been evaluated, return the cached result
-			if (tok == nullptr) { res = _Result; floating = _Floating; return true; }
+			if (_Token.empty()) return { _Result, _Floating, Result::Type::Evaluated };
 
 			// if it's a number
-			if (std::isdigit((*tok)[0]))
+			if (std::isdigit(_Token[0]))
 			{
 				// remove underscores (e.g. 0b_0011_1101_1101_1111) and convert to lowercase for convenience
-				std::string fixed_tok = to_lower(remove_char(*tok, '_'));
-
+				std::string fixed_tok = to_lower(remove_char(_Token, '_'));
+				std::string_view view = fixed_tok;
+				
 				// -- try parsing as int -- //
 
-				// hex prefixes
-				if (starts_with(fixed_tok, "0x") || starts_with(fixed_tok, "0h")) { if (TryParseUInt64(fixed_tok.substr(2), res, 16)) break; }
-				// hex suffixes
-				else if (fixed_tok.back() == 'x' || fixed_tok.back() == 'h') { if (TryParseUInt64(fixed_tok.substr(0, fixed_tok.size() - 1), res, 16)) break; }
-
-				// dec prefixes
-				else if (starts_with(fixed_tok, "0d") || starts_with(fixed_tok, "0t")) { if (TryParseUInt64(fixed_tok.substr(2), res, 10)) break; }
-				// dec suffixes
-				else if (fixed_tok.back() == 'd' || fixed_tok.back() == 't') { if (TryParseUInt64(fixed_tok.substr(0, fixed_tok.size() - 1), res, 10)) break; }
-
-				// oct prefixes
-				else if (starts_with(fixed_tok, "0o") || starts_with(fixed_tok, "0q")) { if (TryParseUInt64(fixed_tok.substr(2), res, 8)) break; }
-				// oct suffixes
-				else if (fixed_tok.back() == 'o' || fixed_tok.back() == 'q') { if (TryParseUInt64(fixed_tok.substr(0, fixed_tok.size() - 1), res, 8)) break; }
-
-				// bin prefixes
-				else if (starts_with(fixed_tok, "0b") || starts_with(fixed_tok, "0y")) { if (TryParseUInt64(fixed_tok.substr(2), res, 2)) break; }
-				// bin suffixes
-				else if (fixed_tok.back() == 'b' || fixed_tok.back() == 'y') { if (TryParseUInt64(fixed_tok.substr(0, fixed_tok.size() - 1), res, 2)) break; }
-
-				// otherwise is dec
-				else { if (TryParseUInt64(fixed_tok, res, 10)) break; }
+				// 0x is hex, 0o is oct, 0b is binary, otherwise decimal
+				if (starts_with(view, "0x")) { if (TryParseUInt64(view.substr(2), res, 16)) break; }
+				else if (starts_with(view, "0o")) { if (TryParseUInt64(view.substr(2), res, 8)) break; }
+				else if (starts_with(view, "0b")) { if (TryParseUInt64(view.substr(2), res, 2)) break; }
+				else if (TryParseUInt64(view, res, 10))
+				{
+					// to avoid confusion with C-style octal prefixes, leading zeros on decimal literals are invalid
+					if (view.size() > 1 && view[0] == '0')
+					{
+						err = "decimal literals cannot have leading zeros (if octal was intended, use 0o prefix)";
+						return { 0, false, Result::Type::Invalid };
+					}
+					break;
+				}
 
 				// -- try parsing as float -- //
 
 				// try floating-point
-				f64 fval;
-				if (TryParseDouble(fixed_tok, fval)) { res = transmute<u64>(fval); floating = true; break; }
+				if (f64 fval; TryParseDouble(fixed_tok, fval)) { res = transmute<u64>(fval); floating = true; break; }
 
 				// if nothing worked, it's an ill-formed numeric literal
-				err = "Ill-formed numeric literal encountered: \"" + (*Token()) + "\"";
-				return false;
+				err = "Ill-formed numeric literal encountered: \"" + _Token + "\"";
+				return { 0, false, Result::Type::Invalid };
 			}
 			// if it's a character constant
-			else if ((*tok)[0] == '"' || (*tok)[0] == '\'' || (*tok)[0] == '`')
+			else if (_Token[0] == '"' || _Token[0] == '\'' || _Token[0] == '`')
 			{
 				// get the characters
 				std::string chars;
-				if (!TryExtractStringChars(*tok, chars, err)) return false;
+				if (!TryExtractStringChars(_Token, chars, err)) return { 0, false, Result::Type::Invalid };
 
 				// must be 1-8 chars
-				if (chars.size() == 0) { err = "Ill-formed character literal encountered (empty): " + *tok; return false; }
-				if (chars.size() > 8) { err = "Ill-formed character literal encountered (too long): " + *tok; return false; }
-
-				res = 0; // zero res just in case that's removed from the top of the function later on
+				if (chars.size() == 0)
+				{
+					err = "Ill-formed character literal encountered (empty): " + _Token;
+					return { 0, false, Result::Type::Invalid };
+				}
+				if (chars.size() > 8)
+				{
+					err = "Ill-formed character literal encountered (too long): " + _Token;
+					return { 0, false, Result::Type::Invalid };
+				}
 
 				// build the value
-				for (int i = 0; i < (int)chars.size(); ++i) res |= (u64)(chars[i] & 0xff) << (i * 8);
-
-				break;
+				u64 res = 0;
+				for (std::size_t i = 0; i < chars.size(); ++i) res |= (u64)(chars[i] & 0xff) << (i * 8);
 			}
-			// if it's a defined symbol we haven't already visited
-			else if (!contains(visited, *tok) && try_get_value(symbols, *tok, expr))
+			// otherwise if it's a symbol we're already visited
+			else if (contains(visited, _Token))
 			{
-				visited.push_back(*tok); // mark token as visited
+				err = "Cyclic dependency on symbol \"" + _Token + "\"";
+				return { 0, false, Result::Type::Invalid };
+			}
+			// otherwise if it's a defined symbol
+			else if (Expr *expr; try_get_value(symbols, _Token, expr))
+			{
+				visited.push_back(_Token); // mark token as visited
 
 				// if we can't evaluate it, fail
-				if (!expr->_Evaluate(symbols, res, floating, err, visited)) { err = "Failed to evaluate referenced symbol \"" + *tok + "\"\n-> " + err; return false; }
+				Result r = expr->_Evaluate(symbols, err, visited);
+				if (r.invalid()) return r;
+				if (!r.evaluated())
+				{
+					err = "Failed to evaluate referenced symbol \"" + _Token + "\"\n-> " + err;
+					return { 0, false, Result::Type::Incomplete };
+				}
+
+				res = r.val;
+				floating = r.floating;
 
 				visited.pop_back(); // unmark token (must be done for diamond expressions i.e. a=b+c, b=d, c=d, d=0)
-
-				break; // break so we can resolve the reference
 			}
-			// otherwise we can't evaluate it
-			else { err = "Failed to evaluate \"" + *tok + "\""; return false; }
+			// otherwise it must be a symbol that's not defined yet
+			else
+			{
+				err = "Failed to evaluate \"" + _Token + "\"";
+				return { 0, false, Result::Type::Incomplete };
+			}
+
+			break;
+		}
 
 		// -- binary operators -- //
 
 		case OPs::Mul:
-			if (!Left->_Evaluate(symbols, L, LF, err, visited)) ret = false;
-			if (!Right->_Evaluate(symbols, R, RF, err, visited)) ret = false;
-			if (ret == false) return false;
+		{
+			Result r1 = Left->_Evaluate(symbols, err, visited);
+			if (r1.invalid()) return r1;
+			Result r2 = Right->_Evaluate(symbols, err, visited);
+			if (r2.invalid()) return r2;
 
-			if (LF || RF) { res = transmute<u64>((LF ? transmute<f64>(L) : (i64)L) * (RF ? transmute<f64>(R) : (i64)R)); floating = true; }
-			else res = L * R;
-			break;
+			if (r1.incomplete() || r2.incomplete()) return { 0, false, Result::Type::Incomplete };
 
-		case OPs::UDiv:
-			if (!Left->_Evaluate(symbols, L, LF, err, visited)) ret = false;
-			if (!Right->_Evaluate(symbols, R, RF, err, visited)) ret = false;
-			if (ret == false) return false;
-
-			if (LF || RF)
+			if (r1.floating || r2.floating)
 			{
-				f64 _num = LF ? transmute<f64>(L) : (f64)L;
-				f64 _denom = RF ? transmute<f64>(R) : (f64)R;
-
-				// catch division by zero
-				if (_denom == 0) { err = "divide by zero"; return false; }
-
-				res = transmute<u64>(_num / _denom);
+				res = transmute<u64>((r1.floating ? transmute<f64>(r1.val) : (i64)r1.val) * (r2.floating ? transmute<f64>(r2.val) : (i64)r2.val));
 				floating = true;
 			}
-			else
-			{
-				// catch division by zero
-				if (R == 0) { err = "divide by zero"; return false; }
-				res = L / R;
-			}
-
-			break;
-		case OPs::UMod:
-			if (!Left->_Evaluate(symbols, L, LF, err, visited)) ret = false;
-			if (!Right->_Evaluate(symbols, R, RF, err, visited)) ret = false;
-			if (ret == false) return false;
-
-			if (LF || RF)
-			{
-				f64 _num = LF ? transmute<f64>(L) : (f64)L;
-				f64 _denom = RF ? transmute<f64>(R) : (f64)R;
-
-				// catch division by zero
-				if (_denom == 0) { err = "divide by zero"; return false; }
-
-				res = transmute<u64>(std::fmod(_num, _denom));
-				floating = true;
-			}
-			else
-			{
-				// catch division by zero
-				if (R == 0) { err = "divide by zero"; return false; }
-				res = L % R;
-			}
-			break;
-
-		case OPs::SDiv:
-			if (!Left->_Evaluate(symbols, L, LF, err, visited)) ret = false;
-			if (!Right->_Evaluate(symbols, R, RF, err, visited)) ret = false;
-			if (ret == false) return false;
-
-			if (LF || RF)
-			{
-				f64 _num = LF ? transmute<f64>(L) : (f64)(i64)L;
-				f64 _denom = RF ? transmute<f64>(R) : (f64)(i64)R;
-
-				// catch division by zero
-				if (_denom == 0) { err = "divide by zero"; return false; }
-
-				res = transmute<u64>(_num / _denom);
-				floating = true;
-			}
-			else
-			{
-				// catch division by zero
-				if (R == 0) { err = "divide by zero"; return false; }
-
-				res = (u64)((i64)L / (i64)R);
-			}
-
-			break;
-		case OPs::SMod:
-			if (!Left->_Evaluate(symbols, L, LF, err, visited)) ret = false;
-			if (!Right->_Evaluate(symbols, R, RF, err, visited)) ret = false;
-			if (ret == false) return false;
-
-			if (LF || RF)
-			{
-				f64 _num = LF ? transmute<f64>(L) : (f64)(i64)L;
-				f64 _denom = RF ? transmute<f64>(R) : (f64)(i64)R;
-
-				// catch division by zero in floating case
-				if (_denom == 0) { err = "divide by zero"; return false; }
-				
-				res = transmute<u64>(std::fmod(_num, _denom));
-				floating = true;
-			}
-			else
-			{
-				// catch division by zero in integral case
-				if (R == 0) { err = "divide by zero"; return false; }
-				res = (u64)((i64)L % (i64)R);
-			}
-			break;
-
-		case OPs::Add:
-			if (!Left->_Evaluate(symbols, L, LF, err, visited)) ret = false;
-			if (!Right->_Evaluate(symbols, R, RF, err, visited)) ret = false;
-			if (ret == false) return false;
-
-			if (LF || RF) { res = transmute<u64>((LF ? transmute<f64>(L) : (i64)L) + (RF ? transmute<f64>(R) : (i64)R)); floating = true; }
-			else res = L + R;
-			break;
-		case OPs::Sub:
-			if (!Left->_Evaluate(symbols, L, LF, err, visited)) ret = false;
-			if (!Right->_Evaluate(symbols, R, RF, err, visited)) ret = false;
-			if (ret == false) return false;
-
-			if (LF || RF) { res = transmute<u64>((LF ? transmute<f64>(L) : (i64)L) - (RF ? transmute<f64>(R) : (i64)R)); floating = true; }
-			else res = L - R;
-			break;
-
-		case OPs::SL:
-			if (!Left->_Evaluate(symbols, L, LF, err, visited)) ret = false;
-			if (!Right->_Evaluate(symbols, R, RF, err, visited)) ret = false;
-			if (ret == false) return false;
+			else res = r1.val * r2.val;
 			
-			res = L << R; floating = LF || RF;
 			break;
-		case OPs::SR:
-			if (!Left->_Evaluate(symbols, L, LF, err, visited)) ret = false;
-			if (!Right->_Evaluate(symbols, R, RF, err, visited)) ret = false;
-			if (ret == false) return false;
+		}
+		case OPs::SDiv:
+		{
+			Result r1 = Left->_Evaluate(symbols, err, visited);
+			if (r1.invalid()) return r1;
+			Result r2 = Right->_Evaluate(symbols, err, visited);
+			if (r2.invalid()) return r2;
 
-			res = L >> R; floating = LF || RF;
+			if (r1.incomplete() || r2.incomplete()) return { 0, false, Result::Type::Incomplete };
+
+			if (r1.floating || r2.floating)
+			{
+				f64 _num = r1.floating ? transmute<f64>(r1.val) : (f64)(i64)r1.val;
+				f64 _denom = r2.floating ? transmute<f64>(r2.val) : (f64)(i64)r2.val;
+
+				if (_denom == 0)
+				{
+					err = "divide by zero";
+					return { 0, false, Result::Type::Invalid };
+				}
+
+				res = transmute<u64>(_num / _denom);
+				floating = true;
+			}
+			else
+			{
+				if (r2.val == 0)
+				{
+					err = "divide by zero";
+					return { 0, false, Result::Type::Invalid };
+				}
+
+				res = (u64)((i64)r1.val / (i64)r2.val);
+			}
+
 			break;
+		}
+		case OPs::SMod:
+		{
+			Result r1 = Left->_Evaluate(symbols, err, visited);
+			if (r1.invalid()) return r1;
+			Result r2 = Right->_Evaluate(symbols, err, visited);
+			if (r2.invalid()) return r2;
 
-		case OPs::Less:
-			if (!Left->_Evaluate(symbols, L, LF, err, visited)) ret = false;
-			if (!Right->_Evaluate(symbols, R, RF, err, visited)) ret = false;
-			if (ret == false) return false;
+			if (r1.incomplete() || r2.incomplete()) return { 0, false, Result::Type::Incomplete };
 
-			if (LF || RF) res = (LF ? transmute<f64>(L) : (i64)L) < (RF ? transmute<f64>(R) : (i64)R) ? 1 : 0ul;
-			else res = (i64)L < (i64)R ? 1 : 0ul;
+			if (r1.floating || r2.floating)
+			{
+				err = "attempt to modulo with floating point values";
+				return { 0, false, Result::Type::Invalid };
+			}
+			if (r2.val == 0)
+			{
+				err = "divide by zero";
+				return { 0, false, Result::Type::Invalid };
+			}
+
+			res = (u64)((i64)r1.val % (i64)r2.val);
+
 			break;
-		case OPs::LessE:
-			if (!Left->_Evaluate(symbols, L, LF, err, visited)) ret = false;
-			if (!Right->_Evaluate(symbols, R, RF, err, visited)) ret = false;
-			if (ret == false) return false;
+		}
+		case OPs::UDiv:
+		{
+			Result r1 = Left->_Evaluate(symbols, err, visited);
+			if (r1.invalid()) return r1;
+			Result r2 = Right->_Evaluate(symbols, err, visited);
+			if (r2.invalid()) return r2;
 
-			if (LF || RF) res = (LF ? transmute<f64>(L) : (i64)L) <= (RF ? transmute<f64>(R) : (i64)R) ? 1 : 0ul;
-			else res = (i64)L <= (i64)R ? 1 : 0ul;
+			if (r1.incomplete() || r2.incomplete()) return { 0, false, Result::Type::Incomplete };
+
+			if (r1.floating || r2.floating)
+			{
+				err = "attempt to unsigned divide with floating point values";
+				return { 0, false, Result::Type::Invalid };
+			}
+			if (r2.val == 0)
+			{
+				err = "divide by zero";
+				return { 0, false, Result::Type::Invalid };
+			}
+
+			res = r1.val / r2.val;
+
 			break;
-		case OPs::Great:
-			if (!Left->_Evaluate(symbols, L, LF, err, visited)) ret = false;
-			if (!Right->_Evaluate(symbols, R, RF, err, visited)) ret = false;
-			if (ret == false) return false;
+		}
+		case OPs::UMod:
+		{
+			Result r1 = Left->_Evaluate(symbols, err, visited);
+			if (r1.invalid()) return r1;
+			Result r2 = Right->_Evaluate(symbols, err, visited);
+			if (r2.invalid()) return r2;
 
-			if (LF || RF) res = (LF ? transmute<f64>(L) : (i64)L) > (RF ? transmute<f64>(R) : (i64)R) ? 1 : 0ul;
-			else res = (i64)L > (i64)R ? 1 : 0ul;
+			if (r1.incomplete() || r2.incomplete()) return { 0, false, Result::Type::Incomplete };
+
+			if (r1.floating || r2.floating)
+			{
+				err = "attempt to unsigned modulo with floating point values";
+				return { 0, false, Result::Type::Invalid };
+			}
+			if (r2.val == 0)
+			{
+				err = "divide by zero";
+				return { 0, false, Result::Type::Invalid };
+			}
+
+			res = r1.val % r2.val;
+
 			break;
-		case OPs::GreatE:
-			if (!Left->_Evaluate(symbols, L, LF, err, visited)) ret = false;
-			if (!Right->_Evaluate(symbols, R, RF, err, visited)) ret = false;
-			if (ret == false) return false;
+		}
+		case OPs::Add:
+		{
+			Result r1 = Left->_Evaluate(symbols, err, visited);
+			if (r1.invalid()) return r1;
+			Result r2 = Right->_Evaluate(symbols, err, visited);
+			if (r2.invalid()) return r2;
 
-			if (LF || RF) res = (LF ? transmute<f64>(L) : (i64)L) >= (RF ? transmute<f64>(R) : (i64)R) ? 1 : 0ul;
-			else res = (i64)L >= (i64)R ? 1 : 0ul;
+			if (r1.incomplete() || r2.incomplete()) return { 0, false, Result::Type::Incomplete };
+
+			if (r1.floating || r2.floating)
+			{
+				res = transmute<u64>((r1.floating ? transmute<f64>(r1.val) : (i64)r1.val) + (r2.floating ? transmute<f64>(r2.val) : (i64)r2.val));
+				floating = true;
+			}
+			else res = r1.val + r2.val;
+
 			break;
+		}
+		case OPs::Sub:
+		{
+			Result r1 = Left->_Evaluate(symbols, err, visited);
+			if (r1.invalid()) return r1;
+			Result r2 = Right->_Evaluate(symbols, err, visited);
+			if (r2.invalid()) return r2;
 
+			if (r1.incomplete() || r2.incomplete()) return { 0, false, Result::Type::Incomplete };
+
+			if (r1.floating || r2.floating)
+			{
+				res = transmute<u64>((r1.floating ? transmute<f64>(r1.val) : (i64)r1.val) - (r2.floating ? transmute<f64>(r2.val) : (i64)r2.val));
+				floating = true;
+			}
+			else res = r1.val - r2.val;
+
+			break;
+		}
+		case OPs::SHL:
+		{
+			Result r1 = Left->_Evaluate(symbols, err, visited);
+			if (r1.invalid()) return r1;
+			Result r2 = Right->_Evaluate(symbols, err, visited);
+			if (r2.invalid()) return r2;
+
+			if (r1.incomplete() || r2.incomplete()) return { 0, false, Result::Type::Incomplete };
+			if (r1.floating || r2.floating)
+			{
+				err = "attempt to bit shift floating point values";
+				return { 0, false, Result::Type::Invalid };
+			}
+
+			// for size agnosticism, overshifting saturates as if infinite word size truncated to 64
+			res = r2.val < 64 ? r1.val << r2.val : 0;
+
+			break;
+		}
+		case OPs::SHR:
+		{
+			Result r1 = Left->_Evaluate(symbols, err, visited);
+			if (r1.invalid()) return r1;
+			Result r2 = Right->_Evaluate(symbols, err, visited);
+			if (r2.invalid()) return r2;
+
+			if (r1.incomplete() || r2.incomplete()) return { 0, false, Result::Type::Incomplete };
+			if (r1.floating || r2.floating)
+			{
+				err = "attempt to bit shift floating point values";
+				return { 0, false, Result::Type::Invalid };
+			}
+
+			// for size agnosticism, overshifting saturates as if infinite word size truncated to 64
+			res = r2.val < 64 ? r1.val >> r2.val : 0;
+
+			break;
+		}
+		case OPs::SAR:
+		{
+			Result r1 = Left->_Evaluate(symbols, err, visited);
+			if (r1.invalid()) return r1;
+			Result r2 = Right->_Evaluate(symbols, err, visited);
+			if (r2.invalid()) return r2;
+
+			if (r1.incomplete() || r2.incomplete()) return { 0, false, Result::Type::Incomplete };
+			if (r1.floating || r2.floating)
+			{
+				err = "attempt to bit shift floating point values";
+				return { 0, false, Result::Type::Invalid };
+			}
+
+			// for size agnosticism, overshifting saturates as if infinite word size truncated to 64
+			if (r2.val < 64) res = (u64)((i64)r1.val >> r2.val);
+			else res = r1.val & 0x8000000000000000u ? 0xffffffffffffffffu : 0u;
+
+			break;
+		}
+		case OPs::SLess:
+		{
+			Result r1 = Left->_Evaluate(symbols, err, visited);
+			if (r1.invalid()) return r1;
+			Result r2 = Right->_Evaluate(symbols, err, visited);
+			if (r2.invalid()) return r2;
+
+			if (r1.incomplete() || r2.incomplete()) return { 0, false, Result::Type::Incomplete };
+
+			if (r1.floating || r2.floating)
+			{
+				res = (r1.floating ? transmute<f64>(r1.val) : (i64)r1.val) < (r2.floating ? transmute<f64>(r2.val) : (i64)r2.val) ? 1 : 0ul;
+			}
+			else res = (i64)r1.val < (i64)r2.val ? 1 : 0ul;
+
+			break;
+		}
+		case OPs::SLessE:
+		{
+			Result r1 = Left->_Evaluate(symbols, err, visited);
+			if (r1.invalid()) return r1;
+			Result r2 = Right->_Evaluate(symbols, err, visited);
+			if (r2.invalid()) return r2;
+
+			if (r1.incomplete() || r2.incomplete()) return { 0, false, Result::Type::Incomplete };
+
+			if (r1.floating || r2.floating)
+			{
+				res = (r1.floating ? transmute<f64>(r1.val) : (i64)r1.val) <= (r2.floating ? transmute<f64>(r2.val) : (i64)r2.val) ? 1 : 0ul;
+			}
+			else res = (i64)r1.val <= (i64)r2.val ? 1 : 0ul;
+
+			break;
+		}
+		case OPs::SGreat:
+		{
+			Result r1 = Left->_Evaluate(symbols, err, visited);
+			if (r1.invalid()) return r1;
+			Result r2 = Right->_Evaluate(symbols, err, visited);
+			if (r2.invalid()) return r2;
+
+			if (r1.incomplete() || r2.incomplete()) return { 0, false, Result::Type::Incomplete };
+
+			if (r1.floating || r2.floating)
+			{
+				res = (r1.floating ? transmute<f64>(r1.val) : (i64)r1.val) > (r2.floating ? transmute<f64>(r2.val) : (i64)r2.val) ? 1 : 0ul;
+			}
+			else res = (i64)r1.val > (i64)r2.val ? 1 : 0ul;
+
+			break;
+		}
+		case OPs::SGreatE:
+		{
+			Result r1 = Left->_Evaluate(symbols, err, visited);
+			if (r1.invalid()) return r1;
+			Result r2 = Right->_Evaluate(symbols, err, visited);
+			if (r2.invalid()) return r2;
+
+			if (r1.incomplete() || r2.incomplete()) return { 0, false, Result::Type::Incomplete };
+
+			if (r1.floating || r2.floating)
+			{
+				res = (r1.floating ? transmute<f64>(r1.val) : (i64)r1.val) >= (r2.floating ? transmute<f64>(r2.val) : (i64)r2.val) ? 1 : 0ul;
+			}
+			else res = (i64)r1.val >= (i64)r2.val ? 1 : 0ul;
+
+			break;
+		}
+		case OPs::ULess:
+		{
+			Result r1 = Left->_Evaluate(symbols, err, visited);
+			if (r1.invalid()) return r1;
+			Result r2 = Right->_Evaluate(symbols, err, visited);
+			if (r2.invalid()) return r2;
+
+			if (r1.incomplete() || r2.incomplete()) return { 0, false, Result::Type::Incomplete };
+			if (r1.floating || r2.floating)
+			{
+				err = "attempt to perform unsigned comparison on floating point values";
+				return { 0, false, Result::Type::Invalid };
+			}
+
+			res = r1.val < r2.val ? 1 : 0ul;
+
+			break;
+		}
+		case OPs::ULessE:
+		{
+			Result r1 = Left->_Evaluate(symbols, err, visited);
+			if (r1.invalid()) return r1;
+			Result r2 = Right->_Evaluate(symbols, err, visited);
+			if (r2.invalid()) return r2;
+
+			if (r1.incomplete() || r2.incomplete()) return { 0, false, Result::Type::Incomplete };
+			if (r1.floating || r2.floating)
+			{
+				err = "attempt to perform unsigned comparison on floating point values";
+				return { 0, false, Result::Type::Invalid };
+			}
+
+			res = r1.val <= r2.val ? 1 : 0ul;
+
+			break;
+		}
+		case OPs::UGreat:
+		{
+			Result r1 = Left->_Evaluate(symbols, err, visited);
+			if (r1.invalid()) return r1;
+			Result r2 = Right->_Evaluate(symbols, err, visited);
+			if (r2.invalid()) return r2;
+
+			if (r1.incomplete() || r2.incomplete()) return { 0, false, Result::Type::Incomplete };
+			if (r1.floating || r2.floating)
+			{
+				err = "attempt to perform unsigned comparison on floating point values";
+				return { 0, false, Result::Type::Invalid };
+			}
+
+			res = r1.val > r2.val ? 1 : 0ul;
+
+			break;
+		}
+		case OPs::UGreatE:
+		{
+			Result r1 = Left->_Evaluate(symbols, err, visited);
+			if (r1.invalid()) return r1;
+			Result r2 = Right->_Evaluate(symbols, err, visited);
+			if (r2.invalid()) return r2;
+
+			if (r1.incomplete() || r2.incomplete()) return { 0, false, Result::Type::Incomplete };
+			if (r1.floating || r2.floating)
+			{
+				err = "attempt to perform unsigned comparison on floating point values";
+				return { 0, false, Result::Type::Invalid };
+			}
+
+			res = r1.val >= r2.val ? 1 : 0ul;
+
+			break;
+		}
 		case OPs::Eq:
-			if (!Left->_Evaluate(symbols, L, LF, err, visited)) ret = false;
-			if (!Right->_Evaluate(symbols, R, RF, err, visited)) ret = false;
-			if (ret == false) return false;
+		{
+			Result r1 = Left->_Evaluate(symbols, err, visited);
+			if (r1.invalid()) return r1;
+			Result r2 = Right->_Evaluate(symbols, err, visited);
+			if (r2.invalid()) return r2;
 
-			if (LF || RF) res = (LF ? transmute<f64>(L) : (i64)L) == (RF ? transmute<f64>(R) : (i64)R) ? 1 : 0ul;
-			else res = L == R ? 1 : 0ul;
+			if (r1.incomplete() || r2.incomplete()) return { 0, false, Result::Type::Incomplete };
+
+			if (r1.floating || r2.floating)
+			{
+				res = (r1.floating ? transmute<f64>(r1.val) : (i64)r1.val) == (r2.floating ? transmute<f64>(r2.val) : (i64)r2.val) ? 1 : 0ul;
+			}
+			else res = (i64)r1.val == (i64)r2.val ? 1 : 0ul;
+
 			break;
+		}
 		case OPs::Neq:
-			if (!Left->_Evaluate(symbols, L, LF, err, visited)) ret = false;
-			if (!Right->_Evaluate(symbols, R, RF, err, visited)) ret = false;
-			if (ret == false) return false;
+		{
+			Result r1 = Left->_Evaluate(symbols, err, visited);
+			if (r1.invalid()) return r1;
+			Result r2 = Right->_Evaluate(symbols, err, visited);
+			if (r2.invalid()) return r2;
 
-			if (LF || RF) res = (LF ? transmute<f64>(L) : (i64)L) != (RF ? transmute<f64>(R) : (i64)R) ? 1 : 0ul;
-			else res = L != R ? 1 : 0ul;
+			if (r1.incomplete() || r2.incomplete()) return { 0, false, Result::Type::Incomplete };
+
+			if (r1.floating || r2.floating)
+			{
+				res = (r1.floating ? transmute<f64>(r1.val) : (i64)r1.val) != (r2.floating ? transmute<f64>(r2.val) : (i64)r2.val) ? 1 : 0ul;
+			}
+			else res = (i64)r1.val != (i64)r2.val ? 1 : 0ul;
+
 			break;
-
+		}
 		case OPs::BitAnd:
-			if (!Left->_Evaluate(symbols, L, LF, err, visited)) ret = false;
-			if (!Right->_Evaluate(symbols, R, RF, err, visited)) ret = false;
-			if (ret == false) return false;
+		{
+			Result r1 = Left->_Evaluate(symbols, err, visited);
+			if (r1.invalid()) return r1;
+			Result r2 = Right->_Evaluate(symbols, err, visited);
+			if (r2.invalid()) return r2;
 
-			res = L & R; floating = LF || RF;
+			if (r1.incomplete() || r2.incomplete()) return { 0, false, Result::Type::Incomplete };
+			if (r1.floating || r2.floating)
+			{
+				err = "attempt to perform bitwise on floating point values";
+				return { 0, false, Result::Type::Invalid };
+			}
+
+			res = r1.val & r2.val;
+
 			break;
+		}
 		case OPs::BitXor:
-			if (!Left->_Evaluate(symbols, L, LF, err, visited)) ret = false;
-			if (!Right->_Evaluate(symbols, R, RF, err, visited)) ret = false;
-			if (ret == false) return false;
+		{
+			Result r1 = Left->_Evaluate(symbols, err, visited);
+			if (r1.invalid()) return r1;
+			Result r2 = Right->_Evaluate(symbols, err, visited);
+			if (r2.invalid()) return r2;
 
-			res = L ^ R; floating = LF || RF;
+			if (r1.incomplete() || r2.incomplete()) return { 0, false, Result::Type::Incomplete };
+			if (r1.floating || r2.floating)
+			{
+				err = "attempt to perform bitwise on floating point values";
+				return { 0, false, Result::Type::Invalid };
+			}
+
+			res = r1.val ^ r2.val;
+
 			break;
+		}
 		case OPs::BitOr:
-			if (!Left->_Evaluate(symbols, L, LF, err, visited)) ret = false;
-			if (!Right->_Evaluate(symbols, R, RF, err, visited)) ret = false;
-			if (ret == false) return false;
+		{
+			Result r1 = Left->_Evaluate(symbols, err, visited);
+			if (r1.invalid()) return r1;
+			Result r2 = Right->_Evaluate(symbols, err, visited);
+			if (r2.invalid()) return r2;
 
-			res = L | R; floating = LF || RF;
+			if (r1.incomplete() || r2.incomplete()) return { 0, false, Result::Type::Incomplete };
+			if (r1.floating || r2.floating)
+			{
+				err = "attempt to perform bitwise on floating point values";
+				return { 0, false, Result::Type::Invalid };
+			}
+
+			res = r1.val | r2.val;
+
 			break;
-
+		}
 		case OPs::LogAnd:
-			if (!Left->_Evaluate(symbols, L, LF, err, visited)) ret = false;
-			if (!Right->_Evaluate(symbols, R, RF, err, visited)) ret = false;
-			if (ret == false) return false;
+		{
+			Result r1 = Left->_Evaluate(symbols, err, visited);
+			if (r1.invalid()) return r1;
+			Result r2 = Right->_Evaluate(symbols, err, visited);
+			if (r2.invalid()) return r2;
 
-			res = !IsZero(L, LF) && !IsZero(R, RF) ? 1 : 0ul;
+			if (r1.incomplete() || r2.incomplete()) return { 0, false, Result::Type::Incomplete };
+			if (r1.floating || r2.floating)
+			{
+				err = "attempt to perform logical and on floating point values";
+				return { 0, false, Result::Type::Invalid };
+			}
+
+			res = r1.val && r2.val ? 1 : 0ul;
+
 			break;
+		}
 		case OPs::LogOr:
-			if (!Left->_Evaluate(symbols, L, LF, err, visited)) ret = false;
-			if (!Right->_Evaluate(symbols, R, RF, err, visited)) ret = false;
-			if (ret == false) return false;
+		{
+			Result r1 = Left->_Evaluate(symbols, err, visited);
+			if (r1.invalid()) return r1;
+			Result r2 = Right->_Evaluate(symbols, err, visited);
+			if (r2.invalid()) return r2;
 
-			res = !IsZero(L, LF) || !IsZero(R, RF) ? 1 : 0ul;
+			if (r1.incomplete() || r2.incomplete()) return { 0, false, Result::Type::Incomplete };
+			if (r1.floating || r2.floating)
+			{
+				err = "attempt to perform logical or on floating point values";
+				return { 0, false, Result::Type::Invalid };
+			}
+
+			res = r1.val || r2.val ? 1 : 0ul;
+
 			break;
+		}
 
-			// unary ops
+		// -- unary ops -- //
 
 		case OPs::Neg:
-			if (!Left->_Evaluate(symbols, L, LF, err, visited)) return false;
+		{
+			Result r = Left->_Evaluate(symbols, err, visited);
+			if (!r.evaluated()) return r;
 
-			res = LF ? transmute<u64>(-transmute<f64>(L)) : ~L + 1; floating = LF;
+			res = r.floating ? transmute<u64>(-transmute<f64>(r.val)) : ~r.val + 1;
+			floating = r.floating;
+
 			break;
+		}
 		case OPs::BitNot:
-			if (!Left->_Evaluate(symbols, L, LF, err, visited)) return false;
+		{
+			Result r = Left->_Evaluate(symbols, err, visited);
+			if (!r.evaluated()) return r;
+			if (r.floating)
+			{
+				err = "attempt to perform bitwise not on floating point value";
+				return { 0, false, Result::Type::Invalid };
+			}
 
-			res = ~L; floating = LF;
+			res = ~r.val;
+
 			break;
+		}
 		case OPs::LogNot:
-			if (!Left->_Evaluate(symbols, L, LF, err, visited)) return false;
+		{
+			Result r = Left->_Evaluate(symbols, err, visited);
+			if (!r.evaluated()) return r;
+			if (r.floating)
+			{
+				err = "attempt to perform logical not on floating point value";
+				return { 0, false, Result::Type::Invalid };
+			}
 
-			res = IsZero(L, LF) ? 1 : 0ul;
+			res = r.val ? 0 : 1ul;
+
 			break;
-
+		}
 		case OPs::Int:
-			if (!Left->_Evaluate(symbols, L, LF, err, visited)) return false;
+		{
+			Result r = Left->_Evaluate(symbols, err, visited);
+			if (!r.evaluated()) return r;
 
 			// float converts to int, otherwise pass-through
-			res = LF ? (u64)(i64)transmute<f64>(L) : L;
+			res = r.floating ? (u64)(i64)transmute<f64>(r.val) : r.val;
+
 			break;
+		}
 		case OPs::Float:
-			if (!Left->_Evaluate(symbols, L, LF, err, visited)) return false;
+		{
+			Result r = Left->_Evaluate(symbols, err, visited);
+			if (!r.evaluated()) return r;
 
-			// int converts to float, otherwise pass-through
-			res = LF ? L : transmute<u64>((f64)(i64)L);
+			res = r.floating ? r.val : transmute<u64>((f64)(i64)r.val);
 			floating = true;
-			break;
 
+			break;
+		}
 		case OPs::Floor:
-			if (!Left->_Evaluate(symbols, L, LF, err, visited)) return false;
+		{
+			Result r = Left->_Evaluate(symbols, err, visited);
+			if (!r.evaluated()) return r;
 
-			// floor the result - results in a float
-			res = transmute<u64>(std::floor(LF ? transmute<f64>(L) : (f64)(i64)L));
-			floating = true;
+			res = r.floating ? transmute<u64>(std::floor(transmute<f64>(r.val))) : r.val;
+			floating = r.floating;
+
 			break;
+		}
 		case OPs::Ceil:
-			if (!Left->_Evaluate(symbols, L, LF, err, visited)) return false;
+		{
+			Result r = Left->_Evaluate(symbols, err, visited);
+			if (!r.evaluated()) return r;
 
-			// ceil the result - results in a float
-			res = transmute<u64>(std::ceil(LF ? transmute<f64>(L) : (f64)(i64)L));
-			floating = true;
+			res = r.floating ? transmute<u64>(std::ceil(transmute<f64>(r.val))) : r.val;
+			floating = r.floating;
+
 			break;
+		}
 		case OPs::Round:
-			if (!Left->_Evaluate(symbols, L, LF, err, visited)) return false;
+		{
+			Result r = Left->_Evaluate(symbols, err, visited);
+			if (!r.evaluated()) return r;
 
-			// round the result - results in a float
-			res = transmute<u64>(std::round(LF ? transmute<f64>(L) : (f64)(i64)L));
-			floating = true;
+			res = r.floating ? transmute<u64>(std::round(transmute<f64>(r.val))) : r.val;
+			floating = r.floating;
+
 			break;
+		}
 		case OPs::Trunc:
-			if (!Left->_Evaluate(symbols, L, LF, err, visited)) return false;
+		{
+			Result r = Left->_Evaluate(symbols, err, visited);
+			if (!r.evaluated()) return r;
 
-			// trunc the result - results in a float
-			res = transmute<u64>(std::trunc(LF ? transmute<f64>(L) : (f64)(i64)L));
-			floating = true;
+			res = r.floating ? transmute<u64>(std::trunc(transmute<f64>(r.val))) : r.val;
+			floating = r.floating;
+
 			break;
-
+		}
 		case OPs::Repr64:
-			if (!Left->_Evaluate(symbols, L, LF, err, visited)) return false;
-			if (!LF) { err = "REPR64 requires a floating-point argument"; return false; }
+		{
+			Result r = Left->_Evaluate(symbols, err, visited);
+			if (!r.evaluated()) return r;
+			if (!r.floating)
+			{
+				err = "REPR64 requires a floating-point argument";
+				return { 0, false, Result::Type::Invalid };
+			}
 
-			// convert the float to a 64-bit representation (already storing as 64-bit representation)
-			res = L;
+			res = r.val;
+
 			break;
+		}
 		case OPs::Repr32:
-			if (!Left->_Evaluate(symbols, L, LF, err, visited)) return false;
-			if (!LF) { err = "REPR32 requires a floating-point argument"; return false; }
+		{
+			Result r = Left->_Evaluate(symbols, err, visited);
+			if (!r.evaluated()) return r;
+			if (!r.floating)
+			{
+				err = "REPR32 requires a floating-point argument";
+				return { 0, false, Result::Type::Invalid };
+			}
 
-			// convert the float to a 32-bit representation
-			res = transmute<u32>((f32)transmute<f64>(L));
+			res = transmute<u32>((f32)transmute<f64>(r.val));
+
 			break;
-
+		}
 		case OPs::Float64:
-			if (!Left->_Evaluate(symbols, L, LF, err, visited)) return false;
-			if (LF) { err = "FLOAT64 requires an integer argument"; return false; }
+		{
+			Result r = Left->_Evaluate(symbols, err, visited);
+			if (!r.evaluated()) return r;
+			if (r.floating)
+			{
+				err = "FLOAT64 requires an integer argument";
+				return { 0, false, Result::Type::Invalid };
+			}
 
-			// convert the 64-bit representation to a float
-			res = L;
+			res = r.val;
 			floating = true;
+
 			break;
+		}
 		case OPs::Float32:
-			if (!Left->_Evaluate(symbols, L, LF, err, visited)) return false;
-			if (LF) { err = "FLOAT32 requires an integer argument"; return false; }
+		{
+			Result r = Left->_Evaluate(symbols, err, visited);
+			if (!r.evaluated()) return r;
+			if (r.floating)
+			{
+				err = "FLOAT32 requires an integer argument";
+				return { 0, false, Result::Type::Invalid };
+			}
+			if (r.val != (u32)r.val)
+			{
+				err = "argument to FLOAT32 was larger than 32-bit";
+				return { 0, false, Result::Type::Invalid };
+			}
 
-			// convert the 32-bit representation to a float
-			res = transmute<u64>((f64)transmute<f32>((u32)L));
+			res = transmute<u64>((f64)transmute<f32>((u32)r.val));
 			floating = true;
-			break;
 
+			break;
+		}
 		case OPs::Prec64:
-			if (!Left->_Evaluate(symbols, L, LF, err, visited)) return false;
-			if (!LF) { err = "PREC64 requires a floating-point argument"; return false; }
+		{
+			Result r = Left->_Evaluate(symbols, err, visited);
+			if (!r.evaluated()) return r;
+			if (!r.floating)
+			{
+				err = "PREC64 requires a floating-point argument";
+				return { 0, false, Result::Type::Invalid };
+			}
 
 			// truncate the precision to 64 bits (already storing in 64-bit floating point, so that would be no-op)
-			res = L;
+			res = r.val;
 			floating = true;
-			break;
-		case OPs::Prec32:
-			if (!Left->_Evaluate(symbols, L, LF, err, visited)) return false;
-			if (!LF) { err = "PREC32 requires a floating-point argument"; return false; }
 
-			// truncate the precision to 32 bits (stored as a 64-bit floating, just chop off some precision from the end)
-			res = L & (u64)0xffffffffe0000000;
-			floating = true;
 			break;
+		}
+		case OPs::Prec32:
+		{
+			Result r = Left->_Evaluate(symbols, err, visited);
+			if (!r.evaluated()) return r;
+			if (!r.floating)
+			{
+				err = "PREC32 requires a floating-point argument";
+				return { 0, false, Result::Type::Invalid };
+			}
+
+			// truncate the precision to 32 bits (stored as a 64-bit floating, just chop off some precision from the end and handle rounding)
+			res = r.val & 0xffffffffe0000000u;
+			if (r.val & 0x10000000u) res += 0x20000000u;
+			floating = true;
+
+			break;
+		}
 
 		// -- misc operators -- //
 
-		case OPs::NullCoalesce:
-			if (!Left->_Evaluate(symbols, L, LF, err, visited)) ret = false;
-			if (!Right->_Evaluate(symbols, R, RF, err, visited)) ret = false;
-			if (ret == false) return false;
-
-			if (!IsZero(L, LF)) { res = L; floating = LF; }
-			else /*          */ { res = R; floating = RF; }
-			break;
 		case OPs::Condition:
-			if (!Left->_Evaluate(symbols, Aux, AuxF, err, visited)) ret = false;
-			if (!Right->Left->_Evaluate(symbols, L, LF, err, visited)) ret = false;
-			if (!Right->Right->_Evaluate(symbols, R, RF, err, visited)) ret = false;
-			if (ret == false) return false;
+		{
+			Result cond = Left->_Evaluate(symbols, err, visited);
+			if (cond.invalid()) return cond;
+			Result r1 = Right->Left->_Evaluate(symbols, err, visited);
+			if (r1.invalid()) return r1;
+			Result r2 = Right->Right->_Evaluate(symbols, err, visited);
+			if (r2.invalid()) return r2;
 
-			if (!IsZero(Aux, AuxF)) { res = L; floating = LF; }
-			else /*              */ { res = R; floating = RF; }
+			if (cond.incomplete() || r1.incomplete() || r2.incomplete()) return { 0, false, Result::Type::Incomplete };
+			if (cond.floating)
+			{
+				err = "attempt to use floating point value as conditon of ?: operator";
+				return { 0, false, Result::Type::Invalid };
+			}
+
+			// because this is evaluated statically, we can allow branches to return different types
+			if (cond.val)
+			{
+				res = r1.val;
+				floating = r1.floating;
+			}
+			else
+			{
+				res = r2.val;
+				floating = r2.floating;
+			}
+
 			break;
-
-		default: err = "Unknown operation"; return false;
 		}
 
-		// cache the result
-		CacheResult(res, floating);
+		default: throw std::invalid_argument("Unknown operation in Expr");
+		}
 
-		return true;
+		CacheResult(res, floating);
+		return { res, floating, Result::Type::Evaluated };
 	}
 
 	bool Expr::_FindPath(const std::string &value, std::vector<Expr*> &path, bool upper)
@@ -626,18 +998,11 @@ namespace CSX64::detail
 		}
 	}
 
-	bool Expr::Evaluate(std::unordered_map<std::string, Expr> &symbols, u64 &res, bool &floating, std::string &err)
+	Expr::Result Expr::Evaluate(std::unordered_map<std::string, Expr> &symbols, std::string &err)
 	{
 		// refer to helper function
 		std::vector<std::string> visited;
-		return _Evaluate(symbols, res, floating, err, visited);
-	}
-	bool Expr::Evaluatable(std::unordered_map<std::string, Expr> &symbols)
-	{
-		u64 res;
-		bool floating;
-		std::string err;
-		return Evaluate(symbols, res, floating, err);
+		return _Evaluate(symbols, err, visited);
 	}
 
 	bool Expr::FindPath(const std::string &value, std::vector<Expr*> &path, bool upper)

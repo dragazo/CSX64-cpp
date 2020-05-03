@@ -435,32 +435,52 @@ namespace CSX64
 		oplen = 0;
 
 		// try to take as many characters as possible (greedy)
+		if (pos + 3 <= token.size())
+		{
+			oplen = 3; // record oplen
+
+			// handle unsigned variants
+			if (token[pos] == '+')
+			{
+				if (token[pos + 1] == '>' && token[pos + 2] == '>') { op = Expr::OPs::SHR; return true; }
+				if (token[pos + 1] == '<' && token[pos + 2] == '=') { op = Expr::OPs::ULessE; return true; }
+				if (token[pos + 1] == '>' && token[pos + 2] == '=') { op = Expr::OPs::UGreatE; return true; }
+			}
+		}
 		if (pos + 2 <= token.size())
 		{
 			oplen = 2; // record oplen
 
-			// do ops where both chars are the same
-			if (token[pos] == token[pos + 1])
+			// handle unsigned variants
+			if (token[pos] == '+')
+			{
+				switch (token[pos + 1])
+				{
+				case '/': op = Expr::OPs::UDiv; return true;
+				case '%': op = Expr::OPs::UMod; return true;
+				case '<': op = Expr::OPs::ULess; return true;
+				case '>': op = Expr::OPs::UGreat; return true;
+				}
+			}
+			// if both chars are the same
+			else if (token[pos] == token[pos + 1])
 			{
 				switch (token[pos])
 				{
-				case '/': op = Expr::OPs::SDiv; return true;
-				case '%': op = Expr::OPs::SMod; return true;
-				case '<': op = Expr::OPs::SL; return true;
-				case '>': op = Expr::OPs::SR; return true;
+				case '<': op = Expr::OPs::SHL; return true;
+				case '>': op = Expr::OPs::SAR; return true;
 				case '=': op = Expr::OPs::Eq; return true;
 				case '&': op = Expr::OPs::LogAnd; return true;
 				case '|': op = Expr::OPs::LogOr; return true;
-				case '?': op = Expr::OPs::NullCoalesce; return true;
 				}
 			}
-			// otherwise second must be =
+			// otherwise if second char is '='
 			else if (token[pos + 1] == '=')
 			{
 				switch (token[pos])
 				{
-				case '<': op = Expr::OPs::LessE; return true;
-				case '>': op = Expr::OPs::GreatE; return true;
+				case '<': op = Expr::OPs::SLessE; return true;
+				case '>': op = Expr::OPs::SGreatE; return true;
 				case '!': op = Expr::OPs::Neq; return true;
 				}
 			}
@@ -468,17 +488,18 @@ namespace CSX64
 		if (pos + 1 <= token.size())
 		{
 			oplen = 1; // record oplen
+
 			switch (token[pos])
 			{
 			case '*': op = Expr::OPs::Mul; return true;
-			case '/': op = Expr::OPs::UDiv; return true;
-			case '%': op = Expr::OPs::UMod; return true;
+			case '/': op = Expr::OPs::SDiv; return true;
+			case '%': op = Expr::OPs::SMod; return true;
 
 			case '+': op = Expr::OPs::Add; return true;
 			case '-': op = Expr::OPs::Sub; return true;
 
-			case '<': op = Expr::OPs::Less; return true;
-			case '>': op = Expr::OPs::Great; return true;
+			case '<': op = Expr::OPs::SLess; return true;
+			case '>': op = Expr::OPs::SGreat; return true;
 
 			case '&': op = Expr::OPs::BitAnd; return true;
 			case '^': op = Expr::OPs::BitXor; return true;
@@ -520,24 +541,23 @@ namespace CSX64
 	PatchError TryPatchHole(std::vector<u8> &res, std::unordered_map<std::string, Expr> &symbols, HoleData &data, std::string &err)
 	{
 		// if we can fill it immediately, do so
-		u64 val;
-		bool floating;
-		if (data.expr.Evaluate(symbols, val, floating, err))
+		Expr::Result r = data.expr.Evaluate(symbols, err);
+		if (r.evaluated())
 		{
 			// if it's floating-point
-			if (floating)
+			if (r.floating)
 			{
 				// only 64-bit and 32-bit are supported
 				switch (data.size)
 				{
-				case 8: if (!Write(res, data.address, 8, val)) { err = "line " + tostr(data.line) + ": Error writing value"; return PatchError::Error; } break;
-				case 4: if (!Write(res, data.address, 4, transmute<u32>((f32)transmute<f64>(val)))) { err = "line " + tostr(data.line) + ": Error writing value"; return PatchError::Error; } break;
+				case 8: if (!Write(res, data.address, 8, r.val)) { err = "line " + tostr(data.line) + ": Error writing value"; return PatchError::Error; } break;
+				case 4: if (!Write(res, data.address, 4, transmute<u32>((f32)transmute<f64>(r.val)))) { err = "line " + tostr(data.line) + ": Error writing value"; return PatchError::Error; } break;
 
 				default: err = "line " + tostr(data.line) + ": Attempt to use unsupported floating-point format"; return PatchError::Error;
 				}
 			}
 			// otherwise it's integral
-			else if (!Write(res, data.address, data.size, val)) { err = "line " + tostr(data.line) + ": Error writing value"; return PatchError::Error; }
+			else if (!Write(res, data.address, data.size, r.val)) { err = "line " + tostr(data.line) + ": Error writing value"; return PatchError::Error; }
 
 			// successfully patched
 			return PatchError::None;
@@ -599,24 +619,8 @@ namespace CSX64
 			args.file.Symbols.insert(predefines->symbols.begin(), predefines->symbols.end());
 		}
 		
-		// -- add a few more that we create -- //
-		
-		args.file.Symbols.insert(std::make_pair("__version__", Expr::CreateInt(Version)));
-
-		args.file.Symbols.insert(std::make_pair("__pinf__", Expr::CreateFloat(std::numeric_limits<f64>::infinity())));
-		args.file.Symbols.insert(std::make_pair("__ninf__", Expr::CreateFloat(-std::numeric_limits<f64>::infinity())));
-		args.file.Symbols.insert(std::make_pair("__nan__", Expr::CreateFloat(std::numeric_limits<f64>::quiet_NaN())));
-
-		args.file.Symbols.insert(std::make_pair("__fmax__", Expr::CreateFloat(std::numeric_limits<f64>::max())));
-		args.file.Symbols.insert(std::make_pair("__fmin__", Expr::CreateFloat(std::numeric_limits<f64>::min())));
-		args.file.Symbols.insert(std::make_pair("__fepsilon__", Expr::CreateFloat(std::numeric_limits<f64>::denorm_min())));
-
-		args.file.Symbols.insert(std::make_pair("__pi__", Expr::CreateFloat(3.141592653589793238462643383279502884197169399375105820974)));
-		args.file.Symbols.insert(std::make_pair("__e__", Expr::CreateFloat(2.718281828459045235360287471352662497757247093699959574966)));
-
 		// potential parsing args for an instruction
 		u64 a = 0;
-		bool floating;
 
 		std::string err; // error location for evaluation
 
@@ -680,8 +684,12 @@ namespace CSX64
 
 		// -- minimize symbols and holes -- //
 
-		// link each symbol to internal symbols (minimizes file size)
-		for(auto &entry : args.file.Symbols) entry.second.Evaluate(args.file.Symbols, a, floating, err);
+		// link each symbol to internal symbols (minimizes file size and allows us to eliminate resolved internals)
+		for (auto &entry : args.file.Symbols)
+		{
+			Expr::Result r = entry.second.Evaluate(args.file.Symbols, err);
+			if (r.invalid()) return { AssembleError::UsageError, "line " + tostr(args.line) + ": Invalid symbol value at end of assembly pass: " + entry.first + "\n-> " + err };
+		}
 
 		// eliminate as many holes as possible
 		if (!_ElimHoles(args.file.Symbols, args.file.TextHoles, args.file.Text, args.res)) return args.res;
@@ -730,8 +738,6 @@ namespace CSX64
 	LinkResult link(Executable &exe, std::list<std::pair<std::string, ObjectFile>> &objs, const std::string &entry_point)
 	{
 		// parsing locations for evaluation
-		u64 _res;
-		bool _floating;
 		std::string _err;
 		LinkResult res;
 
@@ -802,20 +808,10 @@ namespace CSX64
 			}
 		}
 
-		// -- verify things -- //
-
-		// make sure no one defined over reserved symbol names
-		for (auto &obj : objs)
-		{
-			// only the verify ignores are a problem (because we'll be defining those)
-			for (const std::string &reserved : VerifyLegalExpressionIgnores)
-				if (contains_key(obj.second.Symbols, reserved)) return LinkResult{LinkError::SymbolRedefinition, obj.first + ": defined symbol with name \"" + reserved + "\" (reserved)"};
-		}
+		// -- merge things -- //
 
 		// start the merge process with the _start file
 		include_queue.push_back(&objs.front()); // (by this point [0] is guaranteed to exist)
-
-		// -- merge things -- //
 
 		// while there are still things in queue
 		while (!include_queue.empty())
@@ -978,15 +974,12 @@ namespace CSX64
 			obj.Symbols.emplace(SegOffsets.at(AsmSegment::DATA), Expr::CreateInt(text.size() + rodata.size() + std::get<2>(entry.second)));
 			obj.Symbols.emplace(SegOffsets.at(AsmSegment::BSS), Expr::CreateInt(text.size() + rodata.size() + data.size() + std::get<3>(entry.second)));
 
-			// and everything else
-			obj.Symbols.emplace("__heap__", Expr::CreateInt(text.size() + rodata.size() + data.size() + bsslen));
-
 			// for each global symbol
 			for (const std::string &global : obj.GlobalSymbols)
 			{
 				// if it can't be evaluated internally, it's an error (i.e. cannot define a global in terms of another file's globals)
-				if (!obj.Symbols.at(global).Evaluate(obj.Symbols, _res, _floating, _err))
-					return LinkResult{LinkError::MissingSymbol, entry.first->first + ": Global symbol \"" + global + "\" could not be evaluated internally"};
+				Expr::Result r = obj.Symbols.at(global).Evaluate(obj.Symbols, _err);
+				if (!r.evaluated()) return LinkResult{LinkError::MissingSymbol, entry.first->first + ": Global symbol \"" + global + "\" could not be evaluated internally"};
 			}
 		}
 
