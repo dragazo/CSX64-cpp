@@ -10,6 +10,8 @@
 template<typename T> std::string sstostr(const T &v)
 {
 	if constexpr (std::is_enum_v<T>) return std::to_string((std::underlying_type_t<T>)v);
+	else if constexpr (sizeof(T) == 1 && std::is_unsigned_v<T>) return std::to_string((unsigned int)v);
+	else if constexpr (sizeof(T) == 1 && std::is_signed_v<T>) return std::to_string((signed int)v);
 	else { std::ostringstream ss; ss << v; return ss.str(); }
 }
 

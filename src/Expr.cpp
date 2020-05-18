@@ -196,9 +196,9 @@ namespace CSX64::detail
 					return { 0, false, Result::Type::Invalid };
 				}
 
-				// build the value
-				u64 res = 0;
-				for (std::size_t i = 0; i < chars.size(); ++i) res |= (u64)(chars[i] & 0xff) << (i * 8);
+				// build the value - natively stored little endian due to being in string form
+				res = 0;
+				std::memcpy(&res, chars.data(), chars.size());
 			}
 			// otherwise if it's a symbol we're already visited
 			else if (contains(visited, _Token))

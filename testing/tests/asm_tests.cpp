@@ -590,6 +590,15 @@ mov rdi, -1 ? 2 : 54.666
 mov r8, 0 ? 23.21 : 54.775
 mov r9, 834 ? 23.21 : 54.775
 hlt
+mov rax, 'a'
+mov rbx, '2' + 4
+mov rcx, 2 + 'A'
+mov rdx, 'AuFDenXy'
+mov esi, 'WxYz'
+mov di, 'mN'
+mov r8, 'ABCdef'
+mov r9d, 'AvX'
+hlt
 mov eax, 0
 mov ebx, -432
 syscall
@@ -1066,6 +1075,18 @@ times 22 nop
 
 	ASSERT(p->running());
 	ticks = p->tick(20000);
+	ASSERT_EQ(ticks, 8);
+	ASSERT_EQ(p->rax(), (u8)'a');
+	ASSERT_EQ(p->rbx(), (u8)'6');
+	ASSERT_EQ(p->rcx(), (u8)'C');
+	ASSERT_EQ(p->rdx(), 0x79586e6544467541u);
+	ASSERT_EQ(p->rsi(), 0x000000007a597857u);
+	ASSERT_EQ(p->di(), 0x4e6du);
+	ASSERT_EQ(p->r8(), 0x0000666564434241u);
+	ASSERT_EQ(p->r9d(), 0x00587641u);
+
+	ASSERT(p->running());
+	ticks = p->tick(20000);
 	ASSERT_EQ(ticks, 2);
 	ASSERT(!p->running());
 	ASSERT_EQ(p->error(), ErrorCode::None);
@@ -1233,6 +1254,114 @@ void symbol_linkage_tests()
 {
 	asm_lnk("t1: equ t2\nt2: equ 0");
 	ASSERT_THROWS(asm_lnk("t1: equ t2\nt2: equ t1"), AssembleException);
+
+	ASSERT_THROWS(asm_lnk("t1: equ t2"), AssembleException);
+}
+void times_tests()
+{
+	auto p = asm_lnk(R"(
+segment .text
+
+times 27 nop
+hlt
+times 1 nop
+hlt
+times 0 nop
+hlt
+times -1 nop ; negative count is same as 0
+hlt
+times -1433 nop
+hlt
+
+mov rax, uppercase
+mov rbx, lowercase
+mov rcx, digits
+mov rdx, end
+hlt
+
+mov rax, 0
+mov rbx, 0
+syscall
+
+segment .rodata
+
+uppercase:
+times 26 db 'A' + $i
+
+lowercase:
+times 26 db 'a' + $I ; all $whatever utilities should be case insensitive
+
+digits: times 10 db '0' + $i ; should be able to be on same line as label
+
+end: db 0 ; for string read test
+)");
+	ASSERT(p);
+	u64 ticks;
+
+	ASSERT(p->running());
+	ticks = p->tick(20000);
+	ASSERT_EQ(ticks, 27);
+
+	ASSERT(p->running());
+	ticks = p->tick(20000);
+	ASSERT_EQ(ticks, 1);
+
+	ASSERT(p->running());
+	ticks = p->tick(20000);
+	ASSERT_EQ(ticks, 0);
+
+	ASSERT(p->running());
+	ticks = p->tick(20000);
+	ASSERT_EQ(ticks, 0);
+
+	ASSERT(p->running());
+	ticks = p->tick(20000);
+	ASSERT_EQ(ticks, 0);
+
+	ASSERT(p->running());
+	ticks = p->tick(20000);
+	ASSERT_EQ(ticks, 4);
+	ASSERT_EQ(p->rax() + 26, p->rbx());
+	ASSERT_EQ(p->rbx() + 26, p->rcx());
+	ASSERT_EQ(p->rcx() + 10, p->rdx());
+	for (std::size_t i = 0; i < 26; ++i)
+	{
+		u8 t;
+		ASSERT(p->read_mem<u8>(p->rax() + i, t));
+		ASSERT_EQ(t, (u8)('A' + i));
+	}
+	for (std::size_t i = 0; i < 26; ++i)
+	{
+		u8 t;
+		ASSERT(p->read_mem<u8>(p->rbx() + i, t));
+		ASSERT_EQ(t, (u8)('a' + i));
+	}
+	for (std::size_t i = 0; i < 10; ++i)
+	{
+		u8 t;
+		ASSERT(p->read_mem<u8>(p->rcx() + i, t));
+		ASSERT_EQ(t, (u8)('0' + i));
+	}
+	{
+		u8 t;
+		ASSERT(p->read_mem<u8>(p->rdx(), t));
+		ASSERT_EQ(t, 0);
+	}
+	{
+		std::string str = "pre-existing data";
+		ASSERT(p->read_str(p->rax(), str));
+		ASSERT_EQ(str, "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789");
+	}
+
+	ASSERT(p->running());
+	ticks = p->tick(20000);
+	ASSERT_EQ(ticks, 2);
+	ASSERT(!p->running());
+	ASSERT_EQ(p->error(), ErrorCode::None);
+	ASSERT_EQ(p->return_value(), 0);
+
+	asm_lnk("segment .text\ntimes 2 nop");
+	ASSERT_THROWS(asm_lnk("segment .text\ntimes 2.0 nop"), AssembleException);
 }
 void lea_tests()
 {
@@ -1492,5 +1621,6 @@ void asm_tests()
 	RUN_TEST(mov_imm_tests);
 	RUN_TEST(expr_tests);
 	RUN_TEST(symbol_linkage_tests);
+	RUN_TEST(times_tests);
 	RUN_TEST(lea_tests);
 }
