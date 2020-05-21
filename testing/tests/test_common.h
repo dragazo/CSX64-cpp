@@ -6,6 +6,7 @@
 #include <sstream>
 #include <string>
 #include <type_traits>
+#include <typeinfo>
 
 template<typename T> std::string sstostr(const T &v)
 {
@@ -30,10 +31,12 @@ struct assertion_error : std::runtime_error { using std::runtime_error::runtime_
 #define ASSERT_G(e1, e2) ASSERT_OP(e1, e2, >)
 #define ASSERT_GE(e1, e2) ASSERT_OP(e1, e2, >=)
 
-#define ASSERT_THROWS(expr, ex) { int temp_state_name = 0; try { (expr); temp_state_name = 1; } catch (const ex&) {} catch (...) { temp_state_name = 2; } \
+#define ASSERT_THROWS(expr, ex) { std::string temp_string_val; int temp_state_name = 0; \
+	try { (expr); temp_state_name = 1; } catch (const ex&) {} catch (const std::exception &ex) { temp_state_name = 2; temp_string_val = std::string(typeid(ex).name()) + "\n\t" + ex.what(); } catch (...) { temp_state_name = 3; } \
 	switch (temp_state_name) { \
 		case 1: throw assertion_error("assertion failed: " __FILE__ ":" TOSTR(__LINE__) "\n\t" #expr "\n\tdid not throw"); \
-		case 2: throw assertion_error("assertion failed: " __FILE__ ":" TOSTR(__LINE__) "\n\t" #expr "\n\tthrew wrong type"); \
+		case 2: throw assertion_error("assertion failed: " __FILE__ ":" TOSTR(__LINE__) "\n\t" #expr "\n\tthrew wrong type: " + temp_string_val); \
+		case 3: throw assertion_error("assertion failed: " __FILE__ ":" TOSTR(__LINE__) "\n\t" #expr "\n\tthrew wrong type (unknown type)"); \
 	} \
 }
 

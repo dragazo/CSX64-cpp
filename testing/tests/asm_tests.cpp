@@ -5,7 +5,7 @@ using namespace CSX64;
 
 void nop_tests()
 {
-	auto p = asm_lnk(R"(
+	auto p = ASM_LNK(R"(
 segment .text
 nop
 nop
@@ -58,7 +58,7 @@ nop
 }
 void mov_imm_tests()
 {
-	auto p = asm_lnk(R"(
+	auto p = ASM_LNK(R"(
 segment .text
 mov rax, -7784568640113865156
 mov rbx, 0x12de639fcd11a4cb
@@ -238,7 +238,7 @@ times 256 nop
 }
 void expr_tests()
 {
-	auto p = asm_lnk(R"(#!shebang test
+	auto p = ASM_LNK(R"(#!shebang test
 segment .text
 ; test symbol definition and linkage
 t1: equ 721
@@ -606,8 +606,7 @@ times 22 nop
 )");
 	ASSERT(p);
 	u64 ticks;
-	//0x12de639fcd11a4cb
-	//0xf1c89e98daa39a38
+
 	ASSERT(p->running());
 	ticks = p->tick(20000);
 	ASSERT_EQ(ticks, 13);
@@ -1092,174 +1091,184 @@ times 22 nop
 	ASSERT_EQ(p->error(), ErrorCode::None);
 	ASSERT_EQ(p->return_value(), -432);
 
-	asm_lnk("t1: equ 0 / 1");
-	ASSERT_THROWS(asm_lnk("t1: equ 0 / 0"), AssembleException);
-	ASSERT_THROWS(asm_lnk("t1: equ 1 / 0"), AssembleException);
+	ASM_LNK("t1: equ 0 / 1");
+	ASSERT_THROWS(ASM_LNK("t1: equ 0 / 0"), AssembleException);
+	ASSERT_THROWS(ASM_LNK("t1: equ 1 / 0"), AssembleException);
 
-	asm_lnk("t1: equ 0 % 1");
-	asm_lnk("t1: equ 3 % 5");
-	ASSERT_THROWS(asm_lnk("t1: equ 0 % 0"), AssembleException);
-	ASSERT_THROWS(asm_lnk("t1: equ 1 % 0"), AssembleException);
-	ASSERT_THROWS(asm_lnk("t1: equ 3.0 % 5"), AssembleException);
-	ASSERT_THROWS(asm_lnk("t1: equ 3 % 5.0"), AssembleException);
-	ASSERT_THROWS(asm_lnk("t1: equ 3.0 % 5.0"), AssembleException);
+	ASM_LNK("t1: equ 0 % 1");
+	ASM_LNK("t1: equ 3 % 5");
+	ASSERT_THROWS(ASM_LNK("t1: equ 0 % 0"), AssembleException);
+	ASSERT_THROWS(ASM_LNK("t1: equ 1 % 0"), AssembleException);
+	ASSERT_THROWS(ASM_LNK("t1: equ 3.0 % 5"), AssembleException);
+	ASSERT_THROWS(ASM_LNK("t1: equ 3 % 5.0"), AssembleException);
+	ASSERT_THROWS(ASM_LNK("t1: equ 3.0 % 5.0"), AssembleException);
 
-	asm_lnk("t1: equ 0 +/ 1");
-	asm_lnk("t1: equ 3 +/ 5");
-	ASSERT_THROWS(asm_lnk("t1: equ 0 +/ 0"), AssembleException);
-	ASSERT_THROWS(asm_lnk("t1: equ 1 +/ 0"), AssembleException);
-	ASSERT_THROWS(asm_lnk("t1: equ 3.0 +/ 5"), AssembleException);
-	ASSERT_THROWS(asm_lnk("t1: equ 3 +/ 5.0"), AssembleException);
-	ASSERT_THROWS(asm_lnk("t1: equ 3.0 +/ 5.0"), AssembleException);
+	ASM_LNK("t1: equ 0 +/ 1");
+	ASM_LNK("t1: equ 3 +/ 5");
+	ASSERT_THROWS(ASM_LNK("t1: equ 0 +/ 0"), AssembleException);
+	ASSERT_THROWS(ASM_LNK("t1: equ 1 +/ 0"), AssembleException);
+	ASSERT_THROWS(ASM_LNK("t1: equ 3.0 +/ 5"), AssembleException);
+	ASSERT_THROWS(ASM_LNK("t1: equ 3 +/ 5.0"), AssembleException);
+	ASSERT_THROWS(ASM_LNK("t1: equ 3.0 +/ 5.0"), AssembleException);
 
-	asm_lnk("t1: equ 0 +% 1");
-	asm_lnk("t1: equ 3 +% 5");
-	ASSERT_THROWS(asm_lnk("t1: equ 0 +% 0"), AssembleException);
-	ASSERT_THROWS(asm_lnk("t1: equ 1 +% 0"), AssembleException);
-	ASSERT_THROWS(asm_lnk("t1: equ 3.0 +% 5"), AssembleException);
-	ASSERT_THROWS(asm_lnk("t1: equ 3 +% 5.0"), AssembleException);
-	ASSERT_THROWS(asm_lnk("t1: equ 3.0 +% 5.0"), AssembleException);
+	ASM_LNK("t1: equ 0 +% 1");
+	ASM_LNK("t1: equ 3 +% 5");
+	ASSERT_THROWS(ASM_LNK("t1: equ 0 +% 0"), AssembleException);
+	ASSERT_THROWS(ASM_LNK("t1: equ 1 +% 0"), AssembleException);
+	ASSERT_THROWS(ASM_LNK("t1: equ 3.0 +% 5"), AssembleException);
+	ASSERT_THROWS(ASM_LNK("t1: equ 3 +% 5.0"), AssembleException);
+	ASSERT_THROWS(ASM_LNK("t1: equ 3.0 +% 5.0"), AssembleException);
 
 	// equ directive specifically is size-agnostic (nothing to do with expr)
-	asm_lnk("t1: equ 0");
-	ASSERT_THROWS(asm_lnk("t1: equ qword 0"), AssembleException);
-	ASSERT_THROWS(asm_lnk("t1: equ dword 0"), AssembleException);
-	ASSERT_THROWS(asm_lnk("t1: equ word 0"), AssembleException);
-	ASSERT_THROWS(asm_lnk("t1: equ byte 0"), AssembleException);
+	ASM_LNK("t1: equ 0");
+	ASSERT_THROWS(ASM_LNK("t1: equ qword 0"), AssembleException);
+	ASSERT_THROWS(ASM_LNK("t1: equ dword 0"), AssembleException);
+	ASSERT_THROWS(ASM_LNK("t1: equ word 0"), AssembleException);
+	ASSERT_THROWS(ASM_LNK("t1: equ byte 0"), AssembleException);
 
-	asm_lnk("t1: equ 0.0");
-	ASSERT_THROWS(asm_lnk("t1: equ qword 0.0"), AssembleException);
-	ASSERT_THROWS(asm_lnk("t1: equ dword 0.0"), AssembleException);
-	ASSERT_THROWS(asm_lnk("t1: equ word 0.0"), AssembleException);
-	ASSERT_THROWS(asm_lnk("t1: equ byte 0.0"), AssembleException);
+	ASM_LNK("t1: equ 0.0");
+	ASSERT_THROWS(ASM_LNK("t1: equ qword 0.0"), AssembleException);
+	ASSERT_THROWS(ASM_LNK("t1: equ dword 0.0"), AssembleException);
+	ASSERT_THROWS(ASM_LNK("t1: equ word 0.0"), AssembleException);
+	ASSERT_THROWS(ASM_LNK("t1: equ byte 0.0"), AssembleException);
 
-	asm_lnk("t1: equ 0");
-	asm_lnk("t1: equ 0x0");
-	asm_lnk("t1: equ 0o0");
-	asm_lnk("t1: equ 0b0");
-	ASSERT_THROWS(asm_lnk("t1: equ 00"), AssembleException);
-	ASSERT_THROWS(asm_lnk("t1: equ -00"), AssembleException);
-	ASSERT_THROWS(asm_lnk("t1: equ 01"), AssembleException);
-	ASSERT_THROWS(asm_lnk("t1: equ -01"), AssembleException);
-	ASSERT_THROWS(asm_lnk("t1: equ 0x"), AssembleException);
-	ASSERT_THROWS(asm_lnk("t1: equ 0o"), AssembleException);
-	ASSERT_THROWS(asm_lnk("t1: equ 0b"), AssembleException);
-	ASSERT_THROWS(asm_lnk("t1: equ 0_0"), AssembleException);
-	ASSERT_THROWS(asm_lnk("t1: equ 00_"), AssembleException);
-	ASSERT_THROWS(asm_lnk("t1: equ 0_0_"), AssembleException);
-	ASSERT_THROWS(asm_lnk("t1: equ 0x_"), AssembleException);
-	ASSERT_THROWS(asm_lnk("t1: equ 0o_"), AssembleException);
-	ASSERT_THROWS(asm_lnk("t1: equ 0b_"), AssembleException);
+	ASM_LNK("t1: equ 0");
+	ASM_LNK("t1: equ 0x0");
+	ASM_LNK("t1: equ 0o0");
+	ASM_LNK("t1: equ 0b0");
+	ASSERT_THROWS(ASM_LNK("t1: equ 00"), AssembleException);
+	ASSERT_THROWS(ASM_LNK("t1: equ -00"), AssembleException);
+	ASSERT_THROWS(ASM_LNK("t1: equ 01"), AssembleException);
+	ASSERT_THROWS(ASM_LNK("t1: equ -01"), AssembleException);
+	ASSERT_THROWS(ASM_LNK("t1: equ 0x"), AssembleException);
+	ASSERT_THROWS(ASM_LNK("t1: equ 0o"), AssembleException);
+	ASSERT_THROWS(ASM_LNK("t1: equ 0b"), AssembleException);
+	ASSERT_THROWS(ASM_LNK("t1: equ 0_0"), AssembleException);
+	ASSERT_THROWS(ASM_LNK("t1: equ 00_"), AssembleException);
+	ASSERT_THROWS(ASM_LNK("t1: equ 0_0_"), AssembleException);
+	ASSERT_THROWS(ASM_LNK("t1: equ 0x_"), AssembleException);
+	ASSERT_THROWS(ASM_LNK("t1: equ 0o_"), AssembleException);
+	ASSERT_THROWS(ASM_LNK("t1: equ 0b_"), AssembleException);
 
-	asm_lnk("t1: equ 0");
-	ASSERT_THROWS(asm_lnk("t1: equ 0a"), AssembleException);
-	ASSERT_THROWS(asm_lnk("t1: equ 0xx"), AssembleException);
-	ASSERT_THROWS(asm_lnk("t1: equ 0ox"), AssembleException);
-	ASSERT_THROWS(asm_lnk("t1: equ 0bx"), AssembleException);
+	ASM_LNK("t1: equ 0");
+	ASSERT_THROWS(ASM_LNK("t1: equ 0a"), AssembleException);
+	ASSERT_THROWS(ASM_LNK("t1: equ 0xx"), AssembleException);
+	ASSERT_THROWS(ASM_LNK("t1: equ 0ox"), AssembleException);
+	ASSERT_THROWS(ASM_LNK("t1: equ 0bx"), AssembleException);
 
-	asm_lnk("t1: equ 0.0");
-	ASSERT_THROWS(asm_lnk("t1: equ 0.0a"), AssembleException);
+	ASM_LNK("t1: equ 0.0");
+	ASSERT_THROWS(ASM_LNK("t1: equ 0.0a"), AssembleException);
 
-	asm_lnk("t1: equ 2 << 3");
-	ASSERT_THROWS(asm_lnk("t1: equ 2 << 3.0"), AssembleException);
-	ASSERT_THROWS(asm_lnk("t1: equ 2.0 << 3"), AssembleException);
-	ASSERT_THROWS(asm_lnk("t1: equ 2.0 << 3.0"), AssembleException);
+	ASM_LNK("t1: equ 2 << 3");
+	ASSERT_THROWS(ASM_LNK("t1: equ 2 << 3.0"), AssembleException);
+	ASSERT_THROWS(ASM_LNK("t1: equ 2.0 << 3"), AssembleException);
+	ASSERT_THROWS(ASM_LNK("t1: equ 2.0 << 3.0"), AssembleException);
 
-	asm_lnk("t1: equ 2 >> 3");
-	ASSERT_THROWS(asm_lnk("t1: equ 2 >> 3.0"), AssembleException);
-	ASSERT_THROWS(asm_lnk("t1: equ 2.0 >> 3"), AssembleException);
-	ASSERT_THROWS(asm_lnk("t1: equ 2.0 >> 3.0"), AssembleException);
+	ASM_LNK("t1: equ 2 >> 3");
+	ASSERT_THROWS(ASM_LNK("t1: equ 2 >> 3.0"), AssembleException);
+	ASSERT_THROWS(ASM_LNK("t1: equ 2.0 >> 3"), AssembleException);
+	ASSERT_THROWS(ASM_LNK("t1: equ 2.0 >> 3.0"), AssembleException);
 
-	asm_lnk("t1: equ 2 +>> 3");
-	ASSERT_THROWS(asm_lnk("t1: equ 2 +>> 3.0"), AssembleException);
-	ASSERT_THROWS(asm_lnk("t1: equ 2.0 +>> 3"), AssembleException);
-	ASSERT_THROWS(asm_lnk("t1: equ 2.0 +>> 3.0"), AssembleException);
+	ASM_LNK("t1: equ 2 +>> 3");
+	ASSERT_THROWS(ASM_LNK("t1: equ 2 +>> 3.0"), AssembleException);
+	ASSERT_THROWS(ASM_LNK("t1: equ 2.0 +>> 3"), AssembleException);
+	ASSERT_THROWS(ASM_LNK("t1: equ 2.0 +>> 3.0"), AssembleException);
 
-	asm_lnk("t1: equ 1 +< 2");
-	ASSERT_THROWS(asm_lnk("t1: equ 1.0 +< 2"), AssembleException);
-	ASSERT_THROWS(asm_lnk("t1: equ 1 +< 2.0"), AssembleException);
-	ASSERT_THROWS(asm_lnk("t1: equ 1.0 +< 2.0"), AssembleException);
+	ASM_LNK("t1: equ 1 +< 2");
+	ASSERT_THROWS(ASM_LNK("t1: equ 1.0 +< 2"), AssembleException);
+	ASSERT_THROWS(ASM_LNK("t1: equ 1 +< 2.0"), AssembleException);
+	ASSERT_THROWS(ASM_LNK("t1: equ 1.0 +< 2.0"), AssembleException);
 
-	asm_lnk("t1: equ 1 +<= 2");
-	ASSERT_THROWS(asm_lnk("t1: equ 1.0 +<= 2"), AssembleException);
-	ASSERT_THROWS(asm_lnk("t1: equ 1 +<= 2.0"), AssembleException);
-	ASSERT_THROWS(asm_lnk("t1: equ 1.0 +<= 2.0"), AssembleException);
+	ASM_LNK("t1: equ 1 +<= 2");
+	ASSERT_THROWS(ASM_LNK("t1: equ 1.0 +<= 2"), AssembleException);
+	ASSERT_THROWS(ASM_LNK("t1: equ 1 +<= 2.0"), AssembleException);
+	ASSERT_THROWS(ASM_LNK("t1: equ 1.0 +<= 2.0"), AssembleException);
 
-	asm_lnk("t1: equ 1 +> 2");
-	ASSERT_THROWS(asm_lnk("t1: equ 1.0 +> 2"), AssembleException);
-	ASSERT_THROWS(asm_lnk("t1: equ 1 +> 2.0"), AssembleException);
-	ASSERT_THROWS(asm_lnk("t1: equ 1.0 +> 2.0"), AssembleException);
+	ASM_LNK("t1: equ 1 +> 2");
+	ASSERT_THROWS(ASM_LNK("t1: equ 1.0 +> 2"), AssembleException);
+	ASSERT_THROWS(ASM_LNK("t1: equ 1 +> 2.0"), AssembleException);
+	ASSERT_THROWS(ASM_LNK("t1: equ 1.0 +> 2.0"), AssembleException);
 
-	asm_lnk("t1: equ 1 +>= 2");
-	ASSERT_THROWS(asm_lnk("t1: equ 1.0 +>= 2"), AssembleException);
-	ASSERT_THROWS(asm_lnk("t1: equ 1 +>= 2.0"), AssembleException);
-	ASSERT_THROWS(asm_lnk("t1: equ 1.0 +>= 2.0"), AssembleException);
+	ASM_LNK("t1: equ 1 +>= 2");
+	ASSERT_THROWS(ASM_LNK("t1: equ 1.0 +>= 2"), AssembleException);
+	ASSERT_THROWS(ASM_LNK("t1: equ 1 +>= 2.0"), AssembleException);
+	ASSERT_THROWS(ASM_LNK("t1: equ 1.0 +>= 2.0"), AssembleException);
 
-	asm_lnk("t1: equ 1 & 3");
-	ASSERT_THROWS(asm_lnk("t1: equ 1.0 & 3"), AssembleException);
-	ASSERT_THROWS(asm_lnk("t1: equ 1 & 3.0"), AssembleException);
-	ASSERT_THROWS(asm_lnk("t1: equ 1.0 & 3.0"), AssembleException);
+	ASM_LNK("t1: equ 1 & 3");
+	ASSERT_THROWS(ASM_LNK("t1: equ 1.0 & 3"), AssembleException);
+	ASSERT_THROWS(ASM_LNK("t1: equ 1 & 3.0"), AssembleException);
+	ASSERT_THROWS(ASM_LNK("t1: equ 1.0 & 3.0"), AssembleException);
 
-	asm_lnk("t1: equ 1 | 3");
-	ASSERT_THROWS(asm_lnk("t1: equ 1.0 | 3"), AssembleException);
-	ASSERT_THROWS(asm_lnk("t1: equ 1 | 3.0"), AssembleException);
-	ASSERT_THROWS(asm_lnk("t1: equ 1.0 | 3.0"), AssembleException);
+	ASM_LNK("t1: equ 1 | 3");
+	ASSERT_THROWS(ASM_LNK("t1: equ 1.0 | 3"), AssembleException);
+	ASSERT_THROWS(ASM_LNK("t1: equ 1 | 3.0"), AssembleException);
+	ASSERT_THROWS(ASM_LNK("t1: equ 1.0 | 3.0"), AssembleException);
 
-	asm_lnk("t1: equ 1 ^ 3");
-	ASSERT_THROWS(asm_lnk("t1: equ 1.0 ^ 3"), AssembleException);
-	ASSERT_THROWS(asm_lnk("t1: equ 1 ^ 3.0"), AssembleException);
-	ASSERT_THROWS(asm_lnk("t1: equ 1.0 ^ 3.0"), AssembleException);
+	ASM_LNK("t1: equ 1 ^ 3");
+	ASSERT_THROWS(ASM_LNK("t1: equ 1.0 ^ 3"), AssembleException);
+	ASSERT_THROWS(ASM_LNK("t1: equ 1 ^ 3.0"), AssembleException);
+	ASSERT_THROWS(ASM_LNK("t1: equ 1.0 ^ 3.0"), AssembleException);
 
-	asm_lnk("t1: equ 1 && 3");
-	ASSERT_THROWS(asm_lnk("t1: equ 1.0 && 3"), AssembleException);
-	ASSERT_THROWS(asm_lnk("t1: equ 1 && 3.0"), AssembleException);
-	ASSERT_THROWS(asm_lnk("t1: equ 1.0 && 3.0"), AssembleException);
+	ASM_LNK("t1: equ 1 && 3");
+	ASSERT_THROWS(ASM_LNK("t1: equ 1.0 && 3"), AssembleException);
+	ASSERT_THROWS(ASM_LNK("t1: equ 1 && 3.0"), AssembleException);
+	ASSERT_THROWS(ASM_LNK("t1: equ 1.0 && 3.0"), AssembleException);
 
-	asm_lnk("t1: equ 1 || 3");
-	ASSERT_THROWS(asm_lnk("t1: equ 1.0 || 3"), AssembleException);
-	ASSERT_THROWS(asm_lnk("t1: equ 1 || 3.0"), AssembleException);
-	ASSERT_THROWS(asm_lnk("t1: equ 1.0 || 3.0"), AssembleException);
+	ASM_LNK("t1: equ 1 || 3");
+	ASSERT_THROWS(ASM_LNK("t1: equ 1.0 || 3"), AssembleException);
+	ASSERT_THROWS(ASM_LNK("t1: equ 1 || 3.0"), AssembleException);
+	ASSERT_THROWS(ASM_LNK("t1: equ 1.0 || 3.0"), AssembleException);
 
-	asm_lnk("t1: equ ~23");
-	ASSERT_THROWS(asm_lnk("t1: equ ~23.0"), AssembleException);
+	ASM_LNK("t1: equ ~23");
+	ASSERT_THROWS(ASM_LNK("t1: equ ~23.0"), AssembleException);
 
-	asm_lnk("t1: equ !0");
-	ASSERT_THROWS(asm_lnk("t1: equ !0.0"), AssembleException);
+	ASM_LNK("t1: equ !0");
+	ASSERT_THROWS(ASM_LNK("t1: equ !0.0"), AssembleException);
 
-	asm_lnk("t1: equ $repr64(0.0)");
-	ASSERT_THROWS(asm_lnk("t1: equ $repr64(0)"), AssembleException);
+	ASM_LNK("t1: equ $repr64(0.0)");
+	ASSERT_THROWS(ASM_LNK("t1: equ $repr64(0)"), AssembleException);
 
-	asm_lnk("t1: equ $repr32(0.0)");
-	ASSERT_THROWS(asm_lnk("t1: equ $repr32(0)"), AssembleException);
+	ASM_LNK("t1: equ $repr32(0.0)");
+	ASSERT_THROWS(ASM_LNK("t1: equ $repr32(0)"), AssembleException);
 	
-	asm_lnk("t1: equ $float64(0)");
-	ASSERT_THROWS(asm_lnk("t1: equ $float64(0.0)"), AssembleException);
+	ASM_LNK("t1: equ $float64(0)");
+	ASSERT_THROWS(ASM_LNK("t1: equ $float64(0.0)"), AssembleException);
 
-	asm_lnk("t1: equ $float32(0)");
-	ASSERT_THROWS(asm_lnk("t1: equ $float32(0.0)"), AssembleException);
-	ASSERT_THROWS(asm_lnk("t1: equ $float32(-1)"), AssembleException);
+	ASM_LNK("t1: equ $float32(0)");
+	ASSERT_THROWS(ASM_LNK("t1: equ $float32(0.0)"), AssembleException);
+	ASSERT_THROWS(ASM_LNK("t1: equ $float32(-1)"), AssembleException);
 
-	asm_lnk("t1: equ $prec64(1.0)");
-	ASSERT_THROWS(asm_lnk("t1: equ $prec64(1)"), AssembleException);
+	ASM_LNK("t1: equ $prec64(1.0)");
+	ASSERT_THROWS(ASM_LNK("t1: equ $prec64(1)"), AssembleException);
 
-	asm_lnk("t1: equ $prec32(1.0)");
-	ASSERT_THROWS(asm_lnk("t1: equ $prec32(1)"), AssembleException);
+	ASM_LNK("t1: equ $prec32(1.0)");
+	ASSERT_THROWS(ASM_LNK("t1: equ $prec32(1)"), AssembleException);
 
-	asm_lnk("t1: equ 0 ? 1 : 0");
-	asm_lnk("t1: equ 1 ? 1 : 0");
-	ASSERT_THROWS(asm_lnk("t1: equ 0.0 ? 1 : 0"), AssembleException);
-	ASSERT_THROWS(asm_lnk("t1: equ 1.0 ? 1 : 0"), AssembleException);
+	ASM_LNK("t1: equ 0 ? 1 : 0");
+	ASM_LNK("t1: equ 1 ? 1 : 0");
+	ASSERT_THROWS(ASM_LNK("t1: equ 0.0 ? 1 : 0"), AssembleException);
+	ASSERT_THROWS(ASM_LNK("t1: equ 1.0 ? 1 : 0"), AssembleException);
 }
 void symbol_linkage_tests()
 {
-	asm_lnk("t1: equ t2\nt2: equ 0");
-	ASSERT_THROWS(asm_lnk("t1: equ t2\nt2: equ t1"), AssembleException);
+	ASM_LNK("t1: equ t2\nt2: equ 0");
+	ASSERT_THROWS(ASM_LNK("t1: equ t2\nt2: equ t1"), AssembleException);
 
-	ASSERT_THROWS(asm_lnk("t1: equ t2"), AssembleException);
+	ASSERT_THROWS(ASM_LNK("t1: equ t2"), AssembleException);
+
+	ASSERT_THROWS(ASM_LNK("t2: equ t1"), AssembleException);
+	ASSERT_THROWS(ASM_LNK("extern t1\nt2: equ t1"), LinkException);
+	ASSERT_THROWS(ASM_LNK("global t1"), AssembleException);
+	ASM_LNK("t1: equ 53");
+	ASM_LNK("global t1\nt1: equ 53");
+	ASSERT_THROWS(ASM_LNK("t2: equ t1", "t1: equ 53"), AssembleException);
+	ASSERT_THROWS(ASM_LNK("t2: equ t1", "global t1\nt1: equ 53"), AssembleException);
+	ASSERT_THROWS(ASM_LNK("extern t1\nt2: equ t1", "t1: equ 53"), LinkException);
+	ASM_LNK("extern t1\nt2: equ t1", "global t1\nt1: equ 53");
 }
 void times_tests()
 {
-	auto p = asm_lnk(R"(
+	auto p = ASM_LNK(R"(
 segment .text
 
 times 27 nop
@@ -1360,12 +1369,12 @@ end: db 0 ; for string read test
 	ASSERT_EQ(p->error(), ErrorCode::None);
 	ASSERT_EQ(p->return_value(), 0);
 
-	asm_lnk("segment .text\ntimes 2 nop");
-	ASSERT_THROWS(asm_lnk("segment .text\ntimes 2.0 nop"), AssembleException);
+	ASM_LNK("segment .text\ntimes 2 nop");
+	ASSERT_THROWS(ASM_LNK("segment .text\ntimes 2.0 nop"), AssembleException);
 }
 void lea_tests()
 {
-	auto p = asm_lnk(R"(
+	auto p = ASM_LNK(R"(
 segment .text
 mov rax, 412
 mov rbx, 323
@@ -1433,7 +1442,6 @@ mov ebx, 0
 syscall
 times 24 nop
 )");
-	//lea r11d, [r14w + r15w + 10*r15w + r15w + r15w - 3*(2*r15w + r15w)]
 	ASSERT(p);
 	u64 ticks;
 
@@ -1529,90 +1537,90 @@ times 24 nop
 	ASSERT_EQ(p->error(), ErrorCode::None);
 	ASSERT_EQ(p->return_value(), 0);
 
-	asm_lnk("segment .text\nlea rax, [rax + rbx]");
-	asm_lnk("segment .text\nlea rax, [eax + ebx]");
-	asm_lnk("segment .text\nlea rax, [ax + bx]");
-	ASSERT_THROWS(asm_lnk("segment .text\nlea rax, [rax + rbx + rcx]"), AssembleException);
-	ASSERT_THROWS(asm_lnk("segment .text\nlea rax, [eax + ebx + ecx]"), AssembleException);
-	ASSERT_THROWS(asm_lnk("segment .text\nlea rax, [ax + bx +rcx]"), AssembleException);
+	ASM_LNK("segment .text\nlea rax, [rax + rbx]");
+	ASM_LNK("segment .text\nlea rax, [eax + ebx]");
+	ASM_LNK("segment .text\nlea rax, [ax + bx]");
+	ASSERT_THROWS(ASM_LNK("segment .text\nlea rax, [rax + rbx + rcx]"), AssembleException);
+	ASSERT_THROWS(ASM_LNK("segment .text\nlea rax, [eax + ebx + ecx]"), AssembleException);
+	ASSERT_THROWS(ASM_LNK("segment .text\nlea rax, [ax + bx +rcx]"), AssembleException);
 
-	asm_lnk("segment .text\nlea rax, [2*rax + 1*rbx]");
-	asm_lnk("segment .text\nlea rax, [1*rax + 2*rbx]");
-	ASSERT_THROWS(asm_lnk("segment .text\nlea rax, [2*rax + 2*rbx]"), AssembleException);
-	ASSERT_THROWS(asm_lnk("segment .text\nlea rax, [2*rax + 4*rbx]"), AssembleException);
-	ASSERT_THROWS(asm_lnk("segment .text\nlea rax, [2*rax + 8*rbx]"), AssembleException);
-	ASSERT_THROWS(asm_lnk("segment .text\nlea rax, [4*rax + 2*rbx]"), AssembleException);
-	ASSERT_THROWS(asm_lnk("segment .text\nlea rax, [8*rax + 2*rbx]"), AssembleException);
+	ASM_LNK("segment .text\nlea rax, [2*rax + 1*rbx]");
+	ASM_LNK("segment .text\nlea rax, [1*rax + 2*rbx]");
+	ASSERT_THROWS(ASM_LNK("segment .text\nlea rax, [2*rax + 2*rbx]"), AssembleException);
+	ASSERT_THROWS(ASM_LNK("segment .text\nlea rax, [2*rax + 4*rbx]"), AssembleException);
+	ASSERT_THROWS(ASM_LNK("segment .text\nlea rax, [2*rax + 8*rbx]"), AssembleException);
+	ASSERT_THROWS(ASM_LNK("segment .text\nlea rax, [4*rax + 2*rbx]"), AssembleException);
+	ASSERT_THROWS(ASM_LNK("segment .text\nlea rax, [8*rax + 2*rbx]"), AssembleException);
 
-	asm_lnk("segment .text\nlea rax, [1*rax]");
-	asm_lnk("segment .text\nlea rax, [2*rax]");
-	asm_lnk("segment .text\nlea rax, [3*rax]");
-	asm_lnk("segment .text\nlea rax, [4*rax]");
-	asm_lnk("segment .text\nlea rax, [5*rax]");
-	asm_lnk("segment .text\nlea rax, [8*rax]");
-	asm_lnk("segment .text\nlea rax, [9*rax]");
-	ASSERT_THROWS(asm_lnk("segment .text\nlea rax, [6*rax]"), AssembleException);
-	ASSERT_THROWS(asm_lnk("segment .text\nlea rax, [7*rax]"), AssembleException);
-	ASSERT_THROWS(asm_lnk("segment .text\nlea rax, [10*rax]"), AssembleException);
+	ASM_LNK("segment .text\nlea rax, [1*rax]");
+	ASM_LNK("segment .text\nlea rax, [2*rax]");
+	ASM_LNK("segment .text\nlea rax, [3*rax]");
+	ASM_LNK("segment .text\nlea rax, [4*rax]");
+	ASM_LNK("segment .text\nlea rax, [5*rax]");
+	ASM_LNK("segment .text\nlea rax, [8*rax]");
+	ASM_LNK("segment .text\nlea rax, [9*rax]");
+	ASSERT_THROWS(ASM_LNK("segment .text\nlea rax, [6*rax]"), AssembleException);
+	ASSERT_THROWS(ASM_LNK("segment .text\nlea rax, [7*rax]"), AssembleException);
+	ASSERT_THROWS(ASM_LNK("segment .text\nlea rax, [10*rax]"), AssembleException);
 
-	asm_lnk("segment .text\nlea rax, [rax + rbx]");
-	asm_lnk("segment .text\nlea rax, [eax + ebx]");
-	asm_lnk("segment .text\nlea rax, [ax + bx]");
-	ASSERT_THROWS(asm_lnk("segment .text\nlea rax, [rax + ebx]"), AssembleException);
-	ASSERT_THROWS(asm_lnk("segment .text\nlea rax, [rax + bx]"), AssembleException);
-	ASSERT_THROWS(asm_lnk("segment .text\nlea ax, [rax + bl]"), AssembleException);
-	ASSERT_THROWS(asm_lnk("segment .text\nlea ax, [eax + bx]"), AssembleException);
-	ASSERT_THROWS(asm_lnk("segment .text\nlea ax, [ax + bl]"), AssembleException);
-	ASSERT_THROWS(asm_lnk("segment .text\nlea ax, [al + bl]"), AssembleException);
-	ASSERT_THROWS(asm_lnk("segment .text\nlea ax, [ah + bl]"), AssembleException);
-	ASSERT_THROWS(asm_lnk("segment .text\nlea ax, [al + bh]"), AssembleException);
-	ASSERT_THROWS(asm_lnk("segment .text\nlea ax, [ah + bh]"), AssembleException);
-	ASSERT_THROWS(asm_lnk("segment .text\nlea ax, [rax * rbx]"), AssembleException);
-	ASSERT_THROWS(asm_lnk("segment .text\nlea ax, [eax * ebx]"), AssembleException);
-	ASSERT_THROWS(asm_lnk("segment .text\nlea ax, [ax * bx]"), AssembleException);
+	ASM_LNK("segment .text\nlea rax, [rax + rbx]");
+	ASM_LNK("segment .text\nlea rax, [eax + ebx]");
+	ASM_LNK("segment .text\nlea rax, [ax + bx]");
+	ASSERT_THROWS(ASM_LNK("segment .text\nlea rax, [rax + ebx]"), AssembleException);
+	ASSERT_THROWS(ASM_LNK("segment .text\nlea rax, [rax + bx]"), AssembleException);
+	ASSERT_THROWS(ASM_LNK("segment .text\nlea ax, [rax + bl]"), AssembleException);
+	ASSERT_THROWS(ASM_LNK("segment .text\nlea ax, [eax + bx]"), AssembleException);
+	ASSERT_THROWS(ASM_LNK("segment .text\nlea ax, [ax + bl]"), AssembleException);
+	ASSERT_THROWS(ASM_LNK("segment .text\nlea ax, [al + bl]"), AssembleException);
+	ASSERT_THROWS(ASM_LNK("segment .text\nlea ax, [ah + bl]"), AssembleException);
+	ASSERT_THROWS(ASM_LNK("segment .text\nlea ax, [al + bh]"), AssembleException);
+	ASSERT_THROWS(ASM_LNK("segment .text\nlea ax, [ah + bh]"), AssembleException);
+	ASSERT_THROWS(ASM_LNK("segment .text\nlea ax, [rax * rbx]"), AssembleException);
+	ASSERT_THROWS(ASM_LNK("segment .text\nlea ax, [eax * ebx]"), AssembleException);
+	ASSERT_THROWS(ASM_LNK("segment .text\nlea ax, [ax * bx]"), AssembleException);
 
-	asm_lnk("segment .text\nlea rax, [rax * 2]");
-	asm_lnk("segment .text\nlea rax, [2 * rax]");
-	ASSERT_THROWS(asm_lnk("segment .text\nlea rax, [2.0 * rax]"), AssembleException);
-	ASSERT_THROWS(asm_lnk("segment .text\nlea rax, [rax * 2.0]"), AssembleException);
+	ASM_LNK("segment .text\nlea rax, [rax * 2]");
+	ASM_LNK("segment .text\nlea rax, [2 * rax]");
+	ASSERT_THROWS(ASM_LNK("segment .text\nlea rax, [2.0 * rax]"), AssembleException);
+	ASSERT_THROWS(ASM_LNK("segment .text\nlea rax, [rax * 2.0]"), AssembleException);
 
-	asm_lnk("segment .text\nlea rax, [qword rax]");
-	asm_lnk("segment .text\nlea rax, [dword eax]");
-	asm_lnk("segment .text\nlea rax, [word ax]");
-	ASSERT_THROWS(asm_lnk("segment .text\nlea rax, [qword eax]"), AssembleException);
-	ASSERT_THROWS(asm_lnk("segment .text\nlea rax, [qword ax]"), AssembleException);
-	ASSERT_THROWS(asm_lnk("segment .text\nlea rax, [qword al]"), AssembleException);
-	ASSERT_THROWS(asm_lnk("segment .text\nlea rax, [qword ah]"), AssembleException);
-	ASSERT_THROWS(asm_lnk("segment .text\nlea rax, [dword rax]"), AssembleException);
-	ASSERT_THROWS(asm_lnk("segment .text\nlea rax, [dword ax]"), AssembleException);
-	ASSERT_THROWS(asm_lnk("segment .text\nlea rax, [dword al]"), AssembleException);
-	ASSERT_THROWS(asm_lnk("segment .text\nlea rax, [dword ah]"), AssembleException);
-	ASSERT_THROWS(asm_lnk("segment .text\nlea rax, [word rax]"), AssembleException);
-	ASSERT_THROWS(asm_lnk("segment .text\nlea rax, [word eax]"), AssembleException);
-	ASSERT_THROWS(asm_lnk("segment .text\nlea rax, [word al]"), AssembleException);
-	ASSERT_THROWS(asm_lnk("segment .text\nlea rax, [word ah]"), AssembleException);
-	ASSERT_THROWS(asm_lnk("segment .text\nlea rax, [byte rax]"), AssembleException);
-	ASSERT_THROWS(asm_lnk("segment .text\nlea rax, [byte rax]"), AssembleException);
-	ASSERT_THROWS(asm_lnk("segment .text\nlea rax, [byte ax]"), AssembleException);
-	ASSERT_THROWS(asm_lnk("segment .text\nlea rax, [byte al]"), AssembleException);
-	ASSERT_THROWS(asm_lnk("segment .text\nlea rax, [byte ah]"), AssembleException);
+	ASM_LNK("segment .text\nlea rax, [qword rax]");
+	ASM_LNK("segment .text\nlea rax, [dword eax]");
+	ASM_LNK("segment .text\nlea rax, [word ax]");
+	ASSERT_THROWS(ASM_LNK("segment .text\nlea rax, [qword eax]"), AssembleException);
+	ASSERT_THROWS(ASM_LNK("segment .text\nlea rax, [qword ax]"), AssembleException);
+	ASSERT_THROWS(ASM_LNK("segment .text\nlea rax, [qword al]"), AssembleException);
+	ASSERT_THROWS(ASM_LNK("segment .text\nlea rax, [qword ah]"), AssembleException);
+	ASSERT_THROWS(ASM_LNK("segment .text\nlea rax, [dword rax]"), AssembleException);
+	ASSERT_THROWS(ASM_LNK("segment .text\nlea rax, [dword ax]"), AssembleException);
+	ASSERT_THROWS(ASM_LNK("segment .text\nlea rax, [dword al]"), AssembleException);
+	ASSERT_THROWS(ASM_LNK("segment .text\nlea rax, [dword ah]"), AssembleException);
+	ASSERT_THROWS(ASM_LNK("segment .text\nlea rax, [word rax]"), AssembleException);
+	ASSERT_THROWS(ASM_LNK("segment .text\nlea rax, [word eax]"), AssembleException);
+	ASSERT_THROWS(ASM_LNK("segment .text\nlea rax, [word al]"), AssembleException);
+	ASSERT_THROWS(ASM_LNK("segment .text\nlea rax, [word ah]"), AssembleException);
+	ASSERT_THROWS(ASM_LNK("segment .text\nlea rax, [byte rax]"), AssembleException);
+	ASSERT_THROWS(ASM_LNK("segment .text\nlea rax, [byte rax]"), AssembleException);
+	ASSERT_THROWS(ASM_LNK("segment .text\nlea rax, [byte ax]"), AssembleException);
+	ASSERT_THROWS(ASM_LNK("segment .text\nlea rax, [byte al]"), AssembleException);
+	ASSERT_THROWS(ASM_LNK("segment .text\nlea rax, [byte ah]"), AssembleException);
 
-	asm_lnk("segment .text\nlea rax, [0]");
-	asm_lnk("segment .text\nlea rax, [qword 0]");
-	asm_lnk("segment .text\nlea rax, [dword 0]");
-	asm_lnk("segment .text\nlea rax, [word 0]");
-	ASSERT_THROWS(asm_lnk("segment .text\nlea rax, [byte 0]"), AssembleException);
-	ASSERT_THROWS(asm_lnk("segment .text\nlea rax, []"), AssembleException);
-	ASSERT_THROWS(asm_lnk("segment .text\nlea rax, [qword]"), AssembleException);
-	ASSERT_THROWS(asm_lnk("segment .text\nlea rax, [dword]"), AssembleException);
-	ASSERT_THROWS(asm_lnk("segment .text\nlea rax, [word]"), AssembleException);
-	ASSERT_THROWS(asm_lnk("segment .text\nlea rax, [byte]"), AssembleException);
+	ASM_LNK("segment .text\nlea rax, [0]");
+	ASM_LNK("segment .text\nlea rax, [qword 0]");
+	ASM_LNK("segment .text\nlea rax, [dword 0]");
+	ASM_LNK("segment .text\nlea rax, [word 0]");
+	ASSERT_THROWS(ASM_LNK("segment .text\nlea rax, [byte 0]"), AssembleException);
+	ASSERT_THROWS(ASM_LNK("segment .text\nlea rax, []"), AssembleException);
+	ASSERT_THROWS(ASM_LNK("segment .text\nlea rax, [qword]"), AssembleException);
+	ASSERT_THROWS(ASM_LNK("segment .text\nlea rax, [dword]"), AssembleException);
+	ASSERT_THROWS(ASM_LNK("segment .text\nlea rax, [word]"), AssembleException);
+	ASSERT_THROWS(ASM_LNK("segment .text\nlea rax, [byte]"), AssembleException);
 
-	asm_lnk("segment .text\nlea rax, [rax + rbx]");
-	ASSERT_THROWS(asm_lnk("segment .text\nlea rax, [rax * rbx]"), AssembleException);
-	ASSERT_THROWS(asm_lnk("segment .text\nlea rax, [rax / rbx]"), AssembleException);
-	ASSERT_THROWS(asm_lnk("segment .text\nlea rax, [rax / 2]"), AssembleException);
-	ASSERT_THROWS(asm_lnk("segment .text\nlea rax, [2 / rbx]"), AssembleException);
+	ASM_LNK("segment .text\nlea rax, [rax + rbx]");
+	ASSERT_THROWS(ASM_LNK("segment .text\nlea rax, [rax * rbx]"), AssembleException);
+	ASSERT_THROWS(ASM_LNK("segment .text\nlea rax, [rax / rbx]"), AssembleException);
+	ASSERT_THROWS(ASM_LNK("segment .text\nlea rax, [rax / 2]"), AssembleException);
+	ASSERT_THROWS(ASM_LNK("segment .text\nlea rax, [2 / rbx]"), AssembleException);
 }
 
 void asm_tests()

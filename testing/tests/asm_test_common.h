@@ -14,9 +14,10 @@
 struct AssembleException : std::runtime_error { using std::runtime_error::runtime_error; };
 struct LinkException : std::runtime_error { using std::runtime_error::runtime_error; };
 
+#define ASM_LNK(...) asm_lnk(TOSTR(__LINE__), { __VA_ARGS__ })
+
 // assembles and links the program(s) into an executable and loads it into the computer for execution.
 // if this fails, it throws an exception of some kind (AssembleException or LinkException for asm/lnk failure).
-std::unique_ptr<CSX64::Computer> asm_lnk(std::initializer_list<const char*> progs);
-inline std::unique_ptr<CSX64::Computer> asm_lnk(const char *prog) { return asm_lnk({ prog }); }
+std::unique_ptr<CSX64::Computer> asm_lnk(const char *loc, std::initializer_list<const char*> progs);
 
 #endif

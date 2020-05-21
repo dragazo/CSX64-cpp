@@ -197,15 +197,6 @@ namespace CSX64::detail
 	{"ST5", 5},
 	{"ST6", 6},
 	{"ST7", 7},
-
-	{"ST(0)", 0},
-	{"ST(1)", 1},
-	{"ST(2)", 2},
-	{"ST(3)", 3},
-	{"ST(4)", 4},
-	{"ST(5)", 5},
-	{"ST(6)", 6},
-	{"ST(7)", 7}
 	};
 
 	// Maps VPU register names (all caps) to tuples of (id, sizecode)
