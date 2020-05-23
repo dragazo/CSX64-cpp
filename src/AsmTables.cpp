@@ -312,7 +312,6 @@ namespace CSX64::detail
 	{"STATIC_ASSERT", [](AssembleArgs &args) { return args.TryProcessStaticAssert(); }},
 
 	{"SEGMENT", [](AssembleArgs &args) { return args.TryProcessSegment(); }},
-	{"SECTION", [](AssembleArgs &args) { return args.TryProcessSegment(); }},
 
 	{"INCBIN", [](AssembleArgs &args) { return args.TryProcessINCBIN(); }},
 

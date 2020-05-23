@@ -10,6 +10,7 @@ segment .text
 nop
 nop
 nop
+nop
 hlt
 nop
 hlt
@@ -29,6 +30,14 @@ nop
 )");
 	ASSERT(p);
 	u64 ticks;
+
+	ASSERT(p->running());
+	ticks = p->tick(0);
+	ASSERT_EQ(ticks, 0);
+
+	ASSERT(p->running());
+	ticks = p->tick(1);
+	ASSERT_EQ(ticks, 1);
 
 	ASSERT(p->running());
 	ticks = p->tick(20000);
@@ -56,7 +65,7 @@ nop
 	ticks = p->tick(2000);
 	ASSERT_EQ(ticks, 0);
 }
-void mov_imm_tests()
+void load_imm_tests()
 {
 	auto p = ASM_LNK(R"(
 segment .text
@@ -1372,7 +1381,7 @@ end: db 0 ; for string read test
 	ASM_LNK("segment .text\ntimes 2 nop");
 	ASSERT_THROWS(ASM_LNK("segment .text\ntimes 2.0 nop"), AssembleException);
 }
-void lea_tests()
+void addr_tests()
 {
 	auto p = ASM_LNK(R"(
 segment .text
@@ -1622,13 +1631,164 @@ times 24 nop
 	ASSERT_THROWS(ASM_LNK("segment .text\nlea rax, [rax / 2]"), AssembleException);
 	ASSERT_THROWS(ASM_LNK("segment .text\nlea rax, [2 / rbx]"), AssembleException);
 }
+void static_assert_tests()
+{
+	ASM_LNK("static_assert 1");
+	ASM_LNK("static_assert 2");
+	ASM_LNK("static_assert 39485");
+	ASM_LNK("static_assert -52353");
+	ASM_LNK("static_assert $repr64(12.4)"); // result of $repr64 is int
+	ASM_LNK("static_assert $repr32(-1.0)"); // result of $repr32 is int
+	ASSERT_THROWS(ASM_LNK("static_assert 0"), AssembleException);
+
+	// these fail just because of typing
+	ASSERT_THROWS(ASM_LNK("static_assert 0.0"), AssembleException);
+	ASSERT_THROWS(ASM_LNK("static_assert 1.0"), AssembleException);
+	ASSERT_THROWS(ASM_LNK("static_assert -12.5"), AssembleException);
+
+	// tests for optional second arg
+	ASM_LNK("static_assert 21, 'message'");
+	ASSERT_THROWS(ASM_LNK("static_assert 21, 12"), AssembleException);
+	ASSERT_THROWS(ASM_LNK("static_assert 21, 0"), AssembleException);
+	ASSERT_THROWS(ASM_LNK("static_assert 21, -5"), AssembleException);
+	ASSERT_THROWS(ASM_LNK("static_assert 21, 1.2"), AssembleException);
+	ASSERT_THROWS(ASM_LNK("static_assert 21, 0.0"), AssembleException);
+	ASSERT_THROWS(ASM_LNK("static_assert 21, -243"), AssembleException);
+}
+void align_tests()
+{
+	auto p = ASM_LNK(R"(
+segment .text
+start:
+mov r13, after_last_nop
+mov r14, rodata_seg_start
+mov r15, before_align
+mov rax, val
+mov rbx, also_val
+mov rcx, aft_val
+hlt
+
+mov rax, test_1_1
+mov rbx, test_1_2
+mov rcx, test_1_3
+mov rdx, test_1_4
+mov rsi, test_1_5
+hlt
+
+mov rax, test_2_1
+mov rbx, test_2_2
+mov rcx, test_2_3
+mov rdx, test_2_4
+mov rsi, test_2_5
+hlt
+
+mov eax, 0
+mov ebx, 0x654
+syscall
+times 4 nop
+
+times -($-start) & 7 nop ; add nop to pad text segment to multiple of 8 bytes
+nop_size_test:
+count: equ 5
+after_count:
+static_assert $-nop_size_test == 0
+static_assert $-after_count == 0
+static_assert after_count-nop_size_test == 0
+times count nop
+.aft:
+static_assert $-.aft == 0
+static_assert $-nop_size_test == count
+; we're now at align 8 + count
+static_assert ($-start) % 8 == count
+after_last_nop:
+
+segment .rodata
+rodata_seg_start: equ $$
+before_align:
+align 8
+val:
+also_val: db 1
+aft_val:
+
+test_1_1: align 1
+test_1_2: align 2
+test_1_3: align 4
+test_1_4: align 8
+test_1_5:
+
+test_2_1: align 8
+test_2_2: align 4
+test_2_3: align 2
+test_2_4: align 1
+test_2_5:
+)");
+	ASSERT(p);
+	u64 ticks, temp;
+
+	ASSERT(p->running());
+	ticks = p->tick(200000);
+	ASSERT_EQ(ticks, 6);
+	ASSERT_NEQ(p->r13(), p->r14());
+	ASSERT_EQ(p->r14(), p->r15());
+	ASSERT_EQ(p->r14(), p->rax());
+	ASSERT_EQ(p->rax(), p->rbx());
+	ASSERT(p->r15() % 8 == 0); // segments aligned to highest required alignment
+	ASSERT(p->rax() % 8 == 0);
+	ASSERT(p->rcx() % 8 == 1);
+	ASSERT_EQ(p->rbx() + 1, p->rcx());
+	temp = p->rcx();
+
+	ASSERT(p->running());
+	ticks = p->tick(200000);
+	ASSERT_EQ(ticks, 5);
+	ASSERT_EQ(temp + 0, p->rax());
+	ASSERT_EQ(temp + 0, p->rbx());
+	ASSERT_EQ(temp + 1, p->rcx());
+	ASSERT_EQ(temp + 3, p->rdx());
+	ASSERT_EQ(temp + 7, p->rsi());
+
+	ASSERT(p->running());
+	ticks = p->tick(200000);
+	ASSERT_EQ(ticks, 5);
+	ASSERT_EQ(temp + 7, p->rax());
+	ASSERT_EQ(temp + 7, p->rbx());
+	ASSERT_EQ(temp + 7, p->rcx());
+	ASSERT_EQ(temp + 7, p->rdx());
+	ASSERT_EQ(temp + 7, p->rsi());
+
+	ASSERT(p->running());
+	ticks = p->tick(20000);
+	ASSERT_EQ(ticks, 2);
+	ASSERT(!p->running());
+	ASSERT_EQ(p->error(), ErrorCode::None);
+	ASSERT_EQ(p->return_value(), 0x654);
+
+	ticks = p->tick(20000);
+	ASSERT_EQ(ticks, 0);
+
+	ASM_LNK("segment .rodata\nalign 1");
+	ASM_LNK("segment .rodata\nalign 2");
+	ASM_LNK("segment .rodata\nalign 4");
+	ASM_LNK("segment .rodata\nalign 8");
+	ASM_LNK("segment .rodata\nalign 16");
+	ASM_LNK("segment .rodata\nalign 32");
+	ASM_LNK("segment .rodata\nalign 64");
+	ASSERT_THROWS(ASM_LNK("segment .rodata\nalign -1"), AssembleException);
+	ASSERT_THROWS(ASM_LNK("segment .rodata\nalign 0"), AssembleException);
+	ASSERT_THROWS(ASM_LNK("segment .rodata\nalign 3"), AssembleException);
+	ASSERT_THROWS(ASM_LNK("segment .rodata\nalign 10"), AssembleException);
+	ASSERT_THROWS(ASM_LNK("segment .rodata\nalign 100"), AssembleException);
+	ASSERT_THROWS(ASM_LNK("segment .rodata\nalign 12.6"), AssembleException);
+}
 
 void asm_tests()
 {
 	RUN_TEST(nop_tests);
-	RUN_TEST(mov_imm_tests);
+	RUN_TEST(load_imm_tests);
 	RUN_TEST(expr_tests);
 	RUN_TEST(symbol_linkage_tests);
 	RUN_TEST(times_tests);
-	RUN_TEST(lea_tests);
+	RUN_TEST(addr_tests);
+	RUN_TEST(static_assert_tests);
+	RUN_TEST(align_tests);
 }

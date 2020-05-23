@@ -464,8 +464,9 @@ bool AssembleArgs::TryExtractExpr(const std::string &str, const std::size_t str_
 		// if we're past the end, there were unary ops with no operand
 		if (pos >= str_end) { res = {AssembleError::FormatError, "line " + tostr(line) + ": Unary ops encountered without an operand"}; return false; }
 
-		int depth = 0;  // parens depth - initially 0
-		int quote = -1; // index of current quote char - initially not in one
+		constexpr std::size_t npos = ~(std::size_t)0;
+		std::size_t depth = 0;    // parens depth - initially 0
+		std::size_t quote = npos; // index of current quote char - initially not in one
 
 		bool numeric = std::isdigit((unsigned char)str[pos]); // flag if this is a numeric literal
 
@@ -473,7 +474,7 @@ bool AssembleArgs::TryExtractExpr(const std::string &str, const std::size_t str_
 		for (end = pos; end < str_end; ++end)
 		{
 			// if we're not in a quote
-			if (quote < 0)
+			if (quote == npos)
 			{
 				// account for important characters
 				if (str[end] == '(' && (depth != 0 || end == pos)) ++depth;
@@ -483,20 +484,20 @@ bool AssembleArgs::TryExtractExpr(const std::string &str, const std::size_t str_
 					else break; // otherwise this marks the end of the expression
 				}
 				else if (numeric && (str[end] == 'e' || str[end] == 'E') && end + 1 < str_end && (str[end + 1] == '+' || str[end + 1] == '-')) ++end; // make sure an exponent sign won't be parsed as binary + or - by skipping it
-				else if (str[end] == '"' || str[end] == '\'' || str[end] == '`') quote = (int)end; // quotes mark start of a string
+				else if (str[end] == '"' || str[end] == '\'' || str[end] == '`') quote = end; // quotes mark start of a string
 				else if (depth == 0 && (std::isspace((unsigned char)str[end]) || str[end] == '(' || TryGetOp(str, end, bin_op, bin_op_len))) break; // break on white space, open paren, or binary op - only at depth 0
 			}
 			// otherwise we're in a quote
 			else
 			{
 				// if we have a matching quote, end quote mode
-				if (str[end] == str[quote]) quote = -1;
+				if (str[end] == str[quote]) quote = npos;
 			}
 		}
 		// if depth isn't back to 0, there was a parens mismatch
 		if (depth != 0) { res = {AssembleError::FormatError, "line " + tostr(line) + ": Mismatched parenthesis in expression"}; return false; }
-		// if quote isn't back to -1, there was a quote mismatch
-		if (quote >= 0) { res = {AssembleError::FormatError, "line " + tostr(line) + ": Mismatched quotation in expression"}; return false; }
+		// if quote isn't back to npos, there was a quote mismatch
+		if (quote != npos) { res = {AssembleError::FormatError, "line " + tostr(line) + ": Mismatched quotation in expression"}; return false; }
 		// if pos == end we'll have an empty token (e.g. expression was just a binary op)
 		if (pos == end) { res = {AssembleError::FormatError, "line " + tostr(line) + ": Empty token encountered in expression"}; return false; }
 
@@ -852,17 +853,17 @@ std::unique_ptr<Expr> AssembleArgs::Ptrdiff(std::unique_ptr<Expr> expr)
 	for (const std::string &seg_name : PtrdiffIDs)
 	{
 		// i and j incremented after each pass to ensure same pair isn't matched next time
-		for (int i = 0, j = 0; ; ++i, ++j)
+		for (std::size_t i = 0, j = 0; ; ++i, ++j)
 		{
 			// wind i up to next add label
-			for (; i < (int)add.size() && !TryExtractPtrVal(&add[i], a, seg_name); ++i);
+			for (; i < add.size() && !TryExtractPtrVal(&add[i], a, seg_name); ++i);
 			// if this exceeds bounds, break
-			if (i >= (int)add.size()) break;
+			if (i >= add.size()) break;
 
 			// wind j up to next sub label
-			for (; j < (int)sub.size() && !TryExtractPtrVal(&sub[j], b, seg_name); ++j);
+			for (; j < sub.size() && !TryExtractPtrVal(&sub[j], b, seg_name); ++j);
 			// if this exceeds bounds, break
-			if (j >= (int)sub.size()) break;
+			if (j >= sub.size()) break;
 
 			// we got a pair: replace items in add/sub with their pointer values
 			// if extract succeeded but returned null, the "missing" value is zero - just remove from the list
@@ -1415,7 +1416,7 @@ bool AssembleArgs::TryProcessDeclare(u64 size)
 	bool explicit_size, strict;
 
 	// for each argument (not using foreach because order is incredibly important and i'm paranoid)
-	for (int i = 0; i < (int)args.size(); ++i)
+	for (std::size_t i = 0; i < args.size(); ++i)
 	{
 		// if it's a string
 		if (TryExtractStringChars(args[i], chars, err))
@@ -1506,13 +1507,14 @@ bool AssembleArgs::TryProcessStaticAssert()
 	std::string err;
 	Expr::Result r = expr.Evaluate(file.Symbols, err);
 	if (!r.evaluated()) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Expected a critical expression\n-> " + err}; return false; }
+	if (r.floating) { res = { AssembleError::UsageError, "line " + tostr(line) + ": Argument to STATIC_ASSERT may not be floating point" }; return false; }
 
 	// get the assertion message
 	std::string msg;
 	if (args.size() == 2 && !TryExtractStringChars(args[1], msg, err)) { res = {AssembleError::UsageError, "line " + tostr(line) + ": Second (optional) argument was not a string\n-> " + err}; return false; }
 
 	// if the assertion failed, assembly fails
-	if (IsZero(r.val, r.floating)) { res = { AssembleError::Assertion, "line " + tostr(line) + ": Assertion failed" + (args.size() == 2 ? " - " : "") + msg }; return false; }
+	if (r.val == 0) { res = { AssembleError::Assertion, "line " + tostr(line) + ": Assertion failed" + (args.size() == 2 ? " - " : "") + msg }; return false; }
 
 	return true;
 }
